@@ -1,0 +1,7 @@
+<?xml version="1.0"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32" role="img" aria-label="PLX">
+
+  <rect x="0.5" y="0.5" width="31" height="31" fill="#FBF9F5" stroke="#1B1A17" stroke-width="1"></rect>
+  <text class="num" x="4" y="11">14</text>
+  <text class="sym" x="29" y="28" text-anchor="end">Px</text>
+</svg>
