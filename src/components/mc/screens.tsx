@@ -7,7 +7,9 @@ import { AgentFeed } from "./agent-feed";
 import { BucketDetail } from "./bucket-detail";
 import { InboxView } from "./inbox";
 import type { Screen, ScreenProps } from "./route";
+import { TaskDetailView } from "./task-detail";
 import { TraceabilityMatrix } from "./traceability";
+import { WorkViews } from "./work-views";
 
 const SCREEN_TITLES: Record<Screen, string> = {
   home: "Inbox",
@@ -52,14 +54,14 @@ function comingSoon(screen: Screen): ComponentType<ScreenProps> {
 
 export const SCREENS: Record<Screen, ComponentType<ScreenProps>> = {
   home: InboxView,
-  board: comingSoon("board"),
-  list: comingSoon("list"),
-  timeline: comingSoon("timeline"),
+  board: WorkViews,
+  list: WorkViews,
+  timeline: WorkViews,
   matrix: TraceabilityMatrix,
   feed: AgentFeed,
   bucket: BucketDetail,
   repos: comingSoon("repos"),
   files: comingSoon("files"),
   sync: comingSoon("sync"),
-  task: comingSoon("task"),
+  task: TaskDetailView,
 };
