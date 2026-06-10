@@ -1,0 +1,134 @@
+/* ──────────────────────────────────────────────────────────────────────────
+   PLX BRAND TOKEN OVERLAY -- RUNTIME MIRROR
+   ──────────────────────────────────────────────────────────────────────────
+
+   This file is a RUNTIME MIRROR of:
+       docs/design-system/tokens.css
+
+   The canonical SPEC lives in docs/design-system/tokens.css and is the
+   file designers and the design-system bundle ship updates against.
+   This portal copy exists because Next.js 16's Turbopack dev server
+   refuses to import CSS files from outside the Next.js project root
+   (see https://github.com/vercel/next.js -- "leaves the filesystem
+   root" panic on cross-directory @import).
+
+   KEEP THESE TWO FILES IN SYNC. If you edit values here, mirror them
+   to docs/design-system/tokens.css (and vice versa). Token drift
+   between the two files is a hygiene failure.
+
+   ────────────────────────────────────────────────────────────────────────── */
+
+/* ─── 1. BRAND PALETTE — light scheme ───────────────────────────────────── */
+
+:root {
+  --p-paper:        #FBF9F5;
+  --p-paper-2:      #F6F2EA;
+  --p-card:         #FBF9F5;
+
+  --p-ink:          #1B1A17;
+  --p-ink-2:        #3A3833;
+  --p-muted:        #807A6F;
+
+  --p-grid:         rgba(27, 26, 23, 0.16);
+  --p-grid-2:       rgba(27, 26, 23, 0.08);
+
+  --p-accent:       #244A39;
+  --p-accent-soft:  #BCCFBF;
+
+  --p-ok:           #5C7A55;
+  --p-warn:         #C99340;
+  --p-info:         #5B7B91;
+  --p-hot:          #52606E;
+
+  /* Mazius Display is loaded via next/font/local; Inter and JetBrains Mono are
+     loaded via next/font/google. All are exposed on <html> by app/layout.tsx. */
+  --p-font-serif:   var(--font-mazius-display, "Mazius Display"), "Times New Roman", Georgia, serif;
+  --p-font-sans:    var(--font-inter, "Inter"), "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+  --p-font-mono:    var(--font-jetbrains-mono, "JetBrains Mono"), "IBM Plex Mono", ui-monospace, monospace;
+
+  --p-text-display: 56px;
+  --p-text-h1:      32px;
+  --p-text-h2:      24px;
+  --p-text-h3:      18px;
+  --p-text-body:    14px;
+  --p-text-small:   12px;
+  --p-text-mono:    11px;
+  --p-text-meta:    10px;
+  --p-text-kicker:  9.5px;
+  --p-text-tick:    9px;
+
+  --p-track-tick:   0.22em;
+  --p-track-meta:   0.16em;
+  --p-track-data:   0.04em;
+
+  --p-radius:       4px;
+  --p-radius-sm:    3px;
+  --p-radius-lg:    6px;
+
+  --p-space-1:      4px;
+  --p-space-2:      8px;
+  --p-space-3:      14px;
+  --p-space-4:      22px;
+  --p-space-5:      32px;
+  --p-space-6:      48px;
+  --p-space-7:      72px;
+
+  --p-ease:         cubic-bezier(0.2, 0.8, 0.2, 1);
+  --p-dur-fast:     120ms;
+  --p-dur:          180ms;
+  --p-dur-slow:     320ms;
+}
+
+/* ─── 2. BRAND PALETTE — dark scheme ────────────────────────────────────── */
+
+.dark {
+  --p-paper:        #1A1816;
+  --p-paper-2:      #22201D;
+  --p-card:         #1A1816;
+  --p-ink:          #F1ECE0;
+  --p-ink-2:        #C9C2B5;
+  --p-muted:        #827B6F;
+  --p-grid:         rgba(241, 236, 224, 0.12);
+  --p-grid-2:       rgba(241, 236, 224, 0.06);
+  --p-accent:       #7AB18C;
+  --p-accent-soft:  #2D4D3B;
+  --p-ok:           #7A9E6F;
+  --p-warn:         #D9A85C;
+  --p-info:         #7A9DB3;
+  --p-hot:          #8FA0B0;
+}
+
+/* ─── 3. shadcn TOKEN REMAP ─────────────────────────────────────────────── */
+
+:root[data-brand="plx"],
+.brand-plx {
+  --background:           var(--p-paper);
+  --foreground:           var(--p-ink);
+  --card:                 var(--p-paper);
+  --card-foreground:      var(--p-ink);
+  --popover:              var(--p-paper);
+  --popover-foreground:   var(--p-ink);
+  --primary:              var(--p-ink);
+  --primary-foreground:   var(--p-paper);
+  --secondary:            var(--p-paper-2);
+  --secondary-foreground: var(--p-ink);
+  --muted:                var(--p-paper-2);
+  --muted-foreground:     var(--p-muted);
+  --accent:               var(--p-accent-soft);
+  --accent-foreground:    var(--p-accent);
+  --destructive:          var(--p-hot);
+  --destructive-foreground: var(--p-paper);
+  --border:               var(--p-grid);
+  --input:                var(--p-grid);
+  --ring:                 var(--p-accent);
+  --radius:               var(--p-radius);
+}
+
+/* ─── 4. UTILITY CLASSES ────────────────────────────────────────────────── */
+
+.p-serif    { font-family: var(--p-font-serif); font-weight: 400; }
+.p-mono     { font-family: var(--p-font-mono); font-variant-numeric: tabular-nums; }
+.p-kicker   { font-family: var(--p-font-mono); font-size: var(--p-text-kicker); letter-spacing: var(--p-track-tick); text-transform: uppercase; color: var(--p-muted); }
+.p-meta     { font-family: var(--p-font-mono); font-size: var(--p-text-meta); letter-spacing: var(--p-track-meta); text-transform: uppercase; color: var(--p-muted); }
+.p-data     { font-family: var(--p-font-mono); font-variant-numeric: tabular-nums; letter-spacing: var(--p-track-data); }
+.p-hairline { border: 0; border-top: 1px solid var(--p-grid); margin: 0; }

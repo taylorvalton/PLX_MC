@@ -1,0 +1,182 @@
+/* ──────────────────────────────────────────────────────────────────────────
+   PLX DESIGN SYSTEM — BRAND TOKEN OVERLAY
+   ──────────────────────────────────────────────────────────────────────────
+
+   This file is the SPEC -- the design-system source of truth that
+   designers and the design-system handoff bundle ship updates against.
+
+   The RUNTIME copy that the Next.js portal actually imports lives at:
+       portal/src/styles/brand-tokens.css
+
+   Why two files: Next.js 16's Turbopack dev server refuses to import
+   CSS files from outside the Next.js project root (it panics with
+   "leaves the filesystem root" on cross-directory @import). The portal
+   keeps its own copy so the dev compiler is happy.
+
+   KEEP THESE TWO FILES IN SYNC. Token drift between this spec and the
+   portal runtime mirror is a hygiene failure.
+
+   It is designed to layer ON TOP of the existing shadcn/ui tokens in
+   portal/src/app/globals.css. It does NOT replace shadcn variables; it
+   adds a parallel `--p-*` namespace AND remaps a curated set of shadcn
+   variables (--primary, --background, --card, --border, etc.) to the
+   brand values.
+
+   COLOR SPACE: Hex now, OKLCH later. Hex chosen for v0 to match the
+   design artifacts byte-for-byte and avoid OKLCH conversion ambiguity
+   during the first production port. Convert to OKLCH in v1 once
+   visual parity is verified.
+
+   ────────────────────────────────────────────────────────────────────────── */
+
+/* ─── 1. BRAND PALETTE — light scheme ───────────────────────────────────── */
+
+:root {
+  /* surfaces — SYSTEM A · Document model.
+     paper is first-class: page, cards, and every primary surface use --p-paper.
+     paper-2 is the recess: rails, footers, hover/active states, Sealed bands,
+     stamped content emphasis. --p-card is retired (aliased to paper) — do not
+     use in new code; see design-system/decisions/ADR-002-surface-architecture.md. */
+  --p-paper:        #FBF9F5;          /* 1° — page + cards (primary surface) */
+  --p-paper-2:      #F6F2EA;          /* 2° — recess: rails, footers, hovers */
+  --p-card:         #FBF9F5;          /* deprecated alias — was #F2EDE2 */
+
+  /* text — three steps of warm near-black */
+  --p-ink:          #1B1A17;          /* primary text */
+  --p-ink-2:        #3A3833;          /* secondary text, body */
+  --p-muted:        #807A6F;          /* tertiary, mono labels */
+
+  /* hairlines — translucent ink for compound borders */
+  --p-grid:         rgba(27, 26, 23, 0.16);
+  --p-grid-2:       rgba(27, 26, 23, 0.08);
+
+  /* brand accent — forest */
+  --p-accent:       #244A39;          /* primary action, active state */
+  --p-accent-soft:  #BCCFBF;          /* tints, accent backgrounds */
+
+  /* status — muted earth-tones, NOT saturated alarm colors */
+  --p-ok:           #5C7A55;          /* sage — approved / live / signed */
+  --p-warn:         #C99340;          /* amber — pending / in review / open flag */
+  --p-info:         #5B7B91;          /* steel — informational */
+  --p-hot:          #52606E;          /* mineral — destructive ONLY (was rust #B84E32) */
+
+  /* type stacks — load fonts in app/layout.tsx, see MIGRATION-PLAN §4
+     Mazius Display is loaded via next/font/local; Inter and JetBrains Mono are
+     loaded via next/font/google. All are exposed on <html> by app/layout.tsx. */
+  --p-font-serif:   var(--font-mazius-display, "Mazius Display"), "Times New Roman", Georgia, serif;
+  --p-font-sans:    var(--font-inter, "Inter"), "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+  --p-font-mono:    var(--font-jetbrains-mono, "JetBrains Mono"), "IBM Plex Mono", ui-monospace, monospace;
+
+  /* type scale — editorial, generous */
+  --p-text-display: 56px;             /* page heroes, login moments */
+  --p-text-h1:      32px;             /* section titles in folio */
+  --p-text-h2:      24px;             /* subsection */
+  --p-text-h3:      18px;             /* card titles */
+  --p-text-body:    14px;             /* body */
+  --p-text-small:   12px;             /* captions */
+  --p-text-mono:    11px;             /* default mono */
+  --p-text-meta:    10px;             /* compact metadata */
+  --p-text-kicker:  9.5px;            /* high-tracking kicker labels */
+  --p-text-tick:    9px;              /* chassis ticks, kicker labels */
+
+  /* letter-spacing — mono labels need air */
+  --p-track-tick:   0.22em;
+  --p-track-meta:   0.16em;
+  --p-track-data:   0.04em;
+
+  /* radius — nearly sharp; we are not a SaaS app with squishy buttons */
+  --p-radius:       4px;
+  --p-radius-sm:    3px;
+  --p-radius-lg:    6px;
+
+  /* spacing — multiples of 4 with a 14 break for editorial rhythm */
+  --p-space-1:      4px;
+  --p-space-2:      8px;
+  --p-space-3:      14px;
+  --p-space-4:      22px;
+  --p-space-5:      32px;
+  --p-space-6:      48px;
+  --p-space-7:      72px;
+
+  /* motion — short, decisive */
+  --p-ease:         cubic-bezier(0.2, 0.8, 0.2, 1);
+  --p-dur-fast:     120ms;
+  --p-dur:          180ms;
+  --p-dur-slow:     320ms;
+}
+
+/* ─── 2. BRAND PALETTE — dark scheme ────────────────────────────────────── */
+
+.dark {
+  --p-paper:        #1A1816;
+  --p-paper-2:      #22201D;
+  --p-card:         #1A1816;          /* deprecated alias — was #272421 */
+  --p-ink:          #F1ECE0;
+  --p-ink-2:        #C9C2B5;
+  --p-muted:        #827B6F;
+  --p-grid:         rgba(241, 236, 224, 0.12);
+  --p-grid-2:       rgba(241, 236, 224, 0.06);
+  --p-accent:       #7AB18C;
+  --p-accent-soft:  #2D4D3B;
+  --p-ok:           #7A9E6F;
+  --p-warn:         #D9A85C;
+  --p-info:         #7A9DB3;
+  --p-hot:          #8FA0B0;          /* mineral, lifted for dark mode (was #E26648) */
+}
+
+/* ─── 3. shadcn TOKEN REMAP ─────────────────────────────────────────────── */
+/* When the brand layer is active (body[data-brand="plx"] or .brand-plx),
+   the standard shadcn tokens point at the brand palette. This is what
+   makes existing shadcn components inherit the brand voice without code
+   changes. Pages that should NOT be brand-skinned (e.g. the public
+   homepage with its purple/rose gradient) simply omit the data attribute
+   or class. */
+
+:root[data-brand="plx"],
+.brand-plx {
+  --background:           var(--p-paper);
+  --foreground:           var(--p-ink);
+  --card:                 var(--p-paper);     /* Document model: cards = paper + border */
+  --card-foreground:      var(--p-ink);
+  --popover:              var(--p-paper);
+  --popover-foreground:   var(--p-ink);
+  --primary:              var(--p-ink);          /* default action: ink-on-paper */
+  --primary-foreground:   var(--p-paper);
+  --secondary:            var(--p-paper-2);
+  --secondary-foreground: var(--p-ink);
+  --muted:                var(--p-paper-2);
+  --muted-foreground:     var(--p-muted);
+  --accent:               var(--p-accent-soft);  /* hover tint */
+  --accent-foreground:    var(--p-accent);
+  --destructive:          var(--p-hot);
+  --destructive-foreground: var(--p-paper);
+  --border:               var(--p-grid);
+  --input:                var(--p-grid);
+  --ring:                 var(--p-accent);
+  --radius:               var(--p-radius);
+}
+
+/* ─── 4. UTILITY CLASSES ────────────────────────────────────────────────── */
+/* Small set of brand-only utility classes for the editorial moments
+   shadcn doesn't cover. Keep this list short — most styling should
+   happen via shadcn primitives + brand tokens, not custom classes. */
+
+.p-serif    { font-family: var(--p-font-serif); font-weight: 400; }
+.p-mono     { font-family: var(--p-font-mono); font-variant-numeric: tabular-nums; }
+.p-kicker   { font-family: var(--p-font-mono); font-size: var(--p-text-kicker); letter-spacing: var(--p-track-tick); text-transform: uppercase; color: var(--p-muted); }
+.p-meta     { font-family: var(--p-font-mono); font-size: var(--p-text-meta); letter-spacing: var(--p-track-meta); text-transform: uppercase; color: var(--p-muted); }
+.p-data     { font-family: var(--p-font-mono); font-variant-numeric: tabular-nums; letter-spacing: var(--p-track-data); }
+.p-hairline { border: 0; border-top: 1px solid var(--p-grid); margin: 0; }
+
+/* ─── 5. NOTES ──────────────────────────────────────────────────────────── */
+/*
+   - The `--p-*` namespace is intentional. It signals "brand layer" and
+     prevents collisions with shadcn or any future package's token names.
+   - Tokens here are SOURCE OF TRUTH. tokens.ts is a generated mirror;
+     never edit values there directly.
+   - For Tailwind v4 utilities like `bg-paper` or `text-ink`, see
+     MIGRATION-PLAN §3.2 — a small @theme inline block in globals.css
+     exposes these as Tailwind classes.
+   - Mazius Display ships from portal/public/fonts/mazius under the SIL Open Font License.
+     Times New Roman remains only as a runtime fallback if the webfont fails to load.
+*/
