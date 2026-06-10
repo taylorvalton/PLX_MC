@@ -3,9 +3,12 @@
 // touches nothing else in this file; unbuilt screens fall back to ComingSoon.
 import type { ComponentType } from "react";
 
+import { AgentFeed } from "./agent-feed";
+import { BucketDetail } from "./bucket-detail";
 import { InboxView } from "./inbox";
 import type { Screen, ScreenProps } from "./route";
 import { TaskDetailView } from "./task-detail";
+import { TraceabilityMatrix } from "./traceability";
 import { WorkViews } from "./work-views";
 
 const SCREEN_TITLES: Record<Screen, string> = {
@@ -54,9 +57,9 @@ export const SCREENS: Record<Screen, ComponentType<ScreenProps>> = {
   board: WorkViews,
   list: WorkViews,
   timeline: WorkViews,
-  matrix: comingSoon("matrix"),
-  feed: comingSoon("feed"),
-  bucket: comingSoon("bucket"),
+  matrix: TraceabilityMatrix,
+  feed: AgentFeed,
+  bucket: BucketDetail,
   repos: comingSoon("repos"),
   files: comingSoon("files"),
   sync: comingSoon("sync"),
