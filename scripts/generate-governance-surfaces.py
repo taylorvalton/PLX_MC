@@ -47,7 +47,7 @@ def load_contract() -> dict:
     if not CONTRACT.exists():
         print(f"ERROR: {CONTRACT} not found", file=sys.stderr)
         sys.exit(1)
-    return yaml.safe_load(CONTRACT.read_text())
+    return yaml.safe_load(CONTRACT.read_text(encoding="utf-8"))
 
 
 def _bullets(items: list[str]) -> list[str]:
@@ -138,26 +138,26 @@ def main() -> int:
         if not path.exists():
             print(f"WARN: marker file missing, skipping: {rel}", file=sys.stderr)
             continue
-        current = path.read_text()
+        current = path.read_text(encoding="utf-8")
         expected = spliced(current, block)
         if current != expected:
             if check_mode:
                 drifted.append(rel)
             else:
-                path.write_text(expected)
+                path.write_text(expected, encoding="utf-8", newline="\n")
                 print(f"updated {rel}")
 
     rule_rel = surfaces.get("rule_file")
     if rule_rel:
         path = ROOT / rule_rel
         expected = expected_rule_file(block)
-        current = path.read_text() if path.exists() else ""
+        current = path.read_text(encoding="utf-8") if path.exists() else ""
         if current != expected:
             if check_mode:
                 drifted.append(rule_rel)
             else:
                 path.parent.mkdir(parents=True, exist_ok=True)
-                path.write_text(expected)
+                path.write_text(expected, encoding="utf-8", newline="\n")
                 print(f"updated {rule_rel}")
 
     if check_mode:

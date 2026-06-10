@@ -1,0 +1,37 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    name: Preflight + full suite
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Python dependencies (governance tooling)
+        run: pip install -r requirements.txt
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+
+      - name: Install Node dependencies
+        run: |
+          if [ -f package.json ]; then npm ci; fi
+
+      - name: Policy gate (same command agents run locally)
+        run: ./scripts/preflight.sh --mode ci
+
+      - name: Full suite (same command as pre-push)
+        run: ./scripts/preflight.sh --mode pre-push

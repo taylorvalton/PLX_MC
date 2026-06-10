@@ -37,6 +37,11 @@ APPROVED_ROOT_FILES = {
     "package.json",
     "package-lock.json",
     "tsconfig.json",
+    "next.config.ts",
+    "next-env.d.ts",
+    "postcss.config.mjs",
+    "eslint.config.mjs",
+    "components.json",
     ".gitignore",
     ".pre-commit-config.yaml",
 }

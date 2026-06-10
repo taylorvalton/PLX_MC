@@ -1,0 +1,48 @@
+---
+description: Run the full CI pipeline locally before every push
+globs:
+alwaysApply: true
+---
+
+# Local CI Before Push
+
+## The Rule
+
+NEVER push code to a remote branch without first running the full CI pipeline
+locally. GitHub Actions is not your test runner.
+
+## Why This Exists
+
+In the parent project, a session once spent 8+ CI round-trips debugging
+failures that could have been caught locally in under 2 minutes. Each push
+burned Actions minutes, added a multi-minute feedback delay, and wasted tokens
+repeating the same fix-push-wait-read-fix cycle.
+
+## Before Every Push — Run These Locally
+
+```bash
+./scripts/preflight.sh --mode pre-commit   # commit-time quick gate
+./scripts/preflight.sh --mode pre-push     # push-time full gate
+```
+
+`scripts/preflight.sh` is the canonical wrapper used by local hooks, agent
+sessions, and CI. All three surfaces run the same command — there is exactly
+one definition of "passing."
+
+## If Adding Dependencies
+
+- Add Python deps to BOTH `requirements.txt` AND `pyproject.toml`, then verify
+  a clean install (the canary test must still import everything).
+- For Node deps, run the install, commit the lockfile, and re-run typecheck.
+
+## If Changing Lint Config
+
+Run the full lint pass locally BEFORE committing. Never promote a rule to
+`error` if the codebase has unfixed violations — fix them in the same PR or
+keep the rule at `warn`.
+
+## Stop on Unexpected Tracked-File Mutation
+
+If running tests or local CI mutates tracked files outside your feature area,
+stop and inspect before committing. A passing test that dirties unrelated
+tracked files is a hygiene problem, not "just noise."
