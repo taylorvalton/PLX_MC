@@ -1,4 +1,6 @@
 @import "../styles/brand-tokens.css";
+@import "../styles/mc-surface.css";
+@import "../styles/mc-app.css";
 
 * {
   box-sizing: border-box;

@@ -16,6 +16,30 @@
 
 ## Lessons
 
+### 2026-06-10 (ET) — Killed an unrelated dev server with a too-broad process filter
+
+- **What happened:** While clearing stray Next dev servers for this repo, a
+  `node.exe` CommandLine filter of `next|PLX_MC` also matched and killed the
+  operator's separate `vmc-web` dev server (port 3100). It was restarted to
+  restore prior state.
+- **Root cause:** The kill filter matched any process mentioning the framework
+  name, not just this repository.
+- **Rule going forward:** Scope process kills to this repo's full path
+  (`C:\Users\agentic-winrm\PLX_MC`), never a bare framework name; print and
+  eyeball the match list before issuing `Stop-Process`.
+
+### 2026-06-10 (ET) — `localhost` in the IDE browser is not this box
+
+- **What happened:** The IDE browser showed a different app at
+  `http://localhost:3000` than this box's dev server; the browser runs on the
+  operator's machine, so `localhost` resolved there.
+- **Root cause:** Browser and dev server are on different hosts; the dev server
+  is reachable only via this box's Tailscale IP, and Next blocks cross-origin
+  `_next` dev assets by default (so the page renders but never hydrates).
+- **Rule going forward:** View this box's dev server via its Network/Tailscale
+  URL (printed by `next dev`) and add that origin to `allowedDevOrigins` in
+  `next.config.ts` so client chunks load and hydration works.
+
 ### 2026-06-10 (ET) — Reported files missing without fetching first
 
 - **What happened:** The founding session reported `starter-kit/` absent and

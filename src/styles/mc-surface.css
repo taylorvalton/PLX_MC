@@ -1,0 +1,42 @@
+/* ──────────────────────────────────────────────────────────────────────────
+   MISSION CONTROL SURFACE LAYER — scoped under `.mc`
+   ──────────────────────────────────────────────────────────────────────────
+
+   The PLX runtime token mirror (src/styles/brand-tokens.css, the Portal brand
+   authority) ships --p-paper / --p-ink / --p-accent / ... but NOT the
+   document-model surface tokens --p-rail and --p-canvas. Mission Control's own
+   design system (docs/product/DESIGN_TOKENS.md §1-2) treats the three-layer
+   rail < canvas < paper hierarchy as fundamental to the instrument-panel look.
+
+   This layer ADDS the two missing tokens for the MC surface only — it does NOT
+   alter any existing --p-* value (those stay the Portal's verbatim). Values are
+   taken from DESIGN_TOKENS.md and match the precedent already in the bundle
+   (src/styles/mrp-design.css `.mrp-shell`). Decision recorded in
+   docs/design-system/decisions/ADR-004-mission-control-surface-tokens.md.
+
+   It also aliases the prototype font var names (--mazius/--sans/--mono) onto the
+   canonical --p-font-* tokens so the ported skin (mc-app.css) reads cleanly.
+   ────────────────────────────────────────────────────────────────────────── */
+
+.mc {
+  /* Added surface tokens (light) — fill the rail/canvas gap, no value changes. */
+  --p-rail: #eeebe3;
+  --p-canvas: #f5f3ec;
+
+  /* Font-name bridge to the canonical tokens loaded by app/layout.tsx. */
+  --mazius: var(--p-font-serif);
+  --sans: var(--p-font-sans);
+  --mono: var(--p-font-mono);
+
+  min-height: 100vh;
+  background: var(--p-canvas);
+  color: var(--p-ink);
+  font-family: var(--sans);
+  font-feature-settings: "ss01", "ss02";
+}
+
+.mc.dark,
+.dark .mc {
+  --p-rail: #16140f;
+  --p-canvas: #1a1816;
+}

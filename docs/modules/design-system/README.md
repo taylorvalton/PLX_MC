@@ -25,7 +25,9 @@ language. See `docs/design-system/decisions/ADR-003-mission-control-surface.md`.
 - Brand authority lives upstream in `plx-customer-portal`; token value changes
   sync from there with provenance recorded in
   `docs/design-system/HANDOFF-README.md`. Surface-local ADRs (layout, chrome)
-  may be added here without upstream sign-off.
+  may be added here without upstream sign-off — e.g. ADR-004 adds the missing
+  `--p-rail`/`--p-canvas` surface tokens for the `.mc` shell without changing
+  any existing token value.
 - Responsive governance: exactly three breakpoints (≥1025 / 641–1024 / ≤640),
   44px touch targets, tables are the only horizontal-scroll surface.
 

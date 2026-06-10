@@ -2,11 +2,13 @@
 
 ## What
 
-The Next.js (App Router) application shell — the Mission Control UI. Currently
-a scaffold: root layout (fonts, favicon metadata, global CSS) and a branded
-placeholder home page. It owns routing, screens, and client state only — it is
-NOT the system of record (SharePoint is) and NOT the sync engine (a future
-`sync` module per `docs/product/SHAREPOINT_INTEGRATION.md`).
+The Next.js (App Router) application shell — the Mission Control UI. Today it
+ships the shared chrome (Topbar + Sidebar), the **Inbox/home** screen, a
+client shell with a working dark-mode toggle, and a typed prototype data layer.
+Screens not yet built render an honest "not built yet" panel. It owns routing,
+screens, and client state only — it is NOT the system of record (SharePoint is)
+and NOT the sync engine (a future `sync` module per
+`docs/product/SHAREPOINT_INTEGRATION.md`).
 
 ## Why
 
@@ -22,8 +24,13 @@ pixel-precisely in `docs/product/README.md` §6 and
   `docs/design-system/HANDOFF-README.md` §5 (three font families as CSS
   variables on `<html>`, tokens imported in `globals.css`, branded routes
   wrapped in `<BrandBoundary>`).
-- Rebuild screens from the handoff spec — treat `docs/product/prototype/` as
-  the look/behavior spec, never as code to lift verbatim.
+- The screens live in `src/components/mc/`; they read a typed prototype data
+  layer in `src/lib/mc-data/` (faithful to `docs/product/DATA_MODEL.md`) that is
+  swapped for the API at the sync-engine milestone. Each new screen is rebuilt
+  from the handoff spec — treat `docs/product/prototype/` as the look/behavior
+  spec, never as code to lift verbatim — and adds its own data + CSS block.
+- The `.mc` shell opts into the PLX brand boundary and adds two surface tokens
+  (`--p-rail`, `--p-canvas`) per ADR-004; all color stays in `--p-*`.
 - Verification: `npm run typecheck`, `npm run lint`, `npm run test`,
   `npm run build` — all wrapped by `scripts/preflight.sh`.
 
@@ -36,8 +43,14 @@ design-system (tokens + primitives). Future: the sync module's API surface
 ### Key Files
 
 - `src/app/layout.tsx` — root layout: fonts, metadata, global CSS
-- `src/app/page.tsx` — branded placeholder home
-- `src/app/globals.css` — imports `brand-tokens.css`
+- `src/app/page.tsx` — renders the Mission Control shell
+- `src/app/globals.css` — imports brand tokens + the `.mc` surface/skin
+- `src/components/mc/shell.tsx` — client shell: brand boundary, dark toggle, screen state
+- `src/components/mc/chrome.tsx` — Topbar + Sidebar
+- `src/components/mc/inbox.tsx` — the Inbox/home screen
+- `src/components/mc/atoms.tsx` — Avatar, Confidence, PMark
+- `src/lib/mc-data/` — typed prototype data layer (types, fixtures, helpers)
+- `src/styles/mc-surface.css`, `src/styles/mc-app.css` — surface tokens + skin
 - `next.config.ts`, `tsconfig.json`, `eslint.config.mjs`, `vitest.config.ts`
 
 ## Owner
