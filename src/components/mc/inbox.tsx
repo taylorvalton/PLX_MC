@@ -8,7 +8,7 @@ import { allTasks } from "@/lib/mc-data/store";
 import { Confidence } from "./atoms";
 import type { ScreenProps } from "./route";
 
-export function InboxView({ nav }: ScreenProps) {
+export function InboxView({ nav, openNewTask }: ScreenProps & { openNewTask?: () => void }) {
   useMcVersion();
   const firstName = ACTORS[CURRENT_USER].name.split(" ")[0];
   const mine = tasksForUser(CURRENT_USER, allTasks()).slice(0, 5);
@@ -31,8 +31,7 @@ export function InboxView({ nav }: ScreenProps) {
           <button type="button" className="btn ghost" onClick={() => nav("feed")}>
             Agent activity ◉
           </button>
-          {/* Wired to the New Task modal by the authoring lane. */}
-          <button type="button" className="btn" title="New task — coming soon">
+          <button type="button" className="btn" onClick={openNewTask}>
             New ⌘K
           </button>
         </div>

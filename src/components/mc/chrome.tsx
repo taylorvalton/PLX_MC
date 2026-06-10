@@ -15,10 +15,12 @@ export function Topbar({
   nav,
   dark,
   setDark,
+  onOpenPalette,
 }: {
   nav: Nav;
   dark: boolean;
   setDark: (next: boolean) => void;
+  onOpenPalette: () => void;
 }) {
   useMcVersion();
   const c = storeSyncCounts();
@@ -41,14 +43,12 @@ export function Topbar({
         </div>
       </div>
       <div className="r">
-        {/* Command palette is the authoring lane's surface; until it lands
-            this is a visual affordance only. */}
-        <div className="search" title="Command palette — coming soon">
+        <button type="button" className="search" onClick={onOpenPalette}>
           <span style={{ fontFamily: "var(--mono)", fontSize: "10px", letterSpacing: "0.1em" }}>
             Search · jump · create…
           </span>
           <span className="key">⌘K</span>
-        </div>
+        </button>
         <button
           type="button"
           className={`topsync ${cls}`}
