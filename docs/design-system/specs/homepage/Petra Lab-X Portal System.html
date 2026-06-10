@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Petra Lab-X · Portal System v1</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Inter+Tight:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <style>
+    html,body { margin:0; padding:0; background:#0a0a0a; height:100%; overflow:hidden; }
+    body { font-family:-apple-system,BlinkMacSystemFont,system-ui,sans-serif; }
+  </style>
+  <script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+</head>
+<body>
+  <div id="root"></div>
+
+  <script type="text/babel" src="design-canvas.jsx"></script>
+  <script type="text/babel" src="portal-system.jsx"></script>
+  <script type="text/babel" src="portal-login.jsx"></script>
+  <script type="text/babel" src="portal-workbench.jsx"></script>
+  <script type="text/babel" src="portal-workbench-variants.jsx"></script>
+  <script type="text/babel" src="portal-workbench-single-rail.jsx"></script>
+  <script type="text/babel" src="portal-phase-indicator.jsx"></script>
+  <script type="text/babel" src="portal-project-detail.jsx"></script>
+  <script type="text/babel" src="portal-signoff-styles.jsx"></script>
+  <script type="text/babel" src="portal-signoff-sections-1.jsx"></script>
+  <script type="text/babel" src="portal-signoff-sections-2.jsx"></script>
+  <script type="text/babel" src="portal-signoff-sections-3.jsx"></script>
+  <script type="text/babel" src="portal-signoff-legal.jsx"></script>
+  <script type="text/babel" src="portal-signoff-signblock.jsx"></script>
+  <script type="text/babel" src="portal-signoff.jsx"></script>
+  <script type="text/babel" src="portal-signoff-stubs.jsx"></script>
+  <script type="text/babel" src="portal-signoff-responsive.jsx"></script>
+  <script type="text/babel" src="portal-navigation-map.jsx"></script>
+
+  <script type="text/babel" data-presets="react">
+    function TerminologyLegend() {
+      const css = `
+        .term-legend { width:1440px; padding:56px 64px; background:#F8F6F1; color:#0c1a14; font-family:"Inter Tight",-apple-system,sans-serif; box-sizing:border-box;}
+        .term-legend h1 { font-family:"Instrument Serif","Fraunces",serif; font-size:64px; line-height:0.96; letter-spacing:-0.02em; margin:0 0 12px; font-weight:400;}
+        .term-legend h1 em { font-style:italic; color:#a83a26;}
+        .term-legend .lede { font-size:17px; line-height:1.55; max-width:780px; color:#3a3833; margin:0 0 48px;}
+        .term-legend .kicker { font-family:"JetBrains Mono",monospace; font-size:10px; letter-spacing:0.22em; text-transform:uppercase; color:#8c857b;}
+        .term-legend .meta { font-family:"JetBrains Mono",monospace; font-size:10px; letter-spacing:0.18em; text-transform:uppercase; color:#8c857b;}
+        .term-legend .grid { display:grid; grid-template-columns:repeat(4, 1fr); border:1px solid rgba(12,26,20,0.18); border-right:none; border-bottom:none;}
+        .term-legend .term { padding:32px 28px 28px; border-right:1px solid rgba(12,26,20,0.18); border-bottom:1px solid rgba(12,26,20,0.18); display:flex; flex-direction:column; gap:14px; min-height:340px;}
+        .term-legend .term .head { display:flex; align-items:baseline; justify-content:space-between;}
+        .term-legend .term .num { font-family:"JetBrains Mono",monospace; font-size:10px; letter-spacing:0.22em; color:#8c857b;}
+        .term-legend .term h3 { font-family:"Instrument Serif","Fraunces",serif; font-size:42px; line-height:1; letter-spacing:-0.02em; margin:0; font-weight:400;}
+        .term-legend .term h3 em { font-style:italic; color:#a83a26;}
+        .term-legend .role { font-size:13px; line-height:1.5; color:#3a3833;}
+        .term-legend .role strong { color:#0c1a14; font-weight:500;}
+        .term-legend .uses { display:flex; flex-direction:column; gap:6px; margin-top:4px;}
+        .term-legend .use { font-family:"JetBrains Mono",monospace; font-size:10.5px; letter-spacing:0.04em; color:#0c1a14; padding:7px 10px; background:rgba(12,26,20,0.04); border-left:2px solid #a83a26;}
+        .term-legend .footer { display:grid; grid-template-columns:1fr 1fr; gap:48px; margin-top:56px; padding-top:32px; border-top:1px solid rgba(12,26,20,0.18);}
+        .term-legend .footer h4 { font-family:"JetBrains Mono",monospace; font-size:10px; letter-spacing:0.22em; text-transform:uppercase; color:#8c857b; margin:0 0 14px; font-weight:500;}
+        .term-legend .footer .phase { display:grid; grid-template-columns:120px 1fr; gap:14px; font-size:13px; line-height:1.5; padding:10px 0; border-bottom:1px dashed rgba(12,26,20,0.15);}
+        .term-legend .footer .phase:last-child { border-bottom:none;}
+        .term-legend .footer .phase span:first-child { font-family:"JetBrains Mono",monospace; font-size:11px; letter-spacing:0.06em; color:#0c1a14; text-transform:uppercase;}
+        .term-legend .footer .phase span:last-child { color:#3a3833;}
+        .term-legend .retired { background:rgba(168,58,38,0.06); border-left:2px solid #a83a26; padding:18px 20px; margin-top:24px;}
+        .term-legend .retired .label { font-family:"JetBrains Mono",monospace; font-size:10px; letter-spacing:0.22em; text-transform:uppercase; color:#a83a26; margin-bottom:6px;}
+        .term-legend .retired .body { font-size:13px; line-height:1.5; color:#3a3833;}
+        .term-legend .retired .body strong { color:#0c1a14;}
+      `;
+      return (
+        <div className="term-legend">
+          <style>{css}</style>
+          <div className="kicker" style={{marginBottom:16}}>/ Proposal — Voice & vocabulary</div>
+          <h1>One vocabulary,<br/>four <em>positions</em>.</h1>
+          <p className="lede">
+            Right now we say <em>lab</em>, <em>floor</em>, <em>workbench</em> and <em>factory</em> interchangeably across the marketing site and the portal. They aren't synonyms &mdash; each one carries a different signal. Below: a proposed hierarchy so each word does one job, consistently.
+          </p>
+
+          <div className="grid">
+            <div className="term">
+              <div className="head"><span className="num">/ 01</span><span className="meta">Brand · place</span></div>
+              <h3>Lab<em>.</em></h3>
+              <div className="role">The <strong>institution</strong>. Petra Lab-X as a whole &mdash; the company, the building, the brand umbrella. The <em>frontier lab</em>.</div>
+              <div className="uses">
+                <span className="use">"the Lab in Toronto"</span>
+                <span className="use">"the frontier lab"</span>
+                <span className="use">"new to the Lab?"</span>
+              </div>
+            </div>
+
+            <div className="term">
+              <div className="head"><span className="num">/ 02</span><span className="meta">Live ops · status</span></div>
+              <h3>Floor<em>.</em></h3>
+              <div className="role">The <strong>physical, operational reality</strong>. Used for <em>liveness</em>, telemetry, proof-of-life. Things happening right now in a real building.</div>
+              <div className="uses">
+                <span className="use">"FLOOR · LIVE"</span>
+                <span className="use">"one floor, one chain of custody"</span>
+                <span className="use">"on the floor in Toronto"</span>
+              </div>
+            </div>
+
+            <div className="term">
+              <div className="head"><span className="num">/ 03</span><span className="meta">Client surface · product</span></div>
+              <h3>Workbench<em>.</em></h3>
+              <div className="role">The <strong>customer's seat</strong>. The portal product itself &mdash; where clients review formulas, sign docs, message formulators. It's <em>their</em> bench at the lab.</div>
+              <div className="uses">
+                <span className="use">"Client Workbench"</span>
+                <span className="use">"Enter your workbench"</span>
+                <span className="use">"sit at the same bench"</span>
+              </div>
+            </div>
+
+            <div className="term">
+              <div className="head"><span className="num">/ 04</span><span className="meta">Project phase · craft</span></div>
+              <h3>Bench<em>.</em></h3>
+              <div className="role">The <strong>R&amp;D station</strong> &mdash; a single project's working surface during formulation and pilot. Granular: a brand can have many benches; the floor has one heartbeat.</div>
+              <div className="uses">
+                <span className="use">"benchwork"</span>
+                <span className="use">"at the bench"</span>
+                <span className="use">"bench-to-shelf"</span>
+              </div>
+            </div>
+          </div>
+
+          <div className="retired">
+            <div className="label">⌖ Retire — Factory</div>
+            <div className="body">
+              <strong>"Factory" conflicts with the frontier-lab positioning.</strong> It signals commodity contract manufacturing, not R&amp;D-led co-creation. Anywhere we currently say <em>factory</em> for scale-up or fill, "the floor" carries the same meaning warmer and on-brand. <strong>Recommendation: drop it from the lexicon.</strong>
+            </div>
+          </div>
+
+          <div className="footer">
+            <div>
+              <h4>/ Project lifecycle — which word, when</h4>
+              <div className="phase"><span>Concept · brief</span><span>The brand comes <em>to the Lab</em>.</span></div>
+              <div className="phase"><span>R&amp;D · pilot</span><span>Work happens <em>at the bench</em>; visible in their <em>Workbench</em>.</span></div>
+              <div className="phase"><span>Scale-up · fill</span><span>Production moves <em>to the floor</em>.</span></div>
+              <div className="phase"><span>Dock-out</span><span>The Lab ships; the Floor logs the seal.</span></div>
+            </div>
+            <div>
+              <h4>/ Surface map — which word, where</h4>
+              <div className="phase"><span>Marketing site</span><span>Lab (institution) · Floor (proof-of-life)</span></div>
+              <div className="phase"><span>Portal — login</span><span>Workbench (product) · Floor (status)</span></div>
+              <div className="phase"><span>Portal — project view</span><span>Workbench (their seat) · Bench (the work)</span></div>
+              <div className="phase"><span>Portal — ops dashboard</span><span>Floor (live telemetry) · Bench (per-project)</span></div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    function App() {
+      const { DCViewport, DCSection, DCArtboard, PortalTokens, PortalLogin_LabBench, PortalLogin_Instrument, PortalWorkbench, PortalWorkbench_SideRail, PortalWorkbench_BenchItself, PortalWorkbench_SingleRail, PortalProjectDetail, PortalSignoff, PortalSignoffStubArtwork, PortalSignoffStubCOA, PortalNavigationMap } = window;
+      return (
+        <DCViewport title="Petra Lab-X · Client Portal · System v1" subtitle="Vocabulary + tokens + login + workbench + project detail + sign-off.">
+          <DCSection id="nav-map" title="00 — Navigation map" subtitle="How the screens connect. Four nodes from login to sealed v04, plus the branches that come after.">
+            <DCArtboard id="nav-map-light" label="Navigation map · Light" width={1440} height={1500}>
+              <PortalNavigationMap scheme="light" />
+            </DCArtboard>
+          </DCSection>
+          <DCSection id="signoff" title="00 — Sign-off · the deed for v04 · PLX-2614" subtitle="The destination of the 'Sign v04' button. Notarial register, DocuSign-powered. Three legal modes — minimal, standard, regulated SKU. Click-to-agree path shown alongside the embedded DocuSign default.">
+            <DCArtboard id="signoff-review-standard-light" label="Standard mode · Review · Light" width={1440} height={8500}>
+              <PortalSignoff scheme="light" state="review" legalMode="standard" signMethod="docusign" />
+            </DCArtboard>
+            <DCArtboard id="signoff-review-standard-dark" label="Standard mode · Review · Dark" width={1440} height={8500}>
+              <PortalSignoff scheme="dark" state="review" legalMode="standard" signMethod="docusign" />
+            </DCArtboard>
+            <DCArtboard id="signoff-review-regulated" label="Regulated SKU · Review · Light" width={1440} height={9600}>
+              <PortalSignoff scheme="light" state="review" legalMode="regulated" signMethod="docusign" />
+            </DCArtboard>
+            <DCArtboard id="signoff-review-minimal" label="Minimal mode · Review · Light" width={1440} height={7400}>
+              <PortalSignoff scheme="light" state="review" legalMode="minimal" signMethod="docusign" />
+            </DCArtboard>
+            <DCArtboard id="signoff-review-click" label="Click-to-agree path · Standard · Light" width={1440} height={8500}>
+              <PortalSignoff scheme="light" state="review" legalMode="standard" signMethod="click" />
+            </DCArtboard>
+            <DCArtboard id="signoff-sealed-light" label="After sign · Receipt · Light" width={1440} height={1850}>
+              <PortalSignoff scheme="light" state="sealed" legalMode="standard" />
+            </DCArtboard>
+            <DCArtboard id="signoff-sealed-dark" label="After sign · Receipt · Dark" width={1440} height={1850}>
+              <PortalSignoff scheme="dark" state="sealed" legalMode="standard" />
+            </DCArtboard>
+            <DCArtboard id="signoff-sealed-regulated" label="After sign · Receipt · Regulated" width={1440} height={1900}>
+              <PortalSignoff scheme="light" state="sealed" legalMode="regulated" />
+            </DCArtboard>
+          </DCSection>
+
+          <DCSection id="signoff-variants" title="00b — Sign-off · unified flow · stub variants" subtitle="Same chassis, different artefact. Proves the formula → artwork → COA → MSDS thesis. Stubbed at reduced detail so the system reads.">
+            <DCArtboard id="signoff-artwork" label="Variant · Carton artwork v02" width={1440} height={1900}>
+              <PortalSignoffStubArtwork scheme="light" />
+            </DCArtboard>
+            <DCArtboard id="signoff-coa" label="Variant · COA · pilot 04" width={1440} height={2000}>
+              <PortalSignoffStubCOA scheme="light" />
+            </DCArtboard>
+          </DCSection>
+
+          <DCSection id="signoff-responsive" title="00c — Sign-off · responsive variants" subtitle="Does the deed chassis hold up at tablet (768) and mobile (390)? Same component, same data, narrower viewport. Left rail collapses; wide grids fold to single column. The folio metaphor stays intact.">
+            <DCArtboard id="signoff-tablet" label="Tablet · 768 · Standard mode" width={768} height={9200}>
+              <PortalSignoff scheme="light" state="review" legalMode="standard" signMethod="docusign" device="tablet" />
+            </DCArtboard>
+            <DCArtboard id="signoff-mobile" label="Mobile · 390 · Standard mode" width={390} height={11200}>
+              <PortalSignoff scheme="light" state="review" legalMode="standard" signMethod="docusign" device="mobile" />
+            </DCArtboard>
+            <DCArtboard id="signoff-mobile-sealed" label="Mobile · 390 · After sign" width={390} height={2400}>
+              <PortalSignoff scheme="light" state="sealed" legalMode="standard" device="mobile" />
+            </DCArtboard>
+          </DCSection>
+
+          <DCSection id="vocab" title="01 — Vocabulary · proposed hierarchy" subtitle="One word per job. Lab / Floor / Workbench / Bench. Retire 'Factory'.">
+            <DCArtboard id="vocab" label="Voice & vocabulary" width={1440} height={1180}>
+              <TerminologyLegend />
+            </DCArtboard>
+          </DCSection>
+
+          <DCSection id="project-detail" title="01 — Project detail · PLX-2614 · Niacinamide 5% Serum (NEW)" subtitle="What a customer sees when they click into a project from the Workbench. Header + phase bar + awaiting-you callout, formula table (the heart), batch history, documents, activity. Right column: project facts + bench thread.">
+            <DCArtboard id="pd-light" label="Project detail · Light" width={1440} height={2400}>
+              <PortalProjectDetail scheme="light" />
+            </DCArtboard>
+            <DCArtboard id="pd-dark" label="Project detail · Dark" width={1440} height={2400}>
+              <PortalProjectDetail scheme="dark" />
+            </DCArtboard>
+          </DCSection>
+
+          <DCSection id="workbench-d" title="02 — Workbench · Variant D · Single rail" subtitle="One left rail only. No right column. Approvals + floor activity move INTO the main column as full-width sections. Wider canvas, bigger type, more breathing room.">
+            <DCArtboard id="wb-d-light" label="D · Single rail · Light" width={1440} height={1500}>
+              <PortalWorkbench_SingleRail scheme="light" />
+            </DCArtboard>
+            <DCArtboard id="wb-d-dark" label="D · Single rail · Dark" width={1440} height={1500}>
+              <PortalWorkbench_SingleRail scheme="dark" />
+            </DCArtboard>
+          </DCSection>
+
+          <DCSection id="workbench-b-compare" title="02 — Workbench · Variant B · Rail-color comparison" subtitle="A: rails kept slightly deeper than paper (architecture preserved, my recommendation). B: rails fully off-white to match paper (your original ask, flatter surface).">
+            <DCArtboard id="wb-b-A-light" label="A · Subtle step · Light (recommended)" width={1440} height={1100}>
+              <PortalWorkbench_SideRail scheme="light" tokenOverrides={{ '--p-paper-2': '#F4F0E7' }} />
+            </DCArtboard>
+            <DCArtboard id="wb-b-B-light" label="B · Flat off-white · Light (your ask)" width={1440} height={1100}>
+              <PortalWorkbench_SideRail scheme="light" tokenOverrides={{ '--p-paper-2': '#F8F6F1' }} />
+            </DCArtboard>
+          </DCSection>
+
+          <DCSection id="workbench-b" title="03 — Workbench · Variant B · Side rail (default tokens)" subtitle="Two rails. Kept for reference.">
+            <DCArtboard id="wb-b-light" label="B · Side rail · Light (default)" width={1440} height={1100}>
+              <PortalWorkbench_SideRail scheme="light" />
+            </DCArtboard>
+            <DCArtboard id="wb-b-dark" label="B · Side rail · Dark" width={1440} height={1100}>
+              <PortalWorkbench_SideRail scheme="dark" />
+            </DCArtboard>
+          </DCSection>
+
+          <DCSection id="workbench-c" title="02 — Workbench · Variant C · Bench itself" subtitle="The unconventional cut. Projects ARE the navigation — left rail is a stack of project tiles; main column is the selected project's detail view; utility dock on the far right.">
+            <DCArtboard id="wb-c-light" label="C · Bench itself · Light" width={1440} height={1100}>
+              <PortalWorkbench_BenchItself scheme="light" />
+            </DCArtboard>
+            <DCArtboard id="wb-c-dark" label="C · Bench itself · Dark" width={1440} height={1100}>
+              <PortalWorkbench_BenchItself scheme="dark" />
+            </DCArtboard>
+          </DCSection>
+
+          <DCSection id="workbench-a" title="03 — Workbench · Variant A · Top nav (original)" subtitle="Kept for reference. Top horizontal navigation; user feedback flagged this as not intuitive enough for a daily-use portal.">
+            <DCArtboard id="wb-a-light" label="A · Top nav · Light" width={1440} height={1280}>
+              <PortalWorkbench scheme="light" />
+            </DCArtboard>
+            <DCArtboard id="wb-a-dark" label="A · Top nav · Dark" width={1440} height={1280}>
+              <PortalWorkbench scheme="dark" />
+            </DCArtboard>
+          </DCSection>
+
+          <DCSection id="login" title="02 — Login · selected direction" subtitle="Login B / Instrument — PLX wordmark + revised copy.">
+            <DCArtboard id="login-b-light-v2" label="B · Instrument · Light · v2 (selected)" width={1440} height={900}>
+              <PortalLogin_Instrument scheme="light" />
+            </DCArtboard>
+            <DCArtboard id="login-b-dark-v2" label="B · Instrument · Dark · v2" width={1440} height={900}>
+              <PortalLogin_Instrument scheme="dark" />
+            </DCArtboard>
+          </DCSection>
+
+          <DCSection id="login-archive" title="03 — Archive · earlier directions" subtitle="Kept for reference.">
+            <DCArtboard id="login-a-light" label="A · Lab Bench (warmer) · Light" width={1440} height={900}>
+              <PortalLogin_LabBench scheme="light" />
+            </DCArtboard>
+            <DCArtboard id="login-a-dark" label="A · Lab Bench · Dark" width={1440} height={900}>
+              <PortalLogin_LabBench scheme="dark" />
+            </DCArtboard>
+          </DCSection>
+
+          <DCSection id="tokens" title="04 — Tokens">
+            <DCArtboard id="tokens-light" label="Tokens · Light" width={1200} height={760}>
+              <PortalTokens scheme="light" />
+            </DCArtboard>
+            <DCArtboard id="tokens-dark" label="Tokens · Dark" width={1200} height={760}>
+              <PortalTokens scheme="dark" />
+            </DCArtboard>
+          </DCSection>
+        </DCViewport>
+      );
+    }
+
+    ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+  </script>
+</body>
+</html>

@@ -1,0 +1,361 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=1920, height=1080" />
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@hyperframes/core/dist/hyperframe.runtime.iife.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@hyperframes/shader-transitions/dist/index.global.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=PP+Neue+Montreal&family=Space+Grotesk:wght@300;500;700&family=JetBrains+Mono:wght@400;500&family=Instrument+Serif&display=swap" rel="stylesheet" />
+    <style>
+      :root {
+        --bg: #0a0a0a;
+        --ink: #f4f1ea;
+        --paper: #ebe6dc;
+        --accent: #ff5a1f;
+        --muted: #8a8275;
+        --grid: rgba(244,241,234,0.08);
+        --font-display: "Space Grotesk", "PP Neue Montreal", sans-serif;
+        --font-data: "JetBrains Mono", monospace;
+        --font-serif: "Instrument Serif", serif;
+      }
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+      html, body { width: 1920px; height: 1080px; overflow: hidden; background: var(--bg); color: var(--ink); }
+      .scene { position: absolute; top: 0; left: 0; width: 1920px; height: 1080px; overflow: hidden; }
+      .scene-content { width:100%; height:100%; position: relative; z-index:1; }
+
+      /* shared chrome */
+      .chrome { position:absolute; inset:0; z-index:5; pointer-events:none; }
+      .chrome::before {
+        content:""; position:absolute; inset:48px;
+        border: 1px solid var(--grid);
+      }
+      .corner { position:absolute; width:14px; height:14px; border:1px solid var(--ink); }
+      .corner.tl { top:42px; left:42px; border-right:none; border-bottom:none; }
+      .corner.tr { top:42px; right:42px; border-left:none; border-bottom:none; }
+      .corner.bl { bottom:42px; left:42px; border-right:none; border-top:none; }
+      .corner.br { bottom:42px; right:42px; border-left:none; border-top:none; }
+
+      .topline { position:absolute; top:64px; left:64px; right:64px; display:flex; justify-content:space-between; align-items:center; font-family:var(--font-data); font-size:13px; letter-spacing:0.18em; text-transform:uppercase; color:var(--muted); z-index:6; }
+      .topline .dot { width:8px; height:8px; background: var(--accent); display:inline-block; margin-right:10px; vertical-align: middle;}
+
+      .botline { position:absolute; bottom:64px; left:64px; right:64px; display:flex; justify-content:space-between; align-items:flex-end; font-family:var(--font-data); font-size:12px; letter-spacing:0.18em; text-transform:uppercase; color:var(--muted); z-index:6; }
+
+      .display { font-family: var(--font-display); font-weight: 700; line-height:0.92; letter-spacing:-0.03em; }
+      .data-text { font-family: var(--font-data); font-variant-numeric: tabular-nums; }
+
+      .grain {
+        position:absolute; inset:0; pointer-events:none; z-index:50; opacity:.12;
+        background-image:
+          radial-gradient(rgba(255,255,255,.08) 1px, transparent 1.2px),
+          radial-gradient(rgba(0,0,0,.18) 1px, transparent 1.2px);
+        background-size: 3px 3px, 5px 5px;
+        background-position: 0 0, 1px 2px;
+        mix-blend-mode: overlay;
+      }
+
+      /* ========== SCENE 1: SCANLINE GRID ========== */
+      #s1 .grid-bg {
+        position:absolute; inset:0;
+        background-image:
+          linear-gradient(var(--grid) 1px, transparent 1px),
+          linear-gradient(90deg, var(--grid) 1px, transparent 1px);
+        background-size: 60px 60px;
+      }
+      #s1 .scan {
+        position:absolute; left:0; right:0; height:2px; background: var(--accent);
+        box-shadow: 0 0 24px rgba(255,90,31,0.6);
+        top: -2px;
+      }
+      #s1 .crosshair {
+        position:absolute; width:300px; height:300px; left:50%; top:50%;
+        transform: translate(-50%,-50%);
+      }
+      #s1 .crosshair .ring { position:absolute; inset:0; border:1px solid var(--ink); border-radius:50%; opacity:.3; }
+      #s1 .crosshair .ring.r2 { inset: 30px; opacity:.5; }
+      #s1 .crosshair .ring.r3 { inset: 90px; opacity:.8; }
+      #s1 .crosshair .x { position:absolute; left:50%; top:50%; width:1px; height:100%; background:var(--ink); opacity:.4; transform:translateX(-0.5px); }
+      #s1 .crosshair .y { position:absolute; top:50%; left:50%; height:1px; width:100%; background:var(--ink); opacity:.4; transform:translateY(-0.5px); }
+      #s1 .label {
+        position:absolute; font-family:var(--font-data); font-size:11px; letter-spacing:0.15em; text-transform:uppercase; color:var(--muted);
+      }
+      #s1 .center-text {
+        position:absolute; left:50%; top:calc(50% + 220px); transform:translateX(-50%);
+        font-family:var(--font-data); font-size:14px; letter-spacing:0.3em; color:var(--accent);
+      }
+
+      /* ========== SCENE 2: TYPE WORDMARK ========== */
+      #s2 .stage { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; flex-direction:column; gap:32px; }
+      #s2 .kicker { font-family:var(--font-data); font-size:14px; letter-spacing:0.4em; color:var(--accent); text-transform:uppercase; }
+      #s2 .word { font-family: var(--font-display); font-weight: 700; font-size:340px; line-height:.85; letter-spacing:-0.04em; color: var(--ink); position:relative; }
+      #s2 .word .char { display:inline-block; }
+      #s2 .word .char.x { color: var(--accent); }
+      #s2 .sub { font-family: var(--font-serif); font-style: italic; font-size:36px; color: var(--muted); }
+      #s2 .meta { position:absolute; bottom:120px; left:0; right:0; display:flex; justify-content:space-around; font-family:var(--font-data); font-size:12px; letter-spacing:0.2em; text-transform:uppercase; color:var(--muted); }
+      #s2 .meta .k { color: var(--ink); display:block; font-size:18px; margin-top:8px;}
+
+      /* ========== SCENE 3: NUMBER STAT ========== */
+      #s3 .num-stage { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; flex-direction:column; }
+      #s3 .pre { font-family:var(--font-data); font-size:14px; letter-spacing:0.4em; color:var(--accent); text-transform:uppercase; margin-bottom:24px;}
+      #s3 .big { font-family: var(--font-display); font-weight: 700; font-size:520px; line-height:.85; letter-spacing:-0.05em; color:var(--ink); font-variant-numeric: tabular-nums;}
+      #s3 .post { font-family:var(--font-display); font-size:42px; font-weight:300; color: var(--muted); margin-top:24px; max-width: 900px; text-align:center; }
+      #s3 .ticks { position:absolute; left:64px; top:50%; transform:translateY(-50%); display:flex; flex-direction:column; gap:4px; }
+      #s3 .ticks div { width:18px; height:1px; background: var(--muted); opacity:.4;}
+      #s3 .ticks div.on { background: var(--accent); opacity:1; width:32px; }
+
+      /* ========== SCENE 4: FACILITY SCHEMATIC ========== */
+      #s4 .schem { position:absolute; inset:0; }
+      #s4 svg { position:absolute; inset:0; width:100%; height:100%; }
+      #s4 .title { position:absolute; top:140px; left:140px; font-family:var(--font-data); font-size:13px; letter-spacing:0.3em; color:var(--muted); text-transform:uppercase;}
+      #s4 .h2 { position:absolute; top:170px; left:140px; font-family:var(--font-display); font-size:120px; font-weight:700; letter-spacing:-0.03em; line-height:.95; max-width: 1100px;}
+      #s4 .legend { position:absolute; bottom:140px; left:140px; display:flex; gap:64px; font-family:var(--font-data); font-size:12px; letter-spacing:0.2em; text-transform:uppercase; color:var(--muted);}
+      #s4 .legend .k { display:block; color:var(--ink); font-size:32px; margin-bottom:6px;}
+
+      /* ========== SCENE 5: CATEGORY GRID ========== */
+      #s5 .cats { position:absolute; inset:140px; display:grid; grid-template-columns: repeat(3, 1fr); grid-auto-rows: 1fr; gap:0; }
+      #s5 .cat { border:1px solid var(--grid); padding:40px; position:relative; display:flex; flex-direction:column; justify-content:space-between;}
+      #s5 .cat .num { font-family:var(--font-data); font-size:13px; color:var(--muted); letter-spacing:0.2em;}
+      #s5 .cat .name { font-family:var(--font-display); font-size:64px; font-weight:500; letter-spacing:-0.02em; line-height:1;}
+      #s5 .cat .tag { font-family:var(--font-data); font-size:11px; letter-spacing:0.2em; color:var(--accent); text-transform:uppercase;}
+      #s5 .cat.hl { background: var(--accent); color: var(--bg); }
+      #s5 .cat.hl .num, #s5 .cat.hl .tag { color: var(--bg); opacity:.7;}
+      #s5 .heading { position:absolute; top:64px; left:140px; font-family:var(--font-data); font-size:13px; letter-spacing:0.3em; text-transform:uppercase; color:var(--muted); }
+
+      /* ========== SCENE 6: CTA ========== */
+      #s6 .cta-stage { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; flex-direction:column;}
+      #s6 .pre { font-family:var(--font-data); font-size:14px; letter-spacing:0.4em; color:var(--accent); text-transform:uppercase; margin-bottom:32px;}
+      #s6 .h { font-family: var(--font-display); font-weight: 700; font-size:200px; line-height:.92; letter-spacing:-0.04em; text-align:center; max-width: 1500px;}
+      #s6 .h em { font-family: var(--font-serif); font-weight: 400; font-style:italic; color: var(--accent);}
+      #s6 .btn { margin-top:64px; display:inline-flex; align-items:center; gap:16px; border:1px solid var(--ink); padding:24px 48px; font-family:var(--font-data); font-size:14px; letter-spacing:0.3em; text-transform:uppercase;}
+      #s6 .btn .dot { width:10px; height:10px; background:var(--accent); border-radius:50%;}
+    </style>
+  </head>
+  <body>
+    <div id="main" data-composition-id="main" data-width="1920" data-height="1080" data-start="0" data-duration="22">
+
+      <!-- SCENE 1: TARGETING / SCAN -->
+      <div class="scene clip" id="s1" data-start="0" data-duration="3" data-track-index="0">
+        <div class="grid-bg"></div>
+        <div class="scan" id="s1-scan"></div>
+        <div class="grain"></div>
+        <div class="chrome"><span class="corner tl"></span><span class="corner tr"></span><span class="corner bl"></span><span class="corner br"></span></div>
+        <div class="topline"><span><span class="dot"></span>PETRA LAB-X / EST. 1995</span><span id="s1-coord">LAT 43.6532° N · LON 79.3832° W</span></div>
+        <div class="botline"><span>FACILITY 01 · TORONTO</span><span>SECTOR / KETTLE-12</span><span id="s1-time">T-00:00:00</span></div>
+        <div class="scene-content">
+          <div class="crosshair" id="s1-cross">
+            <div class="ring r1"></div>
+            <div class="ring r2"></div>
+            <div class="ring r3"></div>
+            <div class="x"></div>
+            <div class="y"></div>
+          </div>
+          <div class="label" style="left:50%; top:calc(50% - 200px); transform:translateX(-50%);" id="s1-l1">SCANNING / FORMULATION INTAKE</div>
+          <div class="center-text" id="s1-cta">// INITIALIZING</div>
+        </div>
+      </div>
+
+      <!-- SCENE 2: WORDMARK REVEAL (shader anchor 1 in) -->
+      <div class="scene clip" id="s2" data-start="3" data-duration="4" data-track-index="0" style="opacity:0;">
+        <div class="grain"></div>
+        <div class="chrome"><span class="corner tl"></span><span class="corner tr"></span><span class="corner bl"></span><span class="corner br"></span></div>
+        <div class="topline"><span><span class="dot"></span>WHO WE ARE / 002</span><span>CONTRACT MFR · GMP ISO22716</span></div>
+        <div class="scene-content">
+          <div class="stage">
+            <div class="kicker" id="s2-kicker">A NEW BREED IN PERSONAL CARE MANUFACTURING</div>
+            <div class="word">
+              <span class="char" id="s2-c1">P</span><span class="char" id="s2-c2">E</span><span class="char" id="s2-c3">T</span><span class="char" id="s2-c4">R</span><span class="char" id="s2-c5">A</span><span class="char x" id="s2-cx">/X</span>
+            </div>
+            <div class="sub" id="s2-sub">Concept&nbsp;·&nbsp;Formulation&nbsp;·&nbsp;Fill&nbsp;·&nbsp;Fulfilment</div>
+          </div>
+          <div class="meta">
+            <div id="s2-m1">Founded<span class="k">1995</span></div>
+            <div id="s2-m2">Facility<span class="k">60,000 ft²</span></div>
+            <div id="s2-m3">Warehouses<span class="k">04 / Global</span></div>
+            <div id="s2-m4">Certifications<span class="k">GMP · ISO22716</span></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- SCENE 3: BIG NUMBER (shader anchor 2) -->
+      <div class="scene clip" id="s3" data-start="7" data-duration="3.5" data-track-index="0" style="opacity:0;">
+        <div class="grain"></div>
+        <div class="chrome"><span class="corner tl"></span><span class="corner tr"></span><span class="corner bl"></span><span class="corner br"></span></div>
+        <div class="topline"><span><span class="dot"></span>SCALE / 003</span><span>FORMULAS / CATEGORIES / SHIPPED</span></div>
+        <div class="ticks">
+          <div></div><div></div><div></div><div class="on"></div><div></div><div></div><div></div><div></div>
+        </div>
+        <div class="scene-content">
+          <div class="num-stage">
+            <div class="pre">// ARCHIVE COUNT</div>
+            <div class="big" id="s3-num">0000+</div>
+            <div class="post">formulas across skin, hair, body, oral, men&rsquo;s grooming &amp; pet care</div>
+          </div>
+        </div>
+        <div class="botline"><span>SAMPLE / 2024-2026</span><span>SOURCE / INTERNAL R&D LEDGER</span><span>GMP CERTIFIED</span></div>
+      </div>
+
+      <!-- SCENE 4: FACILITY SCHEMATIC -->
+      <div class="scene clip" id="s4" data-start="10.5" data-duration="4" data-track-index="0" style="visibility:hidden;">
+        <div class="grain"></div>
+        <div class="chrome"><span class="corner tl"></span><span class="corner tr"></span><span class="corner bl"></span><span class="corner br"></span></div>
+        <div class="topline"><span><span class="dot"></span>FACILITY / 004</span><span>PLAN VIEW · SCALE 1:600</span></div>
+        <div class="scene-content">
+          <div class="title">Production schematic</div>
+          <div class="h2">12&nbsp;kettles. 10&nbsp;filling lines.<br/>One floor.</div>
+          <svg viewBox="0 0 1920 1080" preserveAspectRatio="none">
+            <!-- factory outline -->
+            <rect id="s4-outline" x="640" y="500" width="1140" height="440" fill="none" stroke="var(--ink)" stroke-width="2" stroke-dasharray="2400" stroke-dashoffset="2400"/>
+            <!-- kettles row -->
+            <g id="s4-kettles">
+              <circle cx="720" cy="600" r="22" fill="none" stroke="var(--ink)" stroke-width="1.5" class="k"/>
+              <circle cx="800" cy="600" r="22" fill="none" stroke="var(--ink)" stroke-width="1.5" class="k"/>
+              <circle cx="880" cy="600" r="22" fill="none" stroke="var(--ink)" stroke-width="1.5" class="k"/>
+              <circle cx="960" cy="600" r="22" fill="none" stroke="var(--ink)" stroke-width="1.5" class="k"/>
+              <circle cx="1040" cy="600" r="22" fill="none" stroke="var(--ink)" stroke-width="1.5" class="k"/>
+              <circle cx="1120" cy="600" r="22" fill="none" stroke="var(--ink)" stroke-width="1.5" class="k"/>
+              <circle cx="1200" cy="600" r="22" fill="none" stroke="var(--accent)" stroke-width="2" class="k hot"/>
+              <circle cx="1280" cy="600" r="22" fill="none" stroke="var(--ink)" stroke-width="1.5" class="k"/>
+              <circle cx="1360" cy="600" r="22" fill="none" stroke="var(--ink)" stroke-width="1.5" class="k"/>
+              <circle cx="1440" cy="600" r="22" fill="none" stroke="var(--ink)" stroke-width="1.5" class="k"/>
+              <circle cx="1520" cy="600" r="22" fill="none" stroke="var(--ink)" stroke-width="1.5" class="k"/>
+              <circle cx="1600" cy="600" r="22" fill="none" stroke="var(--ink)" stroke-width="1.5" class="k"/>
+            </g>
+            <!-- fill lines -->
+            <g id="s4-lines" stroke="var(--ink)" stroke-width="1" fill="none">
+              <path d="M 700 720 H 1740" class="ln" stroke-dasharray="1040" stroke-dashoffset="1040"/>
+              <path d="M 700 760 H 1740" class="ln" stroke-dasharray="1040" stroke-dashoffset="1040"/>
+              <path d="M 700 800 H 1740" class="ln" stroke-dasharray="1040" stroke-dashoffset="1040"/>
+              <path d="M 700 840 H 1740" class="ln" stroke-dasharray="1040" stroke-dashoffset="1040"/>
+              <path d="M 700 880 H 1740" class="ln" stroke-dasharray="1040" stroke-dashoffset="1040"/>
+            </g>
+            <!-- particle dots traveling line -->
+            <circle id="s4-dot" cx="700" cy="760" r="4" fill="var(--accent)"/>
+          </svg>
+          <div class="legend">
+            <div>Footprint<span class="k">60,000 ft²</span></div>
+            <div>Throughput<span class="k">2.4M units / mo</span></div>
+            <div>Warehouses<span class="k">04 global</span></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- SCENE 5: CATEGORY GRID -->
+      <div class="scene clip" id="s5" data-start="14.5" data-duration="3.5" data-track-index="0" style="visibility:hidden;">
+        <div class="grain"></div>
+        <div class="chrome"><span class="corner tl"></span><span class="corner tr"></span><span class="corner bl"></span><span class="corner br"></span></div>
+        <div class="topline"><span><span class="dot"></span>CAPABILITIES / 005</span><span>SIX CATEGORIES · ONE FLOOR</span></div>
+        <div class="heading">// What we make</div>
+        <div class="cats" id="s5-cats">
+          <div class="cat"><div class="num">01</div><div class="name">Skin<br/>Care</div><div class="tag">Serums · Creams · Treatments</div></div>
+          <div class="cat"><div class="num">02</div><div class="name">Hair<br/>Care</div><div class="tag">Shampoo · Leave-in · Color-safe</div></div>
+          <div class="cat hl"><div class="num">03</div><div class="name">Body<br/>Care</div><div class="tag">Wash · Lotion · Bar</div></div>
+          <div class="cat"><div class="num">04</div><div class="name">Cosmetics<br/>&amp; Beauty</div><div class="tag">Niche · Indie · Color</div></div>
+          <div class="cat"><div class="num">05</div><div class="name">Men&rsquo;s<br/>Grooming</div><div class="tag">Beard · Shave · Skin</div></div>
+          <div class="cat"><div class="num">06</div><div class="name">Pet<br/>Care</div><div class="tag">Shampoo · Spritz · Wipes</div></div>
+        </div>
+      </div>
+
+      <!-- SCENE 6: CTA -->
+      <div class="scene clip" id="s6" data-start="18" data-duration="4" data-track-index="0" style="visibility:hidden;">
+        <div class="grain"></div>
+        <div class="chrome"><span class="corner tl"></span><span class="corner tr"></span><span class="corner bl"></span><span class="corner br"></span></div>
+        <div class="topline"><span><span class="dot"></span>CLOSE / 006</span><span>BOOK · DISCOVER · BUILD</span></div>
+        <div class="scene-content">
+          <div class="cta-stage">
+            <div class="pre">// BRING YOURS TO LIFE</div>
+            <div class="h" id="s6-h">Concept to&nbsp;shelf,<br/><em>at&nbsp;speed.</em></div>
+            <div class="btn" id="s6-btn"><span class="dot"></span><span>BOOK A DISCOVERY CALL</span></div>
+          </div>
+        </div>
+        <div class="botline"><span>PETRA LAB-X © 2026</span><span>TORONTO · TOLEDO · MIAMI · ROTTERDAM</span><span>END / 22.0s</span></div>
+      </div>
+    </div>
+
+    <script>
+      window.__timelines = window.__timelines || {};
+      var tl = gsap.timeline({ paused: true, repeat: -1, repeatDelay: 0.5 });
+
+      // --- visibility toggles ---
+      tl.set("#s1", { autoAlpha: 0 }, 3.0);
+      // s2, s3 are shader anchors (HyperShader manages)
+      tl.set("#s2", { opacity: 1 }, 3.0);
+      tl.set("#s4", { autoAlpha: 1 }, 10.5);
+      tl.set("#s4", { autoAlpha: 0 }, 14.5);
+      tl.set("#s5", { autoAlpha: 1 }, 14.5);
+      tl.set("#s5", { autoAlpha: 0 }, 18.0);
+      tl.set("#s6", { autoAlpha: 1 }, 18.0);
+
+      // === SCENE 1 (0-3) — scan / target ===
+      tl.from("#s1-cross .ring", { scale: 0, transformOrigin:"50% 50%", duration: 0.8, ease:"power3.out", stagger: 0.1 }, 0.2);
+      tl.from("#s1-cross .x, #s1-cross .y", { scaleY: 0, scaleX:0, duration: 0.5, ease:"power2.out" }, 0.3);
+      tl.fromTo("#s1-scan", { top:"-2px"}, { top:"100%", duration: 2.4, ease:"none" }, 0.0);
+      tl.from("#s1-l1", { autoAlpha: 0, y: 8, duration: 0.4 }, 0.6);
+      tl.from("#s1-cta", { autoAlpha: 0, y: 8, duration: 0.4 }, 1.0);
+      // ticker counter
+      var t1 = { v: 0 };
+      tl.to(t1, { v: 3, duration: 2.6, ease:"none", onUpdate: function(){
+        var s = t1.v;
+        var sec = String(Math.floor(s)).padStart(2,'0');
+        var ms = String(Math.floor((s%1)*100)).padStart(2,'0');
+        var el = document.getElementById('s1-time'); if(el) el.textContent = "T-00:" + sec + ":" + ms;
+      }}, 0.0);
+
+      // === SCENE 2 (3-7) — wordmark reveal ===
+      tl.from("#s2-kicker", { autoAlpha: 0, y: 12, duration: 0.6, ease:"power2.out" }, 3.3);
+      tl.from("#s2 .word .char", { y: 240, autoAlpha: 0, duration: 0.7, ease: "expo.out", stagger: { each: 0.06, from:"start" } }, 3.5);
+      tl.from("#s2-sub", { autoAlpha: 0, y: 12, duration: 0.5, ease:"power2.out" }, 4.2);
+      tl.from("#s2 .meta > div", { autoAlpha: 0, y: 12, duration: 0.5, ease:"power2.out", stagger: 0.1 }, 4.6);
+      // breathing on the X
+      tl.to("#s2-cx", { rotate: 8, duration: 1.6, ease:"sine.inOut", yoyo:true, repeat:1, transformOrigin:"50% 50%" }, 5.0);
+
+      // === SCENE 3 (7-10.5) — counter ===
+      var n = { v: 0 };
+      tl.to(n, { v: 4218, duration: 2.0, ease:"power3.out", onUpdate: function(){
+        var el = document.getElementById('s3-num'); if(el) el.textContent = String(Math.floor(n.v)).padStart(4,'0') + "+";
+      }}, 7.4);
+      tl.from("#s3 .pre", { autoAlpha:0, y:8, duration:0.4 }, 7.2);
+      tl.from("#s3 .post", { autoAlpha:0, y:12, duration:0.6 }, 8.6);
+      tl.from("#s3 .ticks div", { scaleX:0, transformOrigin:"left center", duration: 0.4, stagger: 0.06 }, 7.6);
+
+      // === SCENE 4 (10.5-14.5) — facility schematic ===
+      tl.from("#s4 .title", { autoAlpha: 0, y: 8, duration: 0.4 }, 10.7);
+      tl.from("#s4 .h2", { autoAlpha: 0, y: 24, duration: 0.7, ease:"expo.out" }, 10.9);
+      tl.to("#s4-outline", { strokeDashoffset: 0, duration: 1.4, ease:"power2.inOut" }, 11.0);
+      tl.from("#s4 #s4-kettles .k", { scale: 0, transformOrigin:"50% 50%", duration: 0.4, stagger: { each: 0.05, from:"start" }, ease:"back.out(1.6)" }, 11.6);
+      tl.to("#s4 #s4-kettles .hot", { opacity: 0.3, duration: 0.6, ease:"sine.inOut", yoyo:true, repeat: 4 }, 12.4);
+      tl.to("#s4-lines .ln", { strokeDashoffset: 0, duration: 1.0, stagger: 0.1, ease:"power2.out" }, 12.0);
+      // particle moving along
+      tl.fromTo("#s4-dot", { attr: { cx: 700 }}, { attr: { cx: 1740 }, duration: 1.6, ease:"power1.inOut" }, 12.6);
+      tl.from("#s4 .legend > div", { autoAlpha:0, y: 12, duration:0.5, stagger:0.1 }, 13.0);
+
+      // === SCENE 5 (14.5-18) — categories grid ===
+      tl.from("#s5 .heading", { autoAlpha:0, y:8, duration:0.4 }, 14.7);
+      tl.from("#s5-cats .cat", { autoAlpha: 0, y: 30, duration: 0.6, ease:"power3.out", stagger: { each: 0.08, from:"start" } }, 14.9);
+      // shift highlight
+      tl.to("#s5-cats .cat.hl", { backgroundColor: "transparent", color: "var(--ink)", duration: 0.001 }, 16.6);
+      tl.to("#s5-cats .cat:nth-child(5)", { backgroundColor: "var(--accent)", color: "var(--bg)", duration: 0.001 }, 16.6);
+
+      // === SCENE 6 (18-22) — CTA ===
+      tl.from("#s6 .pre", { autoAlpha:0, y:8, duration:0.4 }, 18.4);
+      tl.from("#s6-h", { autoAlpha:0, y: 30, duration: 0.8, ease:"expo.out" }, 18.6);
+      tl.from("#s6-btn", { autoAlpha:0, y: 14, duration: 0.6, ease:"power3.out" }, 19.4);
+      tl.to("#s6-btn .dot", { scale: 1.4, duration: 0.7, ease:"sine.inOut", yoyo:true, repeat:3, transformOrigin:"50% 50%" }, 19.8);
+      tl.to("#s6-h", { letterSpacing:"-0.035em", duration: 3.5, ease:"none" }, 18.6);
+
+      window.HyperShader.init({
+        bgColor: getComputedStyle(document.documentElement).getPropertyValue("--bg").trim() || "#0a0a0a",
+        scenes: ["s2", "s3"],
+        timeline: tl,
+        transitions: [
+          { time: 6.7, shader: "cinematic-zoom", duration: 0.5 }
+        ]
+      });
+
+      window.__timelines["main"] = tl;
+      // expose for parent loops
+      try { window.parent.postMessage({type:"hero-ready"}, "*"); } catch(e){}
+    </script>
+  </body>
+</html>

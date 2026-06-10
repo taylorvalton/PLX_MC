@@ -1,0 +1,405 @@
+/* ────────────────────────────────────────────────────────────────────────
+ * Project Development / MRP design language — scoped under `.mrp-shell`.
+ *
+ * Source: ported from the design bundle (mrp/styles.css + mrp/intake.css)
+ * at tmp/petra-design/bundle/mrp/. Class names match the design 1:1 so the
+ * design's React components can be lifted with minimal rewriting.
+ *
+ * Scoping discipline:
+ *   - All custom selectors are prefixed with `.mrp-shell` so the styles
+ *     never leak outside MRP routes.
+ *   - The `.mrp-shell` root also redefines a few brand tokens for the
+ *     "document model" paper hierarchy (--p-rail, --p-canvas, refined
+ *     --p-paper / --p-paper-2). These override the broader `.brand-plx`
+ *     defaults inside MRP only.
+ *   - Existing shadcn/R&D pages keep working: they read tokens that are
+ *     just slightly refined here (no DOM/structural change).
+ * ──────────────────────────────────────────────────────────────────────── */
+
+.mrp-shell {
+  /* SYSTEM A · Document model — refined paper hierarchy.
+     Overrides brand-plx defaults inside MRP routes only. */
+  --p-rail:    #EEEBE3;
+  --p-canvas:  #F5F3EC;
+  --p-paper:   #FBFAF6;
+  --p-paper-2: #ECEFE9;
+  --p-card:    #FBFAF6;
+  --p-ink:     #1B1A17;
+  --p-ink-2:   #3A3833;
+  --p-muted:   #807A6F;
+  --p-grid:    rgba(27, 26, 23, 0.16);
+  --p-grid-2:  rgba(27, 26, 23, 0.08);
+  --p-accent:      #244A39;
+  --p-accent-soft: #BCCFBF;
+  --p-ok:   #5C7A55;
+  --p-warn: #C99340;
+  --p-info: #5B7B91;
+  --p-hot:  #52606E;
+  --mazius: var(--p-font-serif);
+  --sans:   var(--p-font-sans);
+  --mono:   var(--p-font-mono);
+
+  background: var(--p-canvas);
+  color: var(--p-ink);
+  font-family: var(--sans);
+  font-feature-settings: "ss01", "ss02";
+}
+
+.dark .mrp-shell,
+.mrp-shell.dark {
+  --p-rail:    #16140F;
+  --p-canvas:  #1A1816;
+  --p-paper:   #22201D;
+  --p-paper-2: #2A3329;
+  --p-card:    #22201D;
+  --p-ink:     #F1ECE0;
+  --p-ink-2:   #C9C2B5;
+  --p-muted:   #827B6F;
+  --p-grid:    rgba(241, 236, 224, 0.12);
+  --p-grid-2:  rgba(241, 236, 224, 0.06);
+  --p-accent:      #7AB18C;
+  --p-accent-soft: #2D4D3B;
+  --p-ok:   #7A9E6F;
+  --p-warn: #D9A85C;
+  --p-info: #7A9DB3;
+  --p-hot:  #8FA0B0;
+}
+
+/* ─── Type utilities ─── */
+.mrp-shell .mrp-mono   { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+.mrp-shell .mrp-serif  { font-family: var(--mazius); font-weight: 400; }
+.mrp-shell .mrp-kicker { font-family: var(--mono); font-size: var(--p-text-kicker); letter-spacing: var(--p-track-tick); text-transform: uppercase; color: var(--p-muted); }
+.mrp-shell .mrp-meta   { font-family: var(--mono); font-size: var(--p-text-meta); letter-spacing: var(--p-track-meta); text-transform: uppercase; color: var(--p-muted); }
+
+/* ─── Live ops strip (dashboard) ─── */
+.mrp-shell .opstrip { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 0; padding: 0; background: var(--p-paper); border: 1px solid var(--p-grid); font-family: var(--mono); font-size: 9.5px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--p-ink-2); }
+.mrp-shell .opstrip .cell { padding: 8px 16px; border-right: 1px solid var(--p-grid); display: flex; align-items: baseline; gap: 8px; min-width: 0; }
+.mrp-shell .opstrip .cell:last-child { border-right: 0; }
+.mrp-shell .opstrip .cell .lbl { color: var(--p-muted); }
+.mrp-shell .opstrip .cell .v { color: var(--p-ink); font-weight: 500; letter-spacing: 0.04em; }
+.mrp-shell .opstrip .cell .v.acc { color: var(--p-accent); }
+.mrp-shell .opstrip .cell .v.warn { color: var(--p-warn); }
+
+@keyframes mrpPfPulse { 0%,100% { opacity: .4; } 50% { opacity: 1; } }
+.mrp-shell .pulse { width: 6px; height: 6px; border-radius: 50%; background: var(--p-ok); display: inline-block; animation: mrpPfPulse 1.6s infinite; }
+
+/* ─── Project crumb (module + project identity) ─── */
+.mrp-shell .projcrumb { display: flex; align-items: center; justify-content: space-between; padding: 11px 24px; border-bottom: 1px solid var(--p-grid); background: var(--p-paper-2); gap: 24px; }
+.mrp-shell .projcrumb .l { display: flex; align-items: center; gap: 10px; min-width: 0; flex-wrap: wrap; }
+.mrp-shell .projcrumb .crumb { font-family: var(--mono); font-size: 10px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--p-ink-2); display: inline-flex; align-items: center; gap: 8px; }
+.mrp-shell .projcrumb .crumb.muted { color: var(--p-muted); }
+.mrp-shell .projcrumb .crumb.act { color: var(--p-accent); }
+.mrp-shell .projcrumb .crumb .av { width: 18px; height: 18px; background: var(--p-accent); color: var(--p-paper); font-family: var(--mono); font-size: 9px; display: inline-flex; align-items: center; justify-content: center; letter-spacing: 0; }
+.mrp-shell .projcrumb .sep { color: var(--p-grid); font-family: var(--mono); font-size: 11px; }
+.mrp-shell .projcrumb .r { display: flex; gap: 0; align-items: stretch; }
+.mrp-shell .projcrumb .r .id { display: inline-flex; flex-direction: column; gap: 2px; padding: 0 14px; border-left: 1px solid var(--p-grid); }
+.mrp-shell .projcrumb .r .id:first-child { border-left: 0; padding-left: 0; }
+.mrp-shell .projcrumb .r .id .lbl { font-family: var(--mono); font-size: 8px; letter-spacing: 0.2em; text-transform: uppercase; color: var(--p-muted); }
+.mrp-shell .projcrumb .r .id .v { font-family: var(--mono); font-size: 11px; letter-spacing: 0.06em; color: var(--p-ink); font-weight: 500; }
+
+/* ─── Project context bar (team · flags · last activity) ─── */
+.mrp-shell .projctx { display: flex; align-items: stretch; padding: 0; border-bottom: 1px solid var(--p-grid); background: var(--p-paper); position: relative; }
+.mrp-shell .projctx .seg { display: flex; align-items: center; gap: 10px; padding: 9px 18px; border-right: 1px solid var(--p-grid); min-width: 0; flex: 0 0 auto; }
+.mrp-shell .projctx .seg.activity { flex: 1 1 auto; border-right: 0; }
+.mrp-shell .projctx .seg .lbl { font-family: var(--mono); font-size: 8.5px; letter-spacing: 0.2em; text-transform: uppercase; color: var(--p-muted); white-space: nowrap; }
+.mrp-shell .projctx .team .avs { display: flex; gap: 4px; }
+.mrp-shell .projctx .team .av { width: 22px; height: 22px; background: var(--p-ink); color: var(--p-paper); font-family: var(--mono); font-size: 9px; display: inline-flex; align-items: center; justify-content: center; letter-spacing: 0; cursor: default; position: relative; }
+.mrp-shell .projctx .team .av.off { background: var(--p-grid); color: var(--p-muted); }
+.mrp-shell .projctx .team .av.on::after { content: ""; position: absolute; bottom: -1px; right: -1px; width: 6px; height: 6px; background: var(--p-ok); border: 1px solid var(--p-paper); }
+.mrp-shell .projctx .flags { cursor: pointer; position: relative; padding-left: 22px; background: none; border: 0; }
+.mrp-shell .projctx .flags:hover { background: var(--p-paper-2); }
+.mrp-shell .projctx .flags .sevbar { position: absolute; left: 0; top: 0; bottom: 0; width: 4px; }
+.mrp-shell .projctx .flags.sev-hot .sevbar { background: var(--p-hot); }
+.mrp-shell .projctx .flags.sev-warn .sevbar { background: var(--p-warn); }
+.mrp-shell .projctx .flags.sev-info .sevbar { background: var(--p-info); }
+.mrp-shell .projctx .flags .cnt { font-family: var(--mazius); font-size: 22px; line-height: 1; padding: 0 2px 0 0; }
+.mrp-shell .projctx .flags.sev-hot .cnt { color: var(--p-hot); }
+.mrp-shell .projctx .flags.sev-warn .cnt { color: var(--p-warn); }
+.mrp-shell .projctx .flags.sev-info .cnt { color: var(--p-info); }
+.mrp-shell .projctx .flags .sevdots { display: inline-flex; gap: 3px; }
+.mrp-shell .projctx .flags .sd { width: 8px; height: 8px; display: inline-block; border-radius: 1px; }
+.mrp-shell .projctx .flags .sd.sev-hot { background: var(--p-hot); }
+.mrp-shell .projctx .flags .sd.sev-warn { background: var(--p-warn); }
+.mrp-shell .projctx .flags .sd.sev-info { background: var(--p-info); }
+.mrp-shell .projctx .flags .hint { font-family: var(--mono); font-size: 9px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--p-muted); }
+.mrp-shell .projctx .flags .hint .hot { color: var(--p-hot); font-weight: 500; }
+.mrp-shell .projctx .flags .hint .warn { color: var(--p-warn); font-weight: 500; }
+.mrp-shell .projctx .flags .hint .info { color: var(--p-info); font-weight: 500; }
+.mrp-shell .projctx .flags .chev { color: var(--p-muted); font-size: 10px; margin-left: 2px; }
+.mrp-shell .projctx .activity .ts { font-size: 9px; letter-spacing: 0.14em; color: var(--p-muted); }
+.mrp-shell .projctx .activity .ev { font-size: 11.5px; color: var(--p-ink-2); flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mrp-shell .projctx .activity .link { font-family: var(--mono); font-size: 9px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--p-accent); cursor: pointer; text-decoration: none; padding: 0 0 0 14px; border-left: 1px solid var(--p-grid); margin-left: auto; }
+.mrp-shell .projctx .seg .link { font-family: var(--mono); font-size: 9px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--p-accent); cursor: pointer; text-decoration: none; }
+
+/* Flag drop-down */
+.mrp-shell .projctx .flagdrop { position: absolute; top: 100%; left: 0; right: 0; background: var(--p-paper); border-bottom: 1px solid var(--p-grid); box-shadow: 0 8px 16px rgba(27, 26, 23, 0.06); z-index: 5; }
+.mrp-shell .projctx .flagrow { display: grid; grid-template-columns: 140px 80px 1fr auto; gap: 14px; align-items: center; padding: 10px 18px; border-top: 1px solid var(--p-grid-2); }
+.mrp-shell .projctx .flagrow:first-child { border-top: 0; }
+.mrp-shell .projctx .flagrow .code { font-size: 9px; color: var(--p-muted); letter-spacing: 0.14em; }
+.mrp-shell .projctx .flagrow .t { font-size: 12px; color: var(--p-ink-2); }
+
+/* ─── Phase rail (14-stop, two tracks) ─── */
+.mrp-shell .phaserail { padding: 10px 24px 8px; border-bottom: 1px solid var(--p-grid); background: var(--p-paper); }
+.mrp-shell .phaserail .top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; gap: 24px; }
+.mrp-shell .phaserail .ttl { display: flex; align-items: baseline; gap: 10px; min-width: 0; }
+.mrp-shell .phaserail .ttl .code { font-family: var(--mono); font-size: 10px; letter-spacing: 0.16em; color: var(--p-muted); white-space: nowrap; }
+.mrp-shell .phaserail .ttl .name { font-family: var(--mazius); font-size: 15px; line-height: 1; letter-spacing: -0.012em; color: var(--p-ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.mrp-shell .phaserail .right { display: flex; gap: 14px; align-items: center; }
+.mrp-shell .phaserail .right .mini { font-family: var(--mono); font-size: 9.5px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--p-muted); }
+.mrp-shell .phaserail .right .mini b { color: var(--p-ink); font-weight: 500; letter-spacing: 0.02em; }
+.mrp-shell .phaserail .right .mini.acc b { color: var(--p-accent); }
+
+.mrp-shell .tracks { display: grid; grid-template-columns: 1fr 1px 1fr; gap: 0; }
+.mrp-shell .tracks .div { background: var(--p-grid); }
+.mrp-shell .track { padding: 0 14px; }
+.mrp-shell .track:first-child { padding-left: 0; }
+.mrp-shell .track:last-child { padding-right: 0; }
+.mrp-shell .track .lbl { display: flex; align-items: center; gap: 10px; margin-bottom: 5px; }
+.mrp-shell .track .lbl .tag { font-family: var(--mono); font-size: 8.5px; letter-spacing: 0.2em; text-transform: uppercase; color: var(--p-muted); }
+.mrp-shell .track .lbl .tag.act { color: var(--p-accent); }
+.mrp-shell .track .steps { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 0; }
+.mrp-shell .track .step { padding: 6px 6px 4px; border-top: 1px solid var(--p-grid); position: relative; cursor: pointer; background: none; border-left: 0; border-right: 0; border-bottom: 0; text-align: left; font-family: inherit; }
+.mrp-shell .track .step.done { border-top-color: var(--p-ink); }
+.mrp-shell .track .step.now { border-top: 2px solid var(--p-accent); padding-top: 5px; }
+.mrp-shell .track .step.skipped { opacity: 0.5; }
+.mrp-shell .track .step .n { font-family: var(--mono); font-size: 8px; letter-spacing: 0.12em; color: var(--p-muted); }
+.mrp-shell .track .step .name { font-family: var(--mono); font-size: 9px; letter-spacing: 0.04em; color: var(--p-muted); margin-top: 2px; line-height: 1.2; }
+.mrp-shell .track .step.now .name { color: var(--p-accent); font-weight: 500; }
+.mrp-shell .track .step.done .name { color: var(--p-ink-2); }
+.mrp-shell .track .step .evidence { font-family: var(--mono); font-size: 8px; letter-spacing: 0.04em; color: var(--p-muted); margin-top: 3px; line-height: 1.2; opacity: 0.7; }
+
+/* Mini phase rail (used on dashboard project cards) */
+.mrp-shell .mini-phase-rail { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 2px; }
+.mrp-shell .mini-phase-rail .dot { height: 4px; background: var(--p-grid); border-radius: 1px; }
+.mrp-shell .mini-phase-rail .dot.done { background: var(--p-ink); }
+.mrp-shell .mini-phase-rail .dot.now { background: var(--p-accent); }
+.mrp-shell .mini-phase-rail .dot.skipped { background: var(--p-grid-2); }
+
+/* ─── Main grid ─── */
+.mrp-shell .workspace { display: grid; grid-template-columns: 200px 1fr 280px; min-height: calc(100vh - 280px); }
+.mrp-shell .workspace.no-rail { grid-template-columns: 200px 1fr; }
+.mrp-shell .workspace > .sidebar { border-right: 1px solid var(--p-grid); padding: 18px 0; background: var(--p-rail); }
+.mrp-shell .workspace > .sidebar .grp { padding: 0 16px; margin-bottom: 18px; }
+.mrp-shell .workspace > .sidebar .grp .h { font-family: var(--mono); font-size: 9px; letter-spacing: 0.22em; text-transform: uppercase; color: var(--p-muted); margin-bottom: 8px; padding-left: 4px; }
+.mrp-shell .workspace > .sidebar .item { display: flex; align-items: center; justify-content: space-between; padding: 7px 8px; cursor: pointer; font-size: 12px; color: var(--p-ink-2); border-left: 2px solid transparent; background: none; border-top: 0; border-right: 0; border-bottom: 0; width: 100%; text-align: left; font-family: inherit; }
+.mrp-shell .workspace > .sidebar .item:hover { background: var(--p-paper-2); }
+.mrp-shell .workspace > .sidebar .item.active { color: var(--p-ink); border-left-color: var(--p-accent); background: var(--p-paper-2); }
+.mrp-shell .workspace > .sidebar .item .badge { font-family: var(--mono); font-size: 9px; color: var(--p-muted); padding: 1px 5px; border: 1px solid var(--p-grid); }
+.mrp-shell .workspace > .sidebar .item.active .badge { color: var(--p-accent); border-color: var(--p-accent); }
+
+.mrp-shell .mainpane { padding: 0; min-width: 0; background: transparent; }
+.mrp-shell .rightrail { border-left: 1px solid var(--p-grid); padding: 20px 18px; background: var(--p-paper); }
+
+/* ─── Module headers ─── */
+.mrp-shell .modhead { display: flex; align-items: flex-end; justify-content: space-between; padding: 22px 24px 16px; border-bottom: 1px solid var(--p-grid); }
+.mrp-shell .modhead .l { display: flex; align-items: baseline; gap: 14px; flex-direction: column; }
+.mrp-shell .modhead .l .kk { font-family: var(--mono); font-size: 10px; letter-spacing: 0.22em; text-transform: uppercase; color: var(--p-muted); }
+.mrp-shell .modhead .l h2 { font-family: var(--mazius); font-size: 34px; line-height: .95; letter-spacing: -0.02em; margin: 0; font-weight: 400; }
+.mrp-shell .modhead .l h2 em { font-style: italic; color: var(--p-accent); }
+.mrp-shell .modhead .r { display: flex; gap: 8px; }
+
+/* ─── Buttons ─── */
+.mrp-shell .mrp-btn { display: inline-flex; align-items: center; gap: 8px; padding: 8px 14px; border: 1px solid var(--p-ink); background: var(--p-ink); color: var(--p-paper); font-family: var(--mono); font-size: 10px; letter-spacing: 0.18em; text-transform: uppercase; cursor: pointer; transition: all .15s; }
+.mrp-shell .mrp-btn:hover:not(:disabled) { background: var(--p-accent); border-color: var(--p-accent); }
+.mrp-shell .mrp-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.mrp-shell .mrp-btn.ghost { background: transparent; color: var(--p-ink); border-color: var(--p-grid); }
+.mrp-shell .mrp-btn.ghost:hover:not(:disabled) { background: transparent; color: var(--p-ink); border-color: var(--p-ink); }
+.mrp-shell .mrp-btn.sm { padding: 5px 10px; font-size: 9px; }
+.mrp-shell .mrp-btn.acc { background: var(--p-accent); border-color: var(--p-accent); color: #fff; }
+.mrp-shell .mrp-btn.full { width: 100%; justify-content: center; margin-top: 14px; }
+
+/* ─── Status pills ─── */
+.mrp-shell .mrp-pill { display: inline-flex; align-items: center; gap: 6px; padding: 3px 8px; border: 1px solid currentColor; font-family: var(--mono); font-size: 9px; letter-spacing: 0.18em; text-transform: uppercase; }
+.mrp-shell .mrp-pill .dot { width: 5px; height: 5px; border-radius: 50%; background: currentColor; }
+.mrp-shell .mrp-pill.ok    { color: var(--p-ok); }
+.mrp-shell .mrp-pill.warn  { color: var(--p-warn); }
+.mrp-shell .mrp-pill.info  { color: var(--p-info); }
+.mrp-shell .mrp-pill.hot   { color: var(--p-hot); }
+.mrp-shell .mrp-pill.muted { color: var(--p-muted); }
+.mrp-shell .mrp-pill.acc   { color: var(--p-accent); }
+
+.mrp-shell .viewlbl { padding: 8px 18px; background: var(--p-rail); border-bottom: 1px solid var(--p-grid); font-family: var(--mono); font-size: 9.5px; letter-spacing: 0.22em; text-transform: uppercase; color: var(--p-muted); display: flex; justify-content: space-between; align-items: center; }
+.mrp-shell .viewlbl b { color: var(--p-ink); font-weight: 500; }
+
+/* ────────── Intake (Variant A) — Identity strip + tabs ────────── */
+.mrp-shell .idstrip { display: grid; grid-template-columns: 1fr auto auto; gap: 0; border-bottom: 1px solid var(--p-grid); align-items: stretch; }
+.mrp-shell .idstrip .cell { padding: 14px 22px; border-right: 1px solid var(--p-grid); }
+.mrp-shell .idstrip .cell:last-child { border-right: 0; }
+.mrp-shell .idstrip .cell .name { font-family: var(--mazius); font-size: 22px; line-height: 1; letter-spacing: -0.018em; }
+.mrp-shell .idstrip .cell .meta { display: flex; gap: 8px; margin-top: 6px; font-size: 10px; align-items: center; color: var(--p-muted); }
+.mrp-shell .idstrip .cell.stats { display: flex; gap: 0; padding: 0; }
+.mrp-shell .idstrip .cell.stats .stat { padding: 14px 18px; border-right: 1px solid var(--p-grid-2); display: flex; flex-direction: column; gap: 4px; min-width: 96px; }
+.mrp-shell .idstrip .cell.stats .stat:last-child { border-right: 0; }
+.mrp-shell .idstrip .cell.stats .stat .meta { font-family: var(--mono); font-size: 9px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--p-muted); }
+.mrp-shell .idstrip .cell.stats .stat .v { font-family: var(--mono); font-size: 14px; color: var(--p-ink); }
+.mrp-shell .idstrip .cell.stats .stat .v.on { color: var(--p-ok); }
+.mrp-shell .idstrip .cell.stats .stat .v.over { color: var(--p-hot); }
+.mrp-shell .idstrip .cell.gate { padding: 12px 22px; display: flex; flex-direction: column; align-items: flex-start; gap: 2px; background: var(--p-paper-2); }
+.mrp-shell .idstrip .cell.gate .meta { font-family: var(--mono); font-size: 9px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--p-muted); }
+.mrp-shell .idstrip .cell.gate .goval { font-family: var(--mazius); font-size: 32px; line-height: 1; color: var(--p-ok); font-style: italic; }
+.mrp-shell .idstrip .cell.gate .sub { font-family: var(--mono); font-size: 9px; color: var(--p-muted); letter-spacing: 0.14em; }
+
+/* Section tabs */
+.mrp-shell .modtabs { display: flex; gap: 0; padding: 0 22px; border-bottom: 1px solid var(--p-grid); background: var(--p-paper); flex-wrap: wrap; }
+.mrp-shell .modtabs button { background: none; border: none; padding: 12px 16px; cursor: pointer; font-family: var(--mono); font-size: 10px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--p-muted); border-bottom: 2px solid transparent; margin-bottom: -1px; display: inline-flex; align-items: center; gap: 6px; }
+.mrp-shell .modtabs button:hover { color: var(--p-ink-2); }
+.mrp-shell .modtabs button.on { color: var(--p-ink); border-bottom-color: var(--p-accent); }
+.mrp-shell .modtabs button .n { color: var(--p-muted); font-size: 9px; }
+
+/* Two-column intake grid */
+.mrp-shell .intgrid { display: grid; grid-template-columns: 1.4fr 1fr; gap: 0; }
+.mrp-shell .intgrid .col { padding: 22px 24px; min-width: 0; }
+.mrp-shell .intgrid .col.form { border-right: 1px solid var(--p-grid); }
+.mrp-shell .intgrid .col .mrp-kicker { display: block; margin-bottom: 14px; }
+
+/* Field row */
+.mrp-shell .frow { display: grid; grid-template-columns: 160px 1fr; gap: 14px; padding: 9px 0; border-bottom: 1px solid var(--p-grid-2); align-items: baseline; }
+.mrp-shell .frow .lbl { font-family: var(--mono); font-size: 9px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--p-muted); }
+.mrp-shell .frow .val { font-size: 13px; color: var(--p-ink); line-height: 1.4; }
+.mrp-shell .frow .val.acc { color: var(--p-accent); }
+.mrp-shell .frow .val.mono { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+.mrp-shell .frow .hint { grid-column: 2; font-family: var(--mono); font-size: 9px; color: var(--p-muted); letter-spacing: 0.12em; margin-top: 2px; }
+
+.mrp-shell .chips { display: flex; gap: 6px; flex-wrap: wrap; }
+.mrp-shell .chips.wrap { gap: 8px; }
+.mrp-shell .chip { font-family: var(--mono); font-size: 10px; letter-spacing: 0.06em; padding: 4px 9px; border: 1px solid var(--p-grid); color: var(--p-ink-2); background: var(--p-paper); }
+.mrp-shell .chip.avoid { color: var(--p-hot); border-color: var(--p-hot); border-style: dashed; }
+.mrp-shell .chip.reg { background: var(--p-card); }
+
+/* Volumes grid */
+.mrp-shell .vgrid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 18px; }
+.mrp-shell .vstat { padding: 14px; border: 1px solid var(--p-grid); background: var(--p-card); }
+.mrp-shell .vstat .meta { font-family: var(--mono); font-size: 9px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--p-muted); }
+.mrp-shell .vstat .vbig { font-family: var(--mazius); font-size: 32px; line-height: 1; margin-top: 6px; }
+.mrp-shell .vstat .vbig em { font-family: var(--mono); font-size: 14px; font-style: normal; color: var(--p-muted); margin-left: 4px; letter-spacing: 0; }
+.mrp-shell .vstat .vbig.acc { color: var(--p-accent); }
+.mrp-shell .vstat .sub { font-family: var(--mono); font-size: 9px; color: var(--p-muted); margin-top: 6px; letter-spacing: 0.12em; }
+
+/* Live project card (right side) */
+.mrp-shell .col.card { background: var(--p-paper-2); }
+.mrp-shell .pcard { padding: 18px; background: var(--p-paper); border: 1px solid var(--p-ink); }
+.mrp-shell .pcardhead { display: flex; justify-content: space-between; align-items: baseline; padding-bottom: 14px; margin-bottom: 14px; border-bottom: 1px solid var(--p-grid); }
+.mrp-shell .pcardhead .mrp-serif { font-size: 18px; line-height: 1.1; }
+.mrp-shell .mrp-kicker.minted { display: block; margin-top: 18px; margin-bottom: 8px; }
+.mrp-shell .ids { padding: 0; }
+.mrp-shell .idrow { display: flex; justify-content: space-between; padding: 7px 0; border-bottom: 1px solid var(--p-grid-2); font-size: 11px; }
+.mrp-shell .idrow:last-child { border-bottom: 0; }
+.mrp-shell .idrow .lbl { font-family: var(--mono); font-size: 9px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--p-muted); }
+.mrp-shell .idrow .v { font-family: var(--mono); color: var(--p-ink); font-size: 12px; }
+
+.mrp-shell .gateblock { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; padding: 12px; border: 1px solid var(--p-grid); background: var(--p-paper); }
+.mrp-shell .gateblock .grow { display: flex; flex-direction: column; gap: 3px; }
+.mrp-shell .gateblock .grow.full { grid-column: 1 / -1; }
+.mrp-shell .gateblock .grow .meta { font-family: var(--mono); font-size: 8.5px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--p-muted); }
+.mrp-shell .gateblock .grow .v { font-family: var(--mono); font-size: 14px; color: var(--p-ink); }
+.mrp-shell .gateblock .grow .v.ok { color: var(--p-ok); }
+.mrp-shell .gateblock .cbar { height: 6px; background: var(--p-grid-2); position: relative; margin-top: 4px; }
+.mrp-shell .gateblock .cbar span { position: absolute; left: 0; top: 0; bottom: 0; background: var(--p-ok); }
+.mrp-shell .gateblock .gate.gobig { grid-column: 1 / -1; padding: 14px; border-top: 1px solid var(--p-grid); display: flex; flex-direction: column; align-items: center; gap: 4px; }
+.mrp-shell .gateblock .gate.gobig .meta { font-family: var(--mono); font-size: 9px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--p-muted); }
+.mrp-shell .gateblock .gate.gobig .vbig { font-family: var(--mazius); font-size: 48px; line-height: 1; color: var(--p-ok); font-style: italic; }
+.mrp-shell .gateblock .gate.gobig .sub { font-family: var(--mono); font-size: 9px; color: var(--p-muted); letter-spacing: 0.16em; }
+
+.mrp-shell .handoff { padding: 0; }
+.mrp-shell .hdrow { display: flex; justify-content: space-between; padding: 7px 0; border-bottom: 1px solid var(--p-grid-2); font-size: 11px; }
+.mrp-shell .hdrow:last-child { border-bottom: 0; }
+.mrp-shell .hdrow .lbl { font-family: var(--mono); font-size: 9px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--p-muted); }
+
+.mrp-shell .fine { font-family: var(--mono); font-size: 9px; color: var(--p-muted); letter-spacing: 0.14em; margin-top: 8px; text-align: center; }
+
+/* ─── Project card (dashboard "My active projects") ───
+   These are dense workbench list rows, not editorial hero moments. */
+.mrp-shell .pdcard { display: flex; flex-direction: column; gap: 10px; padding: 16px; border: 1px solid var(--p-grid); background: var(--p-paper); transition: border-color .15s, transform .15s; text-decoration: none; color: inherit; }
+.mrp-shell .pdcard:hover { border-color: var(--p-ink); transform: translateY(-1px); }
+.mrp-shell .pdcard .top { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
+.mrp-shell .pdcard .code { font-family: var(--mono); font-size: 9px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--p-muted); }
+.mrp-shell .pdcard .name { font-family: var(--sans); font-size: 13px; line-height: 1.28; letter-spacing: -0.01em; font-weight: 600; color: var(--p-ink); }
+.mrp-shell .pdcard .sub { font-family: var(--sans); font-size: 12px; line-height: 1.4; color: var(--p-ink-2); }
+.mrp-shell .pdcard .meta { display: flex; justify-content: space-between; align-items: center; font-family: var(--mono); font-size: 9px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--p-muted); }
+.mrp-shell .pdcard .meta .now { color: var(--p-accent); font-weight: 500; }
+
+/* ─── Activity rail (used both in project right-rail and dashboard) ─── */
+.mrp-shell .activityrail .row { display: grid; grid-template-columns: auto 1fr auto; gap: 8px; padding: 8px 0; align-items: baseline; border-bottom: 1px solid var(--p-grid-2); }
+.mrp-shell .activityrail .row:last-child { border-bottom: 0; }
+.mrp-shell .activityrail .row .ts { font-family: var(--mono); font-size: 9px; color: var(--p-muted); letter-spacing: 0.06em; }
+.mrp-shell .activityrail .row .ev { font-size: 11.5px; color: var(--p-ink-2); line-height: 1.3; }
+
+/* ════════════════════════════════════════════════════════════════════════
+   RESPONSIVE — desktop-first; collapse gracefully at tablet/phone widths
+   ════════════════════════════════════════════════════════════════════════ */
+@media (max-width: 1024px) {
+  .mrp-shell .opstrip { grid-auto-flow: row; grid-template-columns: 1fr 1fr; grid-auto-columns: unset; }
+  .mrp-shell .opstrip .cell { padding: 7px 12px; }
+  .mrp-shell .opstrip .cell:nth-child(even) { border-right: 0; }
+
+  .mrp-shell .projcrumb { padding: 10px 14px; gap: 12px; flex-wrap: wrap; }
+  .mrp-shell .projcrumb .l { gap: 8px; }
+  .mrp-shell .projcrumb .r { flex-wrap: wrap; gap: 0; }
+  .mrp-shell .projcrumb .r .id { padding: 0 10px; }
+  .mrp-shell .projcrumb .r .id:first-child { padding-left: 0; }
+
+  .mrp-shell .projctx { flex-wrap: wrap; }
+  .mrp-shell .projctx .seg { padding: 8px 14px; }
+  .mrp-shell .projctx .seg.activity { flex: 1 1 100%; border-top: 1px solid var(--p-grid-2); }
+
+  .mrp-shell .phaserail { padding: 10px 14px 8px; }
+  .mrp-shell .phaserail .top { flex-wrap: wrap; gap: 12px; margin-bottom: 8px; }
+  .mrp-shell .phaserail .right { gap: 10px; flex-wrap: wrap; }
+  .mrp-shell .tracks { grid-template-columns: 1fr; gap: 10px; }
+  .mrp-shell .tracks .div { display: none; }
+  .mrp-shell .track:first-child, .mrp-shell .track:last-child { padding: 0; }
+  .mrp-shell .track .step .name { font-size: 8.5px; }
+
+  .mrp-shell .workspace, .mrp-shell .workspace.no-rail { grid-template-columns: 1fr; }
+  .mrp-shell .workspace > .sidebar { border-right: 0; border-bottom: 1px solid var(--p-grid); padding: 10px 0; display: flex; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  .mrp-shell .workspace > .sidebar .grp { padding: 0 14px; margin-bottom: 0; border-right: 1px solid var(--p-grid-2); flex: 0 0 auto; }
+  .mrp-shell .workspace > .sidebar .grp:last-child { border-right: 0; }
+  .mrp-shell .workspace > .sidebar .grp .h { margin-bottom: 4px; }
+  .mrp-shell .workspace > .sidebar .item { padding: 5px 8px; font-size: 11px; white-space: nowrap; border-left: 0; border-bottom: 2px solid transparent; }
+  .mrp-shell .workspace > .sidebar .item.active { border-left: 0; border-bottom-color: var(--p-accent); }
+
+  .mrp-shell .rightrail { border-left: 0; border-top: 1px solid var(--p-grid); }
+
+  .mrp-shell .modhead { padding: 16px 16px 12px; flex-direction: column; align-items: flex-start; gap: 12px; }
+  .mrp-shell .modhead .l { gap: 8px; flex-wrap: wrap; }
+  .mrp-shell .modhead .l h2 { font-size: 26px; }
+  .mrp-shell .modhead .r { flex-wrap: wrap; }
+
+  .mrp-shell .idstrip { grid-template-columns: 1fr; }
+  .mrp-shell .idstrip .cell { border-right: 0; border-bottom: 1px solid var(--p-grid); padding: 12px 16px; }
+  .mrp-shell .idstrip .cell:last-child { border-bottom: 0; }
+  .mrp-shell .idstrip .cell.stats { flex-wrap: wrap; }
+  .mrp-shell .idstrip .cell.stats .stat { min-width: 90px; padding: 10px 14px; border-bottom: 1px solid var(--p-grid-2); flex: 1 1 33%; }
+
+  .mrp-shell .modtabs { padding: 0 12px; overflow-x: auto; -webkit-overflow-scrolling: touch; flex-wrap: nowrap; }
+  .mrp-shell .modtabs button { flex-shrink: 0; padding: 11px 14px; }
+
+  .mrp-shell .intgrid { grid-template-columns: 1fr; }
+  .mrp-shell .intgrid .col { padding: 16px 16px; }
+  .mrp-shell .intgrid .col.form { border-right: 0; border-bottom: 1px solid var(--p-grid); }
+
+  .mrp-shell .frow { grid-template-columns: 1fr; gap: 4px; padding: 8px 0; }
+  .mrp-shell .frow .hint { grid-column: 1; }
+
+  .mrp-shell .vgrid { grid-template-columns: 1fr 1fr; gap: 10px; }
+  .mrp-shell .vstat { padding: 12px; }
+  .mrp-shell .vstat .vbig { font-size: 26px; }
+}
+
+@media (max-width: 640px) {
+  .mrp-shell .opstrip { grid-template-columns: 1fr; }
+  .mrp-shell .opstrip .cell { border-right: 0; border-bottom: 1px solid var(--p-grid-2); }
+  .mrp-shell .opstrip .cell:last-child { border-bottom: 0; }
+
+  .mrp-shell .projctx .seg { padding: 7px 12px; flex: 1 1 auto; }
+  .mrp-shell .projctx .seg.team { flex: 1 1 100%; }
+
+  .mrp-shell .track .steps { grid-auto-flow: column; grid-auto-columns: minmax(80px, 1fr); overflow-x: auto; }
+  .mrp-shell .track .step { padding: 5px 5px 3px; }
+
+  .mrp-shell .modhead .l h2 { font-size: 22px; line-height: 1; }
+  .mrp-shell .idstrip .cell.stats .stat { flex: 1 1 50%; min-width: 0; }
+  .mrp-shell .vgrid { grid-template-columns: 1fr; }
+  .mrp-shell .gateblock { grid-template-columns: 1fr; }
+  .mrp-shell .gateblock .grow.full { grid-column: auto; }
+}

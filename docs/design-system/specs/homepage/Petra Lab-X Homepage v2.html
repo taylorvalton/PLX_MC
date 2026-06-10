@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Petra Lab-X — Frontier lab for breakthrough products at scale</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Fraunces:ital,wght@0,300..900;1,300..900&family=EB+Garamond:ital,wght@0,400..800;1,400..800&family=Inter+Tight:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+    <style>
+      html, body { margin:0; padding:0; background:#f3ede1; color:#0c1a14; font-family:"Inter Tight", system-ui, sans-serif; }
+      img { display:block; max-width:100%; }
+    </style>
+    <script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+    <script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+    <script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+    <script type="text/babel" src="tweaks-panel.jsx"></script>
+    <script type="text/babel" src="apothecary-homepage.jsx"></script>
+    <script type="text/babel" src="apothecary-sections.jsx"></script>
+    <script type="text/babel" src="apothecary-sections-2.jsx"></script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="text/babel" data-presets="env,react">
+      function App() {
+        const [tweaks, setTweak] = useApothecaryTweaks();
+        const headlineFonts = ['Instrument Serif','Fraunces','EB Garamond','GT Sectra'];
+        const paperTones = [
+          {label:'Warm cream', value:'#f3ede1'},
+          {label:'Aged manila', value:'#ece6d4'},
+          {label:'Soft bone', value:'#f7f2e8'},
+          {label:'Linen', value:'#efe7d3'},
+        ];
+        const accentSwatches = [
+          {label:'Forest', value:'#0a3a2a'},
+          {label:'Rust', value:'#a83a26'},
+          {label:'Plum', value:'#5b3a8a'},
+          {label:'Indigo', value:'#1f3a8a'},
+          {label:'Tobacco', value:'#7a5a26'},
+          {label:'Char', value:'#0c1a14'},
+        ];
+        const hotSwatches = [
+          {label:'Rust', value:'#a83a26'},
+          {label:'Safety', value:'#ff5a1f'},
+          {label:'Citron', value:'#c8a32e'},
+          {label:'Coral', value:'#d96a4a'},
+        ];
+
+        return (
+          <>
+            <ApothecaryHomepageFull tweaks={tweaks}/>
+
+            <TweaksPanel title="Tweaks">
+              <TweakSection title="Accent — primary">
+                <TweakColor label="Accent" value={tweaks.accent} onChange={v => setTweak('accent', v)} />
+                <div style={{display:'flex', gap:8, flexWrap:'wrap', marginTop:10}}>
+                  {accentSwatches.map(s => (
+                    <button key={s.value} title={s.label} onClick={()=>setTweak('accent', s.value)}
+                      style={{width:30,height:30,borderRadius:6,border: tweaks.accent===s.value ? '2px solid #0c1a14' : '1px solid #ccc',background:s.value,cursor:'pointer'}} />
+                  ))}
+                </div>
+              </TweakSection>
+
+              <TweakSection title="Accent — hot / industrial">
+                <TweakColor label="Hot accent" value={tweaks.hot} onChange={v => setTweak('hot', v)} />
+                <div style={{display:'flex', gap:8, flexWrap:'wrap', marginTop:10}}>
+                  {hotSwatches.map(s => (
+                    <button key={s.value} title={s.label} onClick={()=>setTweak('hot', s.value)}
+                      style={{width:30,height:30,borderRadius:6,border: tweaks.hot===s.value ? '2px solid #0c1a14' : '1px solid #ccc',background:s.value,cursor:'pointer'}} />
+                  ))}
+                </div>
+              </TweakSection>
+
+              <TweakSection title="Paper tone">
+                <div style={{display:'flex', gap:8, flexWrap:'wrap'}}>
+                  {paperTones.map(s => (
+                    <button key={s.value} title={s.label} onClick={()=>setTweak('paper', s.value)}
+                      style={{padding:'10px 12px', borderRadius:6, border: tweaks.paper===s.value ? '2px solid #0c1a14' : '1px solid #ccc', background:s.value, cursor:'pointer', fontFamily:'JetBrains Mono, monospace', fontSize:10, letterSpacing:'0.18em', textTransform:'uppercase', color:'#0c1a14'}}>
+                      {s.label}
+                    </button>
+                  ))}
+                </div>
+              </TweakSection>
+
+              <TweakSection title="Headline font">
+                <TweakSelect
+                  value={tweaks.headlineFont}
+                  onChange={v => setTweak('headlineFont', v)}
+                  options={headlineFonts.map(f => ({value:f, label:f}))}
+                />
+              </TweakSection>
+
+              <TweakSection title="Industrial elements">
+                <TweakToggle label="Top ticker" value={tweaks.showTicker} onChange={v => setTweak('showTicker', v)} />
+                <TweakToggle label="Crosshairs &amp; grid" value={tweaks.showCrosshairs} onChange={v => setTweak('showCrosshairs', v)} />
+                <TweakToggle label="Figure callouts (REF / FIG.)" value={tweaks.showFigCallouts} onChange={v => setTweak('showFigCallouts', v)} />
+              </TweakSection>
+            </TweaksPanel>
+          </>
+        );
+      }
+
+      ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+    </script>
+  </body>
+</html>
