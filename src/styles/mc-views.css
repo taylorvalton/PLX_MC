@@ -204,6 +204,12 @@
   grid-template-columns: 84px minmax(220px, 2.2fr) 130px 132px 150px 90px 120px;
   gap: 16px;
   padding: 11px 26px;
+  /* Rows are <button>s (keyboard-accessible) — neutralize UA button styling. */
+  width: 100%;
+  background: none;
+  border: 0;
+  font-family: inherit;
+  font-size: inherit;
   border-bottom: 1px solid var(--p-grid-2);
   cursor: pointer;
   text-decoration: none;
@@ -333,6 +339,14 @@
 .mc .tl .row {
   display: grid;
   grid-template-columns: 240px 1fr;
+  /* Rows are <button>s — neutralize UA button styling so the 1fr track keeps
+     its width (the Gantt bars are absolutely positioned inside it). */
+  width: 100%;
+  padding: 0;
+  background: none;
+  border: 0;
+  font-family: inherit;
+  font-size: inherit;
   border-bottom: 1px solid var(--p-grid-2);
   cursor: pointer;
   text-decoration: none;
