@@ -6,6 +6,7 @@ import type { ComponentType } from "react";
 import { InboxView } from "./inbox";
 import type { Screen, ScreenProps } from "./route";
 import { TaskDetailView } from "./task-detail";
+import { WorkViews } from "./work-views";
 
 const SCREEN_TITLES: Record<Screen, string> = {
   home: "Inbox",
@@ -50,9 +51,9 @@ function comingSoon(screen: Screen): ComponentType<ScreenProps> {
 
 export const SCREENS: Record<Screen, ComponentType<ScreenProps>> = {
   home: InboxView,
-  board: comingSoon("board"),
-  list: comingSoon("list"),
-  timeline: comingSoon("timeline"),
+  board: WorkViews,
+  list: WorkViews,
+  timeline: WorkViews,
   matrix: comingSoon("matrix"),
   feed: comingSoon("feed"),
   bucket: comingSoon("bucket"),
