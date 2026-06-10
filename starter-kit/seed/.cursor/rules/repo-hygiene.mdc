@@ -1,0 +1,54 @@
+---
+description: File placement, naming, and archival rules enforced at edit time
+globs:
+alwaysApply: true
+---
+
+# Repo Hygiene Rules
+
+Canonical spec: `docs/REPO_HYGIENE_SPEC.md`. These rules enforce it at edit time.
+
+## Root directory
+
+Do NOT create files at repo root matching these patterns:
+- `FINAL_*`, `QA_*`
+- `*_SUMMARY.md`, `*_REPORT.md`, `*_ASSESSMENT.md`, `*_COMPLETION*.md`
+- Date-stamped status docs (e.g. `*_20260610.md`)
+
+Approved root files are listed in `config/governance-contract.yaml`
+(`repo_hygiene.approved_root_files`). Everything else goes to `docs/`,
+`artifacts/`, or `archive/`.
+
+## Generated reports and evidence
+
+All QA reports, research outputs, verification results, and incident evidence
+must go into a **dated bundle folder**:
+
+```
+artifacts/<domain>/<yyyy-mm-dd>-<slug>/REPORT.md
+```
+
+Never place loose files directly under `artifacts/`. Each bundle needs at
+minimum `REPORT.md` (or `VERDICT.md`) and `index.md` (or `artifacts.json`).
+
+## Naming
+
+- Do not use status adjectives in filenames: `FINAL`, `COMPLETE`, `LATEST`, `NEW`, `FIXED`.
+- Do not create case-variant duplicates (e.g. `Foo_Summary.md` alongside `FOO_SUMMARY.md`).
+- Use lowercase kebab-case for evidence bundle slugs.
+
+## Archive
+
+Superseded or historical material goes to `archive/<yyyy-mm-dd>-<reason>/` with
+a `README.md` explaining reason, original location, and restore policy.
+
+## Canonical Source Policy
+
+Every document has exactly one canonical location. Secondary copies are only
+permitted as generated consumers (written by automation, never edited directly).
+
+## Module Documentation
+
+Every new module must have a contract README at `docs/modules/<module>/README.md`
+with sections: What, Why, How, Dependencies, Owner. A new module without a
+contract README is a hygiene violation.

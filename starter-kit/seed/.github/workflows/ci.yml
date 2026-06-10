@@ -1,0 +1,40 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    name: Preflight + full suite
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      # TODO: adjust install for your stack. pyyaml + ruff + pytest are
+      # required by the preflight gate itself.
+      - name: Install dependencies
+        run: |
+          pip install pyyaml ruff pytest
+          if [ -f pyproject.toml ]; then pip install -e ".[dev]"; fi
+
+      # TODO: enable if the project has a Node side.
+      # - name: Set up Node
+      #   uses: actions/setup-node@v4
+      #   with:
+      #     node-version-file: .nvmrc
+      # - name: Install Node dependencies
+      #   run: npm ci
+
+      - name: Policy gate (same command agents run locally)
+        run: ./scripts/preflight.sh --mode ci
+
+      - name: Full suite (same command as pre-push)
+        run: ./scripts/preflight.sh --mode pre-push
