@@ -15,4 +15,6 @@ key files change, update its contract in the same PR.
 
 | Module | Owner | Criticality | Contract |
 |---|---|---|---|
-| <module> | <owner> | Critical / High / Medium / Low | `docs/modules/<module>/README.md` |
+| governance | Vince | High | `docs/modules/governance/README.md` |
+| design-system | Vince | High | `docs/modules/design-system/README.md` |
+| web | Vince | Critical | `docs/modules/web/README.md` |

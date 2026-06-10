@@ -1,26 +1,61 @@
-# PLX_MC
+# PLX Mission Control
 
-PLX Mission Control.
+Agent-operated work hub for Petra Lab-X: humans direct, review, approve, and
+assign; background agents do the work. A **two-way SharePoint mirror**
+(`petrasoap.sharepoint.com/sites/plx-mission-control`) is the canonical system
+of record — the app is a fast, opinionated lens over it, with manual conflict
+resolution and a full audit trail. Colleagues across `@petralabx.com` /
+`@petrasoap.com` can be tasked via the Microsoft 365 directory.
 
-## Design system
+**Why:** everything resolves to a Task, every change mirrors to the record,
+and work is traceable end-to-end (PRD requirement → task → PR → evidence →
+test status → merge commit). The full product spec lives in
+[`docs/product/`](docs/product/README.md).
 
-This repo carries the PLX design system, forked from `plx-customer-portal` (`staging` @ `c92f1df5`, 2026-05-19). Mission Control is the fourth brand surface under ADR-002 — see `docs/design-system/decisions/ADR-003-mission-control-surface.md`.
+## Stack
 
+- **Web:** Next.js (App Router) + TypeScript + React — `src/app/`
+- **Brand:** PLX design system, fourth brand surface per
+  [ADR-003](docs/design-system/decisions/ADR-003-mission-control-surface.md) —
+  `--p-*` tokens, opt-in `.brand-plx` boundary
+- **Governance tooling:** Python 3.12 (`scripts/`, gated by `requirements.txt`)
+- **System of record:** SharePoint Online via Microsoft Graph (sync engine
+  spec: [`docs/product/SHAREPOINT_INTEGRATION.md`](docs/product/SHAREPOINT_INTEGRATION.md))
+
+## Quickstart
+
+```bash
+# 1. Node side
+npm install
+npm run dev                # http://localhost:3000
+
+# 2. Governance tooling (Python 3.12)
+python -m venv .venv
+.venv/Scripts/python -m pip install -r requirements.txt   # POSIX: .venv/bin/python
+
+# 3. Arm the local gates (once per clone)
+.venv/Scripts/pre-commit install --hook-type pre-commit --hook-type pre-push
 ```
-docs/design-system/        ← canonical governance copy (tokens, ADRs, specs, migration docs)
-src/styles/                ← brand-tokens.css (runtime tokens) + mrp-design.css (optional MRP chrome)
-src/components/brand/      ← brand primitives: BrandBoundary, Kicker, MonoData, PMark, AuthStatusBanner
-src/lib/utils/utils.ts     ← cn() helper the brand components depend on
-public/brand/              ← logos, favicons, marks
-public/fonts/mazius/       ← Mazius Display webfonts (SIL OFL 1.1)
+
+## The two gate commands
+
+Every contributor — human or agent — runs the same gate. CI re-runs the exact
+same script; there is exactly one definition of "passing."
+
+```bash
+./scripts/preflight.sh --mode pre-commit   # before every commit (~seconds)
+./scripts/preflight.sh --mode pre-push     # before every push (full suite + build)
 ```
 
-Read `docs/design-system/HANDOFF-README.md` first — it contains the full integration contract and the rules that must not be broken (`--p-*` namespace, three fixed breakpoints, opt-in `.brand-plx` boundary).
+## Reading order for agents
 
-## Wiring the app (when scaffolding Next.js)
+1. [`SOUL.md`](SOUL.md) — mission and non-negotiables
+2. [`AGENTS.md`](AGENTS.md) — architecture, module ownership, governance block
+3. [`docs/modules/README.md`](docs/modules/README.md) — module contracts index
+4. [`docs/product/README.md`](docs/product/README.md) — the product handoff spec
+5. [`LESSONS.md`](LESSONS.md) — do not repeat documented mistakes
 
-1. Scaffold with the App Router; keep the existing `src/` and `public/` contents in place.
-2. Install the component deps: `clsx`, `tailwind-merge` (and shadcn/ui when needed).
-3. In your global CSS: `@import "../styles/brand-tokens.css";`
-4. In `app/layout.tsx`, load fonts exactly as documented in `docs/design-system/HANDOFF-README.md` §5 (Mazius Display via `next/font/local`, Inter + JetBrains Mono via `next/font/google`) and point favicon metadata at `/brand/*`.
-5. Wrap branded routes in `<BrandBoundary>` (or a `.brand-plx` shell) — tokens are opt-in by design.
+Governance rules are generated from
+[`config/governance-contract.yaml`](config/governance-contract.yaml) — edit
+the contract, run `python scripts/generate-governance-surfaces.py`, never
+hand-edit a generated block.
