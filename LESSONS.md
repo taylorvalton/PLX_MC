@@ -30,6 +30,22 @@
   `ensure_ascii` output, and verify the loader fetch path immediately after
   any write.
 
+### 2026-06-11 (ET) — Idle RDS pool connections hang requests without timeouts
+
+- **What happened:** After ~80 idle minutes, the dev server's pooled Postgres
+  connections had been silently dropped; the next `/api/state` request checked
+  out a dead socket and hung forever (no error, no timeout) — burning two
+  long waits before the root cause was found. A fresh connection to the same
+  database worked instantly.
+- **Root cause:** `pg.Pool` was created with no `connectionTimeoutMillis`,
+  `query_timeout`, `idleTimeoutMillis`, or `keepAlive`; defaults wait
+  indefinitely on dead sockets.
+- **Rule going forward:** Every outbound network client gets explicit
+  timeouts at creation time — pools (`connectionTimeoutMillis`,
+  `query_timeout`, `idleTimeoutMillis` below the path's idle-kill window,
+  `keepAlive`) and HTTP fetches (`AbortSignal.timeout`). A hanging request is
+  worse than a failing one. Fixed in `src/lib/db` and `src/lib/sync/graph.ts`.
+
 ### 2026-06-10 (ET) — Killed an unrelated dev server with a too-broad process filter
 
 - **What happened:** While clearing stray Next dev servers for this repo, a

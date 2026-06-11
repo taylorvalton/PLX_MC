@@ -1,14 +1,18 @@
-// Mission Control runtime store — the PROTOTYPE sync engine.
-// Faithful port of the mutation semantics in docs/product/prototype/mc-data.js
-// (MC_addTask, MC_invitePerson, MC_markAllSynced, MC_applyInbound, conflict
-// resolution) plus the audit-log contract from SHAREPOINT_INTEGRATION.md §5.
-// At the sync-engine milestone these actions become API mutations; the
-// component-facing surface (getters + actions + subscribe) stays.
+// Mission Control runtime store — the client cache over the sync engine.
+// The component-facing surface (getters + actions + subscribe) is FROZEN and
+// unchanged from the prototype port; the internals now mirror every mutation
+// to the API (src/app/api/*, the real engine in src/lib/sync) and hydrate
+// from GET /api/state. Mutations stay optimistic-local-first so the UI is
+// instant and degrades to read-only of last-synced state when the server is
+// unreachable (TOOLS.md fallback) — including SSR/tests, where no server
+// calls are made at all.
 //
 // FROZEN FOR SCREEN LANES: screens consume this store via
 // `useMcVersion()` (hooks.ts) + the getters/actions below. Do not fork
 // per-screen state for anything that the topbar pill / sidebar badges or other
 // screens must observe.
+
+import { api } from "@/lib/api";
 
 import {
   ACTORS,
@@ -37,7 +41,6 @@ import type {
   Task,
 } from "./types";
 
-const USER_TASKS_KEY = "plx_mc_user_tasks_v1";
 const INVITED_KEY = "plx_mc_invited_people_v1";
 
 interface McState {
@@ -161,16 +164,50 @@ function pushAudit(actor: string, body: string, syncState: SyncState) {
 
 const canPersist = () => typeof window !== "undefined" && !!window.localStorage;
 
-function persistUserTasks() {
-  if (!canPersist()) return;
-  try {
-    window.localStorage.setItem(
-      USER_TASKS_KEY,
-      JSON.stringify(state.tasks.filter((t) => t.userCreated))
-    );
-  } catch {
-    // storage unavailable — stays in-memory for the session
+// Server mirror: fire-and-forget on the client, a no-op on the server/tests.
+// Failures keep the optimistic local state — the UI degrades to the
+// last-synced view rather than blocking (TOOLS.md fallback path).
+function serverCall(fn: () => Promise<void>) {
+  if (typeof window === "undefined") return;
+  void fn().catch((err) => {
+    console.warn("[mc-store] server mirror unavailable — staying on local state:", err);
+  });
+}
+
+// API response shape of GET /api/state (the engine's snapshot).
+interface ServerSnapshot {
+  tasks: Task[];
+  risks: Risk[];
+  files: FileEntry[];
+  conflicts: SpConflict[];
+  errors: SpError[];
+  audit: AuditRow[];
+  counts: Record<string, { synced: number; pending: number; conflict: number; error: number }>;
+  lastSweep: string;
+}
+
+// Adopt the server's truth for everything the engine owns; notifications,
+// actors, and the not-yet-mirrored lists keep their local/fixture state.
+function applyServerState(snapshot: ServerSnapshot) {
+  state.tasks = snapshot.tasks;
+  state.risks = snapshot.risks;
+  state.files = snapshot.files;
+  state.conflicts = snapshot.conflicts;
+  state.errors = snapshot.errors;
+  state.audit = snapshot.audit;
+  state.lastSweep = snapshot.lastSweep;
+  for (const list of state.lists) {
+    const counts = snapshot.counts[list.key];
+    if (counts) {
+      list.counts = { ...counts };
+      list.lastSync = snapshot.lastSweep;
+    }
   }
+  emit();
+}
+
+async function refreshFromServer() {
+  applyServerState(await api<ServerSnapshot>("/state"));
 }
 
 function persistInvited() {
@@ -187,34 +224,29 @@ function persistInvited() {
 
 // ─── Actions ─────────────────────────────────────────────────────────────────
 
-// Rehydrate persisted user tasks + invited people. Call from a client effect
-// AFTER hydration (never at module init) so SSR and first client render match.
-export function hydrateFromStorage() {
-  if (!canPersist()) return;
-  let changed = false;
-  try {
-    const rawTasks = window.localStorage.getItem(USER_TASKS_KEY);
-    if (rawTasks) {
-      for (const t of JSON.parse(rawTasks) as Task[]) {
-        if (t?.id && !state.tasks.some((x) => x.id === t.id)) {
-          state.tasks.push(t);
-          changed = true;
+// Hydrate after mount (never at module init, so SSR and the first client
+// render match): invited people from localStorage (directory increment is
+// not server-side yet), then the engine's snapshot from the API. User tasks
+// now persist server-side — localStorage no longer carries them.
+export function hydrate() {
+  if (canPersist()) {
+    try {
+      const rawInvited = window.localStorage.getItem(INVITED_KEY);
+      if (rawInvited) {
+        let changed = false;
+        for (const p of JSON.parse(rawInvited) as Human[]) {
+          if (p?.id && !state.actors[p.id]) {
+            state.actors[p.id] = p;
+            changed = true;
+          }
         }
+        if (changed) emit();
       }
+    } catch {
+      // corrupt payload — ignore, fall back to seed data
     }
-    const rawInvited = window.localStorage.getItem(INVITED_KEY);
-    if (rawInvited) {
-      for (const p of JSON.parse(rawInvited) as Human[]) {
-        if (p?.id && !state.actors[p.id]) {
-          state.actors[p.id] = p;
-          changed = true;
-        }
-      }
-    }
-  } catch {
-    // corrupt payload — ignore, fall back to seed data
   }
-  if (changed) emit();
+  serverCall(refreshFromServer);
 }
 
 export function nextTaskId(): string {
@@ -276,8 +308,20 @@ export function addTask(input: NewTaskInput): Task {
   state.tasks = [...state.tasks, task];
   const todos = state.lists.find((l) => l.key === "todos");
   if (todos) todos.counts.pending += 1;
-  persistUserTasks();
   emit();
+  // Mirror to the engine; the server owns id assignment, so adopt its task
+  // if the optimistic id raced another writer.
+  serverCall(async () => {
+    const created = await api<Task>("/tasks", {
+      method: "POST",
+      body: JSON.stringify({ ...input, reporter }),
+    });
+    const local = state.tasks.findIndex((t) => t.id === id);
+    if (local !== -1 && created.id !== id) {
+      state.tasks[local] = created;
+      emit();
+    }
+  });
   return task;
 }
 
@@ -331,8 +375,13 @@ export function reassignTask(taskId: string, actorId: string | null) {
       ...t.activity,
     ];
     pushAudit(CURRENT_USER, `Unassigned ${taskId} — Assigned To cleared in SharePoint.`, "synced");
-    persistUserTasks();
     emit();
+    serverCall(async () => {
+      await api<Task>(`/tasks/${taskId}`, {
+        method: "PATCH",
+        body: JSON.stringify({ actor: CURRENT_USER, assignee: null }),
+      });
+    });
     return;
   }
   const who = state.actors[actorId];
@@ -348,8 +397,13 @@ export function reassignTask(taskId: string, actorId: string | null) {
     ...t.activity,
   ];
   pushAudit(CURRENT_USER, `Reassigned ${taskId} to ${who.name} — Assigned To mirrored.`, "synced");
-  persistUserTasks();
   emit();
+  serverCall(async () => {
+    await api<Task>(`/tasks/${taskId}`, {
+      method: "PATCH",
+      body: JSON.stringify({ actor: CURRENT_USER, assignee: actorId }),
+    });
+  });
 }
 
 // "Sync now": outbound push — everything pending flips to synced.
@@ -376,13 +430,20 @@ export function markAllSynced(): string {
   }
   state.lastSweep = ts;
   pushAudit(CURRENT_USER, "Sweep completed — outbound pending pushed to SharePoint.", "synced");
-  persistUserTasks();
   emit();
+  // Run a REAL sweep (outbound push + inbound delta) and adopt the engine's
+  // resulting truth — counts, conflicts, audit — when it lands.
+  serverCall(async () => {
+    await api("/sync/sweep", { method: "POST", body: JSON.stringify({ actor: CURRENT_USER }) });
+    await refreshFromServer();
+  });
   return ts;
 }
 
 // Apply a single simulated INBOUND SharePoint edit (TASK-188 due date) so the
 // two-way flow is visible. Idempotent: only the first sweep pulls it.
+// Deliberately local-only (spec §6: "no endpoint — this is what the real
+// inbound delta does"); markAllSynced's real sweep carries actual inbound.
 export function applyInbound(): { taskId: string; field: string; from: string; to: string; by: string } | null {
   if (state.inboundApplied) return null;
   const t = taskById("TASK-188");
@@ -432,6 +493,14 @@ export function resolveConflict(conflictId: string, winner: "mc" | "sp") {
     "synced"
   );
   emit();
+  // The engine writes the chosen value to the loser and audits the choice.
+  serverCall(async () => {
+    await api(`/sync/conflicts/${conflictId}/resolve`, {
+      method: "POST",
+      body: JSON.stringify({ winner, actor: CURRENT_USER }),
+    });
+    await refreshFromServer();
+  });
 }
 
 // Retry a push error. The mapping layer normalizes the Likelihood value
@@ -459,6 +528,14 @@ export function retryError(errorId: string) {
     "synced"
   );
   emit();
+  // The engine re-pushes through the mapping layer's §5.2 normalization.
+  serverCall(async () => {
+    await api(`/sync/errors/${errorId}/retry`, {
+      method: "POST",
+      body: JSON.stringify({ actor: CURRENT_USER }),
+    });
+    await refreshFromServer();
+  });
 }
 
 // Test-only: reset the store to the seed fixture.

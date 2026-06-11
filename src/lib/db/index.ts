@@ -18,6 +18,13 @@ function pool(): Pool {
         .replace(/[?&]$/, ""),
       ssl: { rejectUnauthorized: false },
       max: 5,
+      // Idle sockets to RDS get dropped silently after long quiet periods;
+      // without these a checkout of a dead connection hangs a request
+      // forever (observed 2026-06-11: /api/state hung after ~80 idle min).
+      keepAlive: true,
+      idleTimeoutMillis: 30_000,
+      connectionTimeoutMillis: 10_000,
+      query_timeout: 20_000,
     });
   }
   return globalForDb.__plxMcPool;
