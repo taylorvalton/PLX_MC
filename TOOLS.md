@@ -11,7 +11,7 @@ Canonical reference for tool access, scope, and safety boundaries.
 
 | Integration | Status | Declaration |
 |---|---|---|
-| Microsoft Graph (SharePoint sync, directory, notifications) | Declared, not yet implemented | Owner: Vince. Scope: runtime. Auth: client-credentials app (`MICROSOFT_GRAPH_CLIENT_ID/SECRET/TENANT_ID` from secrets manager). Default: off until the sync module lands. Kill switch: env flag on the sync service. Health: token acquisition + site reachability probe. Fallback: UI degrades to read-only of last-synced state. Audit boundary: every write mirrored to the sync audit log. |
+| Microsoft Graph (SharePoint sync, directory, notifications) | Active for provisioning (staging site `/sites/plx-mission-control-dev` provisioned 2026-06-11 via `scripts/provision-sharepoint.py`); sync engine not yet implemented | Owner: Vince. Scope: runtime. Auth: client-credentials app (`MICROSOFT_GRAPH_CLIENT_ID/SECRET/TENANT_ID` from secrets manager — currently the broad "Vinces MCP" app; register a least-privilege `plx-mission-control` app before production). Default: off until the sync module lands. Kill switch: env flag on the sync service. Health: token acquisition + site reachability probe. Fallback: UI degrades to read-only of last-synced state. Audit boundary: every write mirrored to the sync audit log. |
 | AWS Secrets Manager (`prod/ec2-secrets`, us-east-1) | Active (local dev provisioning) | Owner: Vince. Scope: secret source of truth for all runtimes. Loaded on this box via `~/load-secrets.ps1` (per the "AWS Secrets Runtime" provisioning doc, 2026-06-10). |
 | GitHub (repo, CI via Actions) | Active | Owner: Vince. CI re-runs `scripts/preflight.sh` — the same gate as local hooks. |
 

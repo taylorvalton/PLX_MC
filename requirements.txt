@@ -1,6 +1,8 @@
-# Governance tooling only — the product stack is Next.js + TypeScript.
-# These power scripts/preflight.sh, the drift gate, the hygiene gate, and hooks.
+# Python tooling — the product stack is Next.js + TypeScript.
+# Governance: scripts/preflight.sh, the drift gate, the hygiene gate, hooks.
+# Operations: scripts/provision-sharepoint.py (requests).
 pyyaml==6.0.3
 ruff==0.15.16
 pytest==9.0.3
 pre-commit==4.6.0
+requests==2.32.5
