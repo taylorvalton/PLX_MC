@@ -18,3 +18,7 @@ Thumbs.db
 # Local env — secrets come from AWS Secrets Manager, never files
 .env
 .env.*
+
+# vercel deploy metadata
+.vercel
+.vercel
