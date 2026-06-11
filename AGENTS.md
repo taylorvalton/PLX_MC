@@ -43,6 +43,7 @@ DESIGN_TOKENS).
 | governance | Vince | High |
 | design-system | Vince | High |
 | web | Vince | Critical |
+| sync | Vince | Critical |
 
 ## Canonical Operations Docs
 

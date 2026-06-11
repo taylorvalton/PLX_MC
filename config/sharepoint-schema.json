@@ -1,0 +1,100 @@
+{
+  "$comment": "Canonical SharePoint provisioning schema for PLX Mission Control. Source spec: docs/product/SHAREPOINT_INTEGRATION.md §2-4 (where they differ, the spec wins). Keep aligned with SP_LISTS in src/lib/mc-data/data.ts. Applied by scripts/provision-sharepoint.py. NOTE: Risk Register 'Likelihood' choices are High/Med/Low BY DESIGN (spec §5.2) — the sync mapping layer normalizes MC's 'Medium' -> 'Med'.",
+  "site": {
+    "hostname": "petrasoap.sharepoint.com",
+    "displayName": "PLX Mission Control",
+    "description": "System of record for PLX Mission Control — tasks, initiatives, milestones, risks, and project documents, mirrored two-way.",
+    "template": "sts",
+    "locale": "en-US",
+    "owner": "vince@petrasoap.com",
+    "paths": {
+      "staging": "/sites/plx-mission-control-dev",
+      "production": "/sites/plx-mission-control"
+    }
+  },
+  "lists": [
+    {
+      "key": "roadmap",
+      "displayName": "Roadmap",
+      "template": "genericList",
+      "description": "Initiatives / buckets + Gantt source (two-way).",
+      "columns": [
+        { "name": "InitiativeID", "displayName": "Initiative ID", "type": "text", "required": true, "indexed": true, "unique": true },
+        { "name": "Owner", "displayName": "Owner", "type": "person" },
+        { "name": "Health", "displayName": "Health", "type": "choice", "choices": ["On track", "At risk", "Off track"] },
+        { "name": "StartDate", "displayName": "Start Date", "type": "dateTime" },
+        { "name": "TargetDate", "displayName": "Target Date", "type": "dateTime" },
+        { "name": "PercentComplete", "displayName": "% Complete", "type": "number" },
+        { "name": "PRDLink", "displayName": "PRD Link", "type": "text", "$comment": "Spec says Hyperlink, but Graph cannot create hyperlinkOrPicture columns app-only (400 invalidRequest, verified 2026-06-11). Push-only URL stored as text; upgrade the column manually in SharePoint if rich link rendering is ever needed." }
+      ]
+    },
+    {
+      "key": "todos",
+      "displayName": "ToDos",
+      "template": "genericList",
+      "description": "Tasks (two-way). Task ID is the indexed unique key.",
+      "columns": [
+        { "name": "TaskID", "displayName": "Task ID", "type": "text", "required": true, "indexed": true, "unique": true },
+        { "name": "Status", "displayName": "Status", "type": "choice", "choices": ["Backlog", "Specced", "Approved", "Planned", "In Progress", "In QA", "In Review", "Merged", "Verified"] },
+        { "name": "AssignedTo", "displayName": "Assigned To", "type": "person" },
+        { "name": "Reporter", "displayName": "Reporter", "type": "person" },
+        { "name": "Priority", "displayName": "Priority", "type": "choice", "choices": ["Urgent", "High", "Medium", "Low"] },
+        { "name": "DueDate", "displayName": "Due Date", "type": "dateTime" },
+        { "name": "Initiative", "displayName": "Initiative", "type": "lookup", "lookupList": "roadmap" },
+        { "name": "PRDRequirements", "displayName": "PRD Requirements", "type": "multiline" },
+        { "name": "Estimate", "displayName": "Estimate", "type": "choice", "choices": ["S", "M", "L"] },
+        { "name": "Repos", "displayName": "Repos", "type": "multiline" },
+        { "name": "EvidenceComplete", "displayName": "Evidence Complete", "type": "boolean" },
+        { "name": "Description", "displayName": "Description", "type": "multiline" }
+      ]
+    },
+    {
+      "key": "milestones",
+      "displayName": "Milestone Register",
+      "template": "genericList",
+      "description": "Milestones (two-way).",
+      "columns": [
+        { "name": "Initiative", "displayName": "Initiative", "type": "lookup", "lookupList": "roadmap" },
+        { "name": "State", "displayName": "State", "type": "choice", "choices": ["Upcoming", "Active", "At risk", "Met"] },
+        { "name": "DueDate", "displayName": "Due Date", "type": "dateTime" },
+        { "name": "RegisterRef", "displayName": "Register Ref", "type": "text" }
+      ]
+    },
+    {
+      "key": "risks",
+      "displayName": "Risk Register",
+      "template": "genericList",
+      "description": "Risks (two-way). Likelihood choices intentionally High/Med/Low per spec §5.2.",
+      "columns": [
+        { "name": "Initiative", "displayName": "Initiative", "type": "lookup", "lookupList": "roadmap" },
+        { "name": "Likelihood", "displayName": "Likelihood", "type": "choice", "choices": ["High", "Med", "Low"] },
+        { "name": "Impact", "displayName": "Impact", "type": "choice", "choices": ["High", "Medium", "Low"] },
+        { "name": "Owner", "displayName": "Owner", "type": "person" },
+        { "name": "Status", "displayName": "Status", "type": "choice", "choices": ["Open", "Mitigating", "Closed"] },
+        { "name": "Mitigation", "displayName": "Mitigation", "type": "multiline" }
+      ]
+    },
+    {
+      "key": "documents",
+      "displayName": "Project Documents",
+      "template": "documentLibrary",
+      "description": "Project documents library (two-way): PRDs, evidence bundles, sealed deeds, reports.",
+      "columns": [
+        { "name": "Initiative", "displayName": "Initiative", "type": "lookup", "lookupList": "roadmap" },
+        { "name": "DocumentType", "displayName": "Document Type", "type": "choice", "choices": ["PRD", "Evidence", "Deed", "Report", "Spec", "Export"] }
+      ]
+    }
+  ],
+  "documentFolders": {
+    "library": "documents",
+    "shared": "Shared",
+    "perInitiative": ["PRD", "Evidence", "Deeds", "Reports"],
+    "initiatives": [
+      "Customer Portal v2",
+      "MRP Floor Sync",
+      "Design System 2.0",
+      "Auth & SSO Hardening",
+      "Mobile Companion"
+    ]
+  }
+}
