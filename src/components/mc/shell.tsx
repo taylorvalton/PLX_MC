@@ -7,7 +7,7 @@
 import { useCallback, useEffect, useState } from "react";
 
 import { BrandBoundary } from "@/components/brand";
-import { hydrateFromStorage } from "@/lib/mc-data/store";
+import { hydrate } from "@/lib/mc-data/store";
 
 import { Sidebar, Topbar } from "./chrome";
 import { CommandPalette } from "./command-palette";
@@ -23,10 +23,11 @@ export function MissionControlShell() {
   const [newTaskOpen, setNewTaskOpen] = useState(false);
   const [newTaskCtx, setNewTaskCtx] = useState<{ bucketId?: string } | undefined>(undefined);
 
-  // Rehydrate user-created tasks / invited people after hydration so SSR HTML
-  // and the first client render stay identical.
+  // Hydrate after mount so SSR HTML and the first client render stay
+  // identical: invited people from localStorage, then the engine's live
+  // snapshot from the API.
   useEffect(() => {
-    hydrateFromStorage();
+    hydrate();
   }, []);
 
   const nav = useCallback<Nav>((screen: Screen, extra) => {

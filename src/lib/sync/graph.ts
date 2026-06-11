@@ -28,6 +28,7 @@ async function getToken(): Promise<string> {
   if (cachedToken && Date.now() < cachedToken.expiresAt - 60_000) return cachedToken.token;
   const { tenantId, clientId, clientSecret } = graphCredentials();
   const resp = await fetch(`https://login.microsoftonline.com/${tenantId}/oauth2/v2.0/token`, {
+    signal: AbortSignal.timeout(30_000),
     method: "POST",
     headers: { "content-type": "application/x-www-form-urlencoded" },
     body: new URLSearchParams({
@@ -49,6 +50,9 @@ export async function graphFetch<T>(url: string, init?: RequestInit): Promise<T>
   const absolute = url.startsWith("https://") ? url : `${GRAPH}${url}`;
   const token = await getToken();
   const resp = await fetch(absolute, {
+    // Never let a sweep hang on a stalled socket (same failure class as the
+    // DB pool timeouts in src/lib/db).
+    signal: AbortSignal.timeout(60_000),
     ...init,
     headers: {
       Authorization: `Bearer ${token}`,

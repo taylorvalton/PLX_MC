@@ -8,10 +8,13 @@ Traceability, Agent activity, Bucket detail, Task detail (evidence bundle +
 TaskRecord), Sync console (registers, review queue, audit log), Files, and
 Repos — plus the ⌘K command palette, New Task modal, and PeoplePicker (Petra
 domain rule enforced in the UI). State flows through the runtime store
-(`src/lib/mc-data/store.ts`), the prototype stand-in for the sync engine. It
-owns routing, screens, and client state only — it is NOT the system of record
-(SharePoint is) and NOT the sync engine (a future `sync` module per
-`docs/product/SHAREPOINT_INTEGRATION.md`).
+(`src/lib/mc-data/store.ts`) — since 2026-06-11 a client cache over the sync
+module's API: it hydrates from `GET /api/state` after mount and mirrors every
+mutation through the shared fetch wrapper (`src/lib/api`), staying
+optimistic-local-first so the UI degrades to the last-synced view offline.
+The getter/action surface is unchanged from the prototype port. It owns
+routing, screens, and client state only — it is NOT the system of record
+(SharePoint is) and NOT the sync engine (the `sync` module is).
 
 ## Why
 
@@ -27,9 +30,9 @@ pixel-precisely in `docs/product/README.md` §6 and
   `docs/design-system/HANDOFF-README.md` §5 (three font families as CSS
   variables on `<html>`, tokens imported in `globals.css`, branded routes
   wrapped in `<BrandBoundary>`).
-- The screens live in `src/components/mc/`; they read a typed prototype data
-  layer in `src/lib/mc-data/` (faithful to `docs/product/DATA_MODEL.md`) that is
-  swapped for the API at the sync-engine milestone. Each new screen is rebuilt
+- The screens live in `src/components/mc/`; they read the typed data layer in
+  `src/lib/mc-data/` (faithful to `docs/product/DATA_MODEL.md`) whose store is
+  now API-backed; fixtures remain the SSR/offline baseline. Each new screen is rebuilt
   from the handoff spec — treat `docs/product/prototype/` as the look/behavior
   spec, never as code to lift verbatim — and adds its own data + CSS block.
 - The `.mc` shell opts into the PLX brand boundary and adds two surface tokens
@@ -39,9 +42,9 @@ pixel-precisely in `docs/product/README.md` §6 and
 
 ## Dependencies
 
-design-system (tokens + primitives). Future: the sync module's API surface
-(`docs/product/SHAREPOINT_INTEGRATION.md` §6) replaces the prototype's
-`window.MC_*` mutations.
+design-system (tokens + primitives); sync (the API surface per
+`docs/product/SHAREPOINT_INTEGRATION.md` §6, consumed via the shared fetch
+wrapper in `src/lib/api`).
 
 ### Key Files
 
