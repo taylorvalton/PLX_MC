@@ -22,8 +22,11 @@ import {
   RISKS,
   SP_CONFLICTS,
   SP_ERRORS,
+  PRIORITY,
   SP_LAST_SWEEP,
   SP_LISTS,
+  STAGE_IDX,
+  STAGES,
   TASKS,
 } from "./data";
 import { domainOf, isPetraEmail } from "./helpers";
@@ -37,6 +40,7 @@ import type {
   SpConflict,
   SpError,
   SpListDef,
+  Subtask,
   SyncState,
   Task,
 } from "./types";
@@ -359,48 +363,121 @@ export function markRead(notificationId: string) {
   emit();
 }
 
-// Reassign a task (null = unassign). Mirrors assignee → SharePoint
-// "Assigned To" and (in the prototype) dispatches the Teams/email trail.
+// The patchable subset of a Task — the fields routed through the single
+// persisted-mutation path. Mirrors PatchTaskInput (state.ts) on the server.
+export type TaskFieldPatch = Partial<
+  Pick<Task, "stage" | "priority" | "bucket" | "labels" | "coassignees" | "subtasks" | "assignee">
+>;
+
+// The single persisted task mutation: optimistic local apply + honest
+// activity, emit(), then mirror to PATCH /api/tasks/{id}. On success adopt the
+// server's returned task so optimistic state reconciles to DB truth (closes
+// the "optimistic-only, lost on hydrate" gap). A no-op when the patch is empty.
+export function patchTaskFields(taskId: string, patch: TaskFieldPatch, opts?: { activity?: string }) {
+  const t = taskById(taskId);
+  if (!t) return;
+  const entries = Object.entries(patch).filter(([, v]) => v !== undefined);
+  if (entries.length === 0) return; // empty patch is a safe no-op
+  Object.assign(t, Object.fromEntries(entries));
+  if (opts?.activity) {
+    t.activity = [{ age: "now", who: CURRENT_USER, kind: "move", what: opts.activity }, ...t.activity];
+  }
+  emit();
+  serverCall(async () => {
+    const updated = await api<Task>(`/tasks/${taskId}`, {
+      method: "PATCH",
+      body: JSON.stringify({ actor: CURRENT_USER, ...patch }),
+    });
+    // Reconcile optimistic state to the server's DB truth.
+    const i = state.tasks.findIndex((x) => x.id === taskId);
+    if (i !== -1) {
+      state.tasks[i] = updated;
+      emit();
+    }
+  });
+}
+
+// ─── Thin persisted-mutation wrappers (used by drag + inline editing) ─────────
+
+export const setTaskStage = (taskId: string, stage: Task["stage"]) =>
+  // Stage display name via the existing STAGES/STAGE_IDX pattern (no
+  // STAGE_IDX_NAME map exists — do not invent one, Pillar 3).
+  patchTaskFields(taskId, { stage }, { activity: `moved to ${STAGES[STAGE_IDX[stage]].name} — pending push` });
+
+export const setTaskPriority = (taskId: string, priority: Task["priority"]) =>
+  patchTaskFields(taskId, { priority }, { activity: `set priority to ${PRIORITY[priority].label} — pending push` });
+
+export const setTaskBucket = (taskId: string, bucket: string) =>
+  // DB-only — Initiative mirror lands with the directory/lookup increment.
+  patchTaskFields(taskId, { bucket }, { activity: "moved to a different initiative" });
+
+export const setTaskLabels = (taskId: string, labels: string[]) =>
+  patchTaskFields(taskId, { labels }, { activity: "updated labels" }); // DB-only — no sync claim
+
+export const setCoassignees = (taskId: string, ids: string[]) => {
+  const t = taskById(taskId);
+  if (!t) return;
+  // Dedupe and never include the primary assignee as a co-assignee.
+  const coassignees = Array.from(new Set(ids)).filter((id) => id !== t.assignee);
+  patchTaskFields(taskId, { coassignees }, { activity: "updated co-assignees" }); // DB-only
+};
+
+export const addSubtask = (taskId: string, text: string, who: string) => {
+  const t = taskById(taskId);
+  if (!t) return;
+  const body = text.trim();
+  if (!body) return;
+  // SUB-${max+1} scoped to the task (mirrors nextTaskId style).
+  const max = Math.max(
+    0,
+    ...t.subtasks.map((s) => parseInt((/(\d+)/.exec(s.id) ?? [])[1] ?? "0", 10))
+  );
+  const sub: Subtask = { id: `SUB-${max + 1}`, t: body, done: false, who };
+  patchTaskFields(taskId, { subtasks: [...t.subtasks, sub] }, { activity: "added a subtask" }); // DB-only
+};
+
+export const toggleSubtask = (taskId: string, subtaskId: string) => {
+  const t = taskById(taskId);
+  if (!t) return;
+  const subtasks = t.subtasks.map((s) => (s.id === subtaskId ? { ...s, done: !s.done } : s));
+  patchTaskFields(taskId, { subtasks }, { activity: "toggled a subtask" }); // DB-only
+};
+
+// Reassign a task (null = unassign). Thin wrapper over the shared mutation
+// spine. The Assigned To person column is NOT mirrored yet (M365 directory
+// increment) — the activity + audit copy reflect that deferral honestly, the
+// server (state.ts) likewise does not re-queue the entity for push.
 export function reassignTask(taskId: string, actorId: string | null) {
   const t = taskById(taskId);
   if (!t) return;
   if (actorId === null) {
     if (t.assignee === null) return;
-    t.assignee = null;
-    t.activity = [
-      { age: "now", who: CURRENT_USER, kind: "sync", what: "unassigned — mirrored to SharePoint" },
-      ...t.activity,
-    ];
-    pushAudit(CURRENT_USER, `Unassigned ${taskId} — Assigned To cleared in SharePoint.`, "synced");
-    emit();
-    serverCall(async () => {
-      await api<Task>(`/tasks/${taskId}`, {
-        method: "PATCH",
-        body: JSON.stringify({ actor: CURRENT_USER, assignee: null }),
-      });
-    });
+    pushAudit(
+      CURRENT_USER,
+      `Unassigned ${taskId} — Assigned To mirror deferred to the directory increment.`,
+      "pending"
+    );
+    patchTaskFields(
+      taskId,
+      { assignee: null },
+      { activity: "unassigned — Assigned To mirror deferred to the directory increment" }
+    );
     return;
   }
   const who = state.actors[actorId];
   if (!who) return;
-  t.assignee = actorId;
-  t.activity = [
-    {
-      age: "now",
-      who: CURRENT_USER,
-      kind: "sync",
-      what: `reassigned to ${who.name} — mirrored to SharePoint · notified via Teams + email`,
-    },
-    ...t.activity,
-  ];
-  pushAudit(CURRENT_USER, `Reassigned ${taskId} to ${who.name} — Assigned To mirrored.`, "synced");
-  emit();
-  serverCall(async () => {
-    await api<Task>(`/tasks/${taskId}`, {
-      method: "PATCH",
-      body: JSON.stringify({ actor: CURRENT_USER, assignee: actorId }),
-    });
-  });
+  // Client audit intentionally carries the assignee name for the local trail;
+  // the server audit (state.ts) omits it — a documented divergence, not parity.
+  pushAudit(
+    CURRENT_USER,
+    `Reassigned ${taskId} to ${who.name} — Assigned To mirror deferred to the directory increment.`,
+    "pending"
+  );
+  patchTaskFields(
+    taskId,
+    { assignee: actorId },
+    { activity: `reassigned to ${who.name} — Assigned To mirror deferred to the directory increment` }
+  );
 }
 
 // "Sync now": outbound push — everything pending flips to synced.

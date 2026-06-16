@@ -83,6 +83,22 @@ describe("outbound task mapping", () => {
     expect(Object.keys(fields)).not.toContain("Initiative");
   });
 
+  it("never emits the Cycle-1 DB-only fields outbound (bucket/labels/coassignees) — locks the DB-only tier; promotion must be a conscious test edit", () => {
+    const withDbOnly: Task = {
+      ...task,
+      bucket: "BKT-DAPI",
+      labels: ["go-live", "api"],
+      coassignees: ["lena", "evan"],
+      subtasks: [{ id: "SUB-1", t: "spike", done: false, who: "vince" }],
+    };
+    const keys = Object.keys(outboundFields("task", withDbOnly as never, { creating: true }));
+    expect(keys).not.toContain("Initiative");
+    expect(keys).not.toContain("Bucket");
+    expect(keys).not.toContain("Labels");
+    expect(keys).not.toContain("Coassignees");
+    expect(keys).not.toContain("Subtasks");
+  });
+
   it("honors the `only` filter for targeted pushes", () => {
     expect(Object.keys(outboundFields("task", task as never, { only: ["stage"] }))).toEqual(["Status"]);
   });
