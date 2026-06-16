@@ -17,6 +17,8 @@ export const SCREENS: Record<Screen, ComponentType<ScreenProps>> = {
   board: WorkViews,
   list: WorkViews,
   timeline: WorkViews,
+  // My Tasks reuses WorkViews, pre-filtered to the current user (do not fork).
+  mine: WorkViews,
   matrix: TraceabilityMatrix,
   feed: AgentFeed,
   bucket: BucketDetail,
