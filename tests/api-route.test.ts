@@ -4,6 +4,7 @@
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
 import { ApiError, parseBody, route } from "@/lib/api/route";
+import { patchTaskSchema } from "@/app/api/tasks/[id]/route";
 
 const ctx = { params: Promise.resolve({}) };
 const req = (body?: unknown) =>
@@ -48,5 +49,43 @@ describe("parseBody validation", () => {
   it("rejects invalid JSON and schema violations as ApiError", async () => {
     await expect(parseBody(req(), schema)).rejects.toMatchObject({ code: "invalid_json" });
     await expect(parseBody(req({ winner: "lww" }), schema)).rejects.toMatchObject({ code: "invalid_request" });
+  });
+});
+
+describe("patchTaskSchema (PATCH /api/tasks/{id} validation contract)", () => {
+  it("accepts the new optional DB-only fields", () => {
+    const parsed = patchTaskSchema.safeParse({
+      actor: "vince",
+      bucket: "BKT-DAPI",
+      labels: ["go-live", "api"],
+      coassignees: ["lena", "evan"],
+      subtasks: [{ id: "SUB-1", t: "spike", done: false, who: "vince" }],
+    });
+    expect(parsed.success).toBe(true);
+  });
+
+  it("rejects a subtask missing the `done` flag (strict subtaskSchema — Risk R5)", () => {
+    const parsed = patchTaskSchema.safeParse({
+      actor: "vince",
+      subtasks: [{ id: "SUB-1", t: "spike", who: "vince" }],
+    });
+    expect(parsed.success).toBe(false);
+  });
+
+  it("rejects non-array labels", () => {
+    const parsed = patchTaskSchema.safeParse({ actor: "vince", labels: "go-live" });
+    expect(parsed.success).toBe(false);
+  });
+
+  it("rejects labels over the soft cap (max 25 — Risk R6)", () => {
+    const parsed = patchTaskSchema.safeParse({
+      actor: "vince",
+      labels: Array.from({ length: 26 }, (_, i) => `l${i}`),
+    });
+    expect(parsed.success).toBe(false);
+  });
+
+  it("requires a non-empty actor", () => {
+    expect(patchTaskSchema.safeParse({ actor: "", labels: ["x"] }).success).toBe(false);
   });
 });

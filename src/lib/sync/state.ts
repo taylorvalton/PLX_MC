@@ -95,14 +95,25 @@ export async function createTask(input: CreateTaskInput): Promise<Task> {
 }
 
 export interface PatchTaskInput {
-  assignee?: string | null;
+  assignee?: string | null; // already wired — copy-only fix in PR-0
   title?: string;
   stage?: Task["stage"];
   priority?: Task["priority"];
   due?: string;
   description?: string;
+  bucket?: string; // NEW — DB-only (see §4)
+  labels?: string[]; // NEW — DB-only
+  coassignees?: string[]; // NEW — DB-only
+  subtasks?: Task["subtasks"]; // NEW — DB-only (Subtask[])
 }
 
+// Persistence tiers (Cycle 1):
+//   SP  (pushed): title, stage, priority, due, description  ── below
+//   DB  (jsonb-only, NOT pushed):
+//       newly-added this cycle: bucket, labels, coassignees, subtasks
+//       already-wired (copy-only fix, not a new allow-list entry): assignee
+//       bucket/labels promote to SP in Cycle 2 once the Initiative lookup-id
+//       resolution and a Labels SP column exist (see mapping.ts:6-8).
 const PUSHED_FIELDS = ["title", "stage", "priority", "due", "description"];
 
 export async function patchTask(id: string, patch: PatchTaskInput, actor: string): Promise<Task | null> {

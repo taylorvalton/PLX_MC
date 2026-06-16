@@ -204,9 +204,12 @@ export function NotifyTrail({ id }: { id: string | null }) {
   const person = id ? actorById(id) : undefined;
   if (!person || person.kind !== "human") return null;
   return (
-    <span className="notify-trail" title={`Assigned To mirrored to SharePoint · notified ${person.name}`}>
+    <span
+      className="notify-trail"
+      title={`Assigned To mirror for ${person.name} deferred to the directory increment`}
+    >
       <span className="d" />
-      Mirrored to SharePoint · notified via Teams + email
+      Assigned To mirror deferred to the directory increment
     </span>
   );
 }

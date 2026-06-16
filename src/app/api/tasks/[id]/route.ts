@@ -6,7 +6,17 @@ import { patchTask } from "@/lib/sync";
 
 const STAGES = ["backlog", "specced", "approved", "planned", "progress", "qa", "review", "merged", "verified"] as const;
 
-const patchTaskSchema = z.object({
+// Exported for unit testing of the validation contract (api-route.test.ts).
+// Next treats only HTTP-method exports (PATCH) as route handlers, so a schema
+// export is inert for routing.
+export const subtaskSchema = z.object({
+  id: z.string(),
+  t: z.string(),
+  done: z.boolean(),
+  who: z.string(),
+});
+
+export const patchTaskSchema = z.object({
   actor: z.string().min(1),
   assignee: z.string().nullable().optional(),
   title: z.string().min(1).optional(),
@@ -14,6 +24,10 @@ const patchTaskSchema = z.object({
   priority: z.enum(["urgent", "high", "medium", "low"]).optional(),
   due: z.string().optional(),
   description: z.string().optional(),
+  bucket: z.string().min(1).optional(), // NEW
+  labels: z.array(z.string()).max(25).optional(), // NEW — soft cap (see Risk R6)
+  coassignees: z.array(z.string()).optional(), // NEW
+  subtasks: z.array(subtaskSchema).optional(), // NEW
 });
 
 export const PATCH = route(async (req, ctx) => {
