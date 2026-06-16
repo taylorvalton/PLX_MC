@@ -9,6 +9,7 @@
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
+    "test:e2e": "playwright test",
     "migrate": "node scripts/migrate.mjs"
   },
   "dependencies": {
@@ -22,6 +23,7 @@
     "zod": "^4.4.3"
   },
   "devDependencies": {
+    "@playwright/test": "^1.61.0",
     "@types/node": "^25.9.2",
     "@types/pg": "^8.20.0",
     "@types/react": "^19.2.17",

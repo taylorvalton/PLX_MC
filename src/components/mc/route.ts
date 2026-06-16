@@ -7,6 +7,7 @@ export type Screen =
   | "board"
   | "list"
   | "timeline"
+  | "mine"
   | "matrix"
   | "feed"
   | "bucket"
