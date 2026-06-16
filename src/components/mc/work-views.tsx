@@ -3,7 +3,15 @@
 import type { CSSProperties, DragEvent } from "react";
 import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 
-import { BUCKET_IDX, CYCLES, MILESTONES, STAGES, STAGE_IDX } from "@/lib/mc-data";
+import {
+  BUCKET_IDX,
+  CURRENT_USER,
+  CYCLES,
+  MILESTONES,
+  STAGES,
+  STAGE_IDX,
+  tasksForUser,
+} from "@/lib/mc-data";
 import { useMcVersion } from "@/lib/mc-data/hooks";
 import {
   allTasks,
@@ -448,16 +456,31 @@ export function WorkViews({ route, nav }: ScreenProps) {
   // formerly called as a bare statement and its return discarded.
   const version = useMcVersion();
 
+  const screen = route.screen;
+  // My Tasks (PR-D1) is a peer screen that reuses this whole surface, seeded
+  // with the current user's tasks (SPEC §5 Module D1). It is cross-bucket by
+  // definition, so it ignores route.bucketId and suppresses the bucket pill.
+  const isMine = screen === "mine";
+
   // One unified axis drives board + list; `swimlanes` stays board-only state.
   // Both `groupBy` and `filters` live here (not in BoardView/ListView) so they
   // persist across the board/list/timeline tab switch — the `vsw` switcher
-  // keeps WorkViews mounted.
-  const [groupBy, setGroupBy] = useState<GroupBy>("band");
+  // keeps WorkViews mounted. My Tasks defaults to grouping by initiative
+  // (SPEC §5 D1: "default to list grouped by bucket").
+  const [groupBy, setGroupBy] = useState<GroupBy>(isMine ? "bucket" : "band");
   const [swimlanes, setSwimlanes] = useState<BoardSwimlanes>("off");
   const [filters, setFilters] = useState<FilterState>({});
+  // My Tasks is one screen, not three, so its board/list/timeline lens is local
+  // state (defaults to list per SPEC §5 D1) rather than the route. The other
+  // screens read their lens straight from `route.screen`.
+  const [mineView, setMineView] = useState<"board" | "list" | "timeline">("list");
   const filterInputRef = useRef<HTMLInputElement | null>(null);
 
-  const screen = route.screen;
+  // The effective board/list/timeline lens: the route screen for the normal
+  // views, the local toggle for My Tasks.
+  const view: "board" | "list" | "timeline" = isMine
+    ? mineView
+    : (screen as "board" | "list" | "timeline");
 
   // Switching to a non-band/stage axis forces swimlanes OFF (not merely hides
   // the toggle): BoardView keys its sub-lanes off the `swimlanes` prop alone,
@@ -468,16 +491,23 @@ export function WorkViews({ route, nav }: ScreenProps) {
     if (!swimlanesAllowed(next)) setSwimlanes("off");
   };
 
-  const bucket = route.bucketId ? BUCKET_IDX[route.bucketId] : undefined;
-  const baseTasks = filterTasksByBucket(allTasks(), route.bucketId);
+  // Composition precedence (SPEC §5 D1): the mine-seed REPLACES the bucket base
+  // (it is not composed on top of filterTasksByBucket), then user `filters`,
+  // then group-by. A `mine` route arriving with a bucketId must NOT silently
+  // show "my tasks in that one bucket", so route.bucketId is ignored here.
+  const bucket = isMine ? undefined : route.bucketId ? BUCKET_IDX[route.bucketId] : undefined;
+  const baseTasks = isMine
+    ? tasksForUser(CURRENT_USER, allTasks())
+    : filterTasksByBucket(allTasks(), route.bucketId);
   const visible = useMemo(
-    () => applyFilters(filterTasksByBucket(allTasks(), route.bucketId), filters),
-    // `version` is a deliberate dependency: `allTasks()` reads the external
-    // store (not a captured value the linter can see), so the bumped version is
-    // what re-pivots the filtered/grouped board after a mutation. Without it the
-    // memo would return a stale snapshot on the next store emit (SPEC §5).
+    () => applyFilters(baseTasks, filters),
+    // `version` is a deliberate dependency: `allTasks()` (read inside baseTasks)
+    // reads the external store (not a captured value the linter can see), so the
+    // bumped version is what re-pivots the filtered/grouped board after a
+    // mutation. Without it the memo would return a stale snapshot on the next
+    // store emit (SPEC §5). `isMine`/`route.bucketId` re-key the source itself.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [route.bucketId, filters, version]
+    [isMine, route.bucketId, filters, version]
   );
 
   const labelOptions = useMemo(() => labelUniverse(baseTasks), [baseTasks]);
@@ -508,18 +538,28 @@ export function WorkViews({ route, nav }: ScreenProps) {
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [filtersActive]);
 
+  // On the normal screens the lens switch is a route navigation; on My Tasks it
+  // flips the local lens so the user stays inside their pre-filtered view.
   const goView = (next: "board" | "list" | "timeline") => {
+    if (isMine) {
+      setMineView(next);
+      return;
+    }
     nav(next, route.bucketId ? { bucketId: route.bucketId } : undefined);
   };
 
   const openTask = (taskId: string) => nav("task", { taskId });
-  const title = bucket ? splitTitleAccent(bucket.name) : { lead: "All", accent: "work" };
+  const title = isMine
+    ? { lead: "My", accent: "Tasks" }
+    : bucket
+      ? splitTitleAccent(bucket.name)
+      : { lead: "All", accent: "work" };
 
   return (
     <div className="mc-main">
       <div className="ph" style={{ paddingBottom: 14 }}>
         <div>
-          <span className="kk">Workspace{bucket ? ` · ${bucket.id}` : ""}</span>
+          <span className="kk">{isMine ? "My Tasks" : `Workspace${bucket ? ` · ${bucket.id}` : ""}`}</span>
           <h1>
             {title.lead}
             {title.accent ? (
@@ -530,13 +570,17 @@ export function WorkViews({ route, nav }: ScreenProps) {
             ) : null}
           </h1>
           <p className="sub">
-            Board, list, and timeline are three lenses over the same task ledger across buckets.
+            {isMine
+              ? "Assigned to, co-owned by, or reported by you — across every initiative."
+              : "Board, list, and timeline are three lenses over the same task ledger across buckets."}
           </p>
         </div>
         <div className="r">
           <button type="button" className="btn ghost" onClick={() => nav("feed")}>
             Agent activity ◉
           </button>
+          {/* The bucket pill is suppressed on My Tasks (SPEC §5 D1): the view is
+              cross-bucket, so it must not display a bucket scope it isn't honoring. */}
           {bucket && (
             <button type="button" className="pill muted" onClick={() => nav(screen)}>
               <span className="dot" />
@@ -553,20 +597,20 @@ export function WorkViews({ route, nav }: ScreenProps) {
               { key: "board", label: "Board" },
               { key: "list", label: "List" },
               { key: "timeline", label: "Timeline" },
-            ].map((view) => (
+            ].map((tab) => (
               <button
-                key={view.key}
+                key={tab.key}
                 type="button"
-                className={screen === view.key ? "on" : ""}
-                onClick={() => goView(view.key as "board" | "list" | "timeline")}
+                className={view === tab.key ? "on" : ""}
+                onClick={() => goView(tab.key as "board" | "list" | "timeline")}
               >
-                {view.label}
+                {tab.label}
               </button>
             ))}
           </div>
         </div>
         <div className="r">
-          {(screen === "board" || screen === "list") && (
+          {(view === "board" || view === "list") && (
             <>
               <span className="lbl">Group by</span>
               <div className="seg">
@@ -581,7 +625,7 @@ export function WorkViews({ route, nav }: ScreenProps) {
                   </button>
                 ))}
               </div>
-              {screen === "board" && swimlanesAllowed(groupBy) && (
+              {view === "board" && swimlanesAllowed(groupBy) && (
                 <>
                   <span className="lbl">Swimlanes</span>
                   <div className="seg">
@@ -605,18 +649,18 @@ export function WorkViews({ route, nav }: ScreenProps) {
             </>
           )}
           <span className="count">
-            <b>{screen === "timeline" ? baseTasks.length : visible.length}</b> tasks
+            <b>{view === "timeline" ? baseTasks.length : visible.length}</b> tasks
           </span>
         </div>
       </div>
 
       {/* The filter bar drives the board + list only; the timeline stays the
           fixed June grid over the full bucket scope (filtering it is Cycle 2). */}
-      {screen === "timeline" ? (
+      {view === "timeline" ? (
         baseTasks.length === 0 ? (
           <div className="empty">
             <h3>A calm, empty board</h3>
-            <p>No tasks in this initiative yet.</p>
+            <p>{isMine ? "Nothing is assigned to, co-owned by, or reported by you yet." : "No tasks in this initiative yet."}</p>
           </div>
         ) : (
           <TimelineView tasks={baseTasks} onOpen={openTask} />
@@ -646,11 +690,15 @@ export function WorkViews({ route, nav }: ScreenProps) {
               ) : (
                 <>
                   <h3>A calm, empty board</h3>
-                  <p>No tasks in this initiative yet.</p>
+                  <p>
+                    {isMine
+                      ? "Nothing is assigned to, co-owned by, or reported by you yet."
+                      : "No tasks in this initiative yet."}
+                  </p>
                 </>
               )}
             </div>
-          ) : screen === "board" ? (
+          ) : view === "board" ? (
             <BoardView tasks={visible} groupBy={groupBy} swimlanes={swimlanes} onOpen={openTask} />
           ) : (
             <ListView tasks={visible} groupBy={groupBy} onOpen={openTask} />

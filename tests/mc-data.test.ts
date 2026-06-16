@@ -5,6 +5,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   BUCKETS,
+  CURRENT_USER,
   STAGES,
   TASKS,
   bandOf,
@@ -15,7 +16,7 @@ import {
   syncCounts,
   tasksForUser,
 } from "@/lib/mc-data";
-import type { Evidence } from "@/lib/mc-data";
+import type { Evidence, Task } from "@/lib/mc-data";
 
 describe("bandOf", () => {
   it("maps every stage to its declared band", () => {
@@ -85,6 +86,44 @@ describe("tasksForUser", () => {
 
   it("returns nothing for someone with no involvement", () => {
     expect(tasksForUser("lena")).toHaveLength(0);
+  });
+
+  // PR-D1 (My Tasks) membership: the view seeds from tasksForUser, so it must
+  // include tasks where the user is the assignee OR a co-assignee (and the
+  // reporter), and exclude tasks they have no part in. Synthetic fixture so the
+  // three cases are isolated from the shared mock data.
+  it("includes assignee, co-assignee, and reporter tasks; excludes the rest", () => {
+    const base = TASKS[0];
+    const fixture: Task[] = [
+      { ...base, id: "MINE-ASG", assignee: "vince", coassignees: [], reporter: "maya" },
+      { ...base, id: "MINE-CO", assignee: "maya", coassignees: ["vince"], reporter: "maya" },
+      { ...base, id: "MINE-REP", assignee: "maya", coassignees: [], reporter: "vince" },
+      { ...base, id: "NOT-MINE", assignee: "maya", coassignees: ["lena"], reporter: "maya" },
+    ];
+    const mine = tasksForUser("vince", fixture).map((t) => t.id);
+    expect(mine).toEqual(["MINE-ASG", "MINE-CO", "MINE-REP"]);
+    expect(mine).not.toContain("NOT-MINE");
+  });
+
+  // My Tasks is cross-bucket BY DEFINITION (SPEC §5 D1): the seed must span
+  // every initiative the user is involved in, never one bucket. This pins the
+  // composition-precedence rule — the mine-seed replaces the bucket base, so a
+  // single-bucket filter on top would wrongly drop the user's other tasks.
+  it("seeds My Tasks across multiple buckets (cross-bucket, not one initiative)", () => {
+    const mineBuckets = new Set(
+      tasksForUser(CURRENT_USER, TASKS).map((t) => t.bucket)
+    );
+    expect(mineBuckets.size).toBeGreaterThan(1);
+  });
+
+  it("ignores bucket scoping — every involved task is returned regardless of bucket", () => {
+    const base = TASKS[0];
+    const fixture: Task[] = [
+      { ...base, id: "B1", assignee: "vince", bucket: "BKT-WMS" },
+      { ...base, id: "B2", assignee: "vince", bucket: "BKT-DAPI" },
+    ];
+    const ids = tasksForUser("vince", fixture).map((t) => t.id);
+    expect(ids).toEqual(["B1", "B2"]); // both buckets present, none filtered out
   });
 });
 

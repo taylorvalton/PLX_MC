@@ -53,16 +53,22 @@ export function MissionControlShell() {
     setNewTaskCtx(undefined);
   }, []);
 
-  // Pending `g`-prefix for two-key view chords (g b / g l / g t). A ref (not
-  // state) so arming the prefix never triggers a render.
+  // Pending `g`-prefix for two-key view chords (g b / g l / g t / g m). A ref
+  // (not state) so arming the prefix never triggers a render.
   const gPrefix = useRef<number | null>(null);
 
   useEffect(() => {
     // Prefixed `g _` view chords. SPEC §3: PR-A adds a persistent filter input
     // to the views surface, so bare single-key chords would fire while typing.
-    // Map the prefix's second key to the screens that exist in PR-A; `g m`
-    // (My Tasks) lands with PR-D1.
-    const VIEW_CHORDS: Record<string, Screen> = { b: "board", l: "list", t: "timeline" };
+    // `g m` (My Tasks) is the PR-D1 chord deferred from PR-A; it rides the same
+    // guard (newTaskOpen || paletteOpen + the input/textarea/contenteditable
+    // check below).
+    const VIEW_CHORDS: Record<string, Screen> = {
+      b: "board",
+      l: "list",
+      t: "timeline",
+      m: "mine",
+    };
 
     const onKeyDown = (event: KeyboardEvent) => {
       // ⌘K / Ctrl-K toggles the palette (a modifier combo — safe while typing);
