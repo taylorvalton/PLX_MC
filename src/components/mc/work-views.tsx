@@ -173,17 +173,29 @@ function BoardView({
   tasks,
   groupBy,
   swimlanes,
+  version,
   onOpen,
 }: {
   tasks: Task[];
   groupBy: GroupBy;
   swimlanes: BoardSwimlanes;
+  version: number;
   onOpen: (taskId: string) => void;
 }) {
   const columns = boardColumns(groupBy, tasks);
-  // Single-pass partition; memoized so a re-render that doesn't change the task
-  // list or axis (e.g. swimlane toggle) doesn't re-bucket every card.
-  const byColumn = useMemo(() => partitionTasksByColumn(tasks, groupBy), [tasks, groupBy]);
+  // Single-pass partition. `version` is a load-bearing dependency: a drag/inline
+  // mutation applies optimistically by MUTATING the task object IN PLACE
+  // (store.patchTaskFields → Object.assign), so `tasks` keeps the same array AND
+  // object reference across the mutation — only the store `version` bumps. Without
+  // it the memo would return a STALE partition and a dragged card would not move
+  // to its new column until some other dep changed (axis/filter toggle). It still
+  // does NOT re-bucket on a swimlane toggle (local state — `version`/`tasks`/
+  // `groupBy` all unchanged), preserving the original optimization intent.
+  const byColumn = useMemo(
+    () => partitionTasksByColumn(tasks, groupBy),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [tasks, groupBy, version]
+  );
 
   // Static lookup reused for every column header below; STAGES is constant.
   const stageByKey = useMemo(() => Object.fromEntries(STAGES.map((s) => [s.key, s])), []);
@@ -702,7 +714,7 @@ export function WorkViews({ route, nav }: ScreenProps) {
               )}
             </div>
           ) : view === "board" ? (
-            <BoardView tasks={visible} groupBy={groupBy} swimlanes={swimlanes} onOpen={openTask} />
+            <BoardView tasks={visible} groupBy={groupBy} swimlanes={swimlanes} version={version} onOpen={openTask} />
           ) : (
             <ListView tasks={visible} groupBy={groupBy} onOpen={openTask} />
           )}
