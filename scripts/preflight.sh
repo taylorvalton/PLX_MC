@@ -90,6 +90,8 @@ run_full() {
     npm run test
     step "Production build"
     npm run build
+    step "Playwright E2E (Cycle-1 Planner)"
+    npx playwright test
   fi
 }
 

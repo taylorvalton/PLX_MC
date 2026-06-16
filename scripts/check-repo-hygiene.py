@@ -41,6 +41,7 @@ APPROVED_ROOT_FILES = {
     "next-env.d.ts",
     "eslint.config.mjs",
     "vitest.config.ts",
+    "playwright.config.ts",
     ".gitignore",
     ".pre-commit-config.yaml",
 }

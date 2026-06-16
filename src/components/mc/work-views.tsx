@@ -173,16 +173,33 @@ function BoardView({
   tasks,
   groupBy,
   swimlanes,
+  version,
+  filtersActive,
   onOpen,
 }: {
   tasks: Task[];
   groupBy: GroupBy;
   swimlanes: BoardSwimlanes;
+  version: number;
+  filtersActive: boolean;
   onOpen: (taskId: string) => void;
 }) {
   const columns = boardColumns(groupBy, tasks);
-  const byColumn = partitionTasksByColumn(tasks, groupBy);
+  // Single-pass partition. `version` is a load-bearing dependency: a drag/inline
+  // mutation applies optimistically by MUTATING the task object IN PLACE
+  // (store.patchTaskFields → Object.assign), so `tasks` keeps the same array AND
+  // object reference across the mutation — only the store `version` bumps. Without
+  // it the memo would return a STALE partition and a dragged card would not move
+  // to its new column until some other dep changed (axis/filter toggle). It still
+  // does NOT re-bucket on a swimlane toggle (local state — `version`/`tasks`/
+  // `groupBy` all unchanged), preserving the original optimization intent.
+  const byColumn = useMemo(
+    () => partitionTasksByColumn(tasks, groupBy),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [tasks, groupBy, version]
+  );
 
+  // Static lookup reused for every column header below; STAGES is constant.
   const stageByKey = useMemo(() => Object.fromEntries(STAGES.map((s) => [s.key, s])), []);
 
   // Drag is enabled only on axes where a column-drop maps to a real, persisted
@@ -219,8 +236,18 @@ function BoardView({
       {columns.map((column) => {
         const list = byColumn[column.key];
         const stage = stageByKey[column.key] as Stage | undefined;
+        // a11y: each column is a labelled region so screen readers announce the
+        // column name + card count during keyboard nav (WCAG 1.3.1). The header
+        // name span carries the visible text; the region label restates it with
+        // the count so the relationship card→column is announced.
+        const emptyLabel = filtersActive ? "No matches in this column" : "Empty";
         return (
-          <div className="bcol" key={column.key}>
+          <div
+            className="bcol"
+            key={column.key}
+            role="region"
+            aria-label={`${column.name} · ${list.length} ${list.length === 1 ? "task" : "tasks"}`}
+          >
             <div className="bhead">
               <span className="nm">
                 {stage?.n && <span className="n">{stage.n}</span>}
@@ -265,7 +292,7 @@ function BoardView({
                             ))}
                           </>
                         )}
-                        {list.length === 0 && <div className="colempty">Empty</div>}
+                        {list.length === 0 && <div className="colempty">{emptyLabel}</div>}
                       </>
                     );
                   })()}
@@ -275,7 +302,7 @@ function BoardView({
                   <TaskCard key={task.id} task={task} onOpen={onOpen} draggable={dragEnabled} />
                 ))
               ) : (
-                <div className="colempty">Empty</div>
+                <div className="colempty">{emptyLabel}</div>
               )}
             </div>
           </div>
@@ -699,7 +726,14 @@ export function WorkViews({ route, nav }: ScreenProps) {
               )}
             </div>
           ) : view === "board" ? (
-            <BoardView tasks={visible} groupBy={groupBy} swimlanes={swimlanes} onOpen={openTask} />
+            <BoardView
+              tasks={visible}
+              groupBy={groupBy}
+              swimlanes={swimlanes}
+              version={version}
+              filtersActive={filtersActive}
+              onOpen={openTask}
+            />
           ) : (
             <ListView tasks={visible} groupBy={groupBy} onOpen={openTask} />
           )}
