@@ -181,8 +181,11 @@ function BoardView({
   onOpen: (taskId: string) => void;
 }) {
   const columns = boardColumns(groupBy, tasks);
-  const byColumn = partitionTasksByColumn(tasks, groupBy);
+  // Single-pass partition; memoized so a re-render that doesn't change the task
+  // list or axis (e.g. swimlane toggle) doesn't re-bucket every card.
+  const byColumn = useMemo(() => partitionTasksByColumn(tasks, groupBy), [tasks, groupBy]);
 
+  // Static lookup reused for every column header below; STAGES is constant.
   const stageByKey = useMemo(() => Object.fromEntries(STAGES.map((s) => [s.key, s])), []);
 
   // Drag is enabled only on axes where a column-drop maps to a real, persisted

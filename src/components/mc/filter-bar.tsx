@@ -10,7 +10,7 @@
 // "/" focus and the no-input Esc-clear are wired in WorkViews via `inputRef`);
 // see SPEC §3 for the chord/Esc precedence with PeoplePicker.
 
-import { forwardRef, useEffect, useRef, useState } from "react";
+import { Fragment, forwardRef, useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { ACTORS, PRIORITY, STAGES } from "@/lib/mc-data";
 import type { PriorityKey, StageKey } from "@/lib/mc-data";
@@ -19,6 +19,23 @@ import type { FilterState } from "./work-views.helpers";
 import { UNASSIGNED_KEY, hasActiveFilters } from "./work-views.helpers";
 
 type Facet = "priority" | "assignee" | "label" | "stage";
+
+// Facets in toolbar order. The per-facet option universe, current selection,
+// and toggle handler are looked up from one config map below (one source — no
+// 4-way ternary fan-out per facet, no per-facet JSX fork).
+const FACET_ORDER: Array<{ facet: Facet; label: string }> = [
+  { facet: "priority", label: "Priority" },
+  { facet: "assignee", label: "Assignee" },
+  { facet: "label", label: "Label" },
+  { facet: "stage", label: "Stage" },
+];
+
+interface FacetConfig {
+  label: string;
+  options: Array<{ value: string; label: string }>;
+  selected: Set<string>;
+  onToggle: (value: string) => void;
+}
 
 function toggleValue<T extends string>(values: T[] | undefined, value: T): T[] {
   const current = values ?? [];
@@ -90,16 +107,25 @@ export const FilterBar = forwardRef<HTMLInputElement, FilterBarProps>(function F
 ) {
   const [openFacet, setOpenFacet] = useState<Facet | null>(null);
 
-  const priorityOptions = (Object.keys(PRIORITY) as PriorityKey[]).map((key) => ({
-    value: key,
-    label: PRIORITY[key].label,
-  }));
-  const stageOptions = STAGES.map((stage) => ({ value: stage.key, label: stage.name }));
-  const labelOptions = labels.map((label) => ({ value: label, label }));
-  const assigneeOptions = [
-    ...assignees.map((id) => ({ value: id, label: ACTORS[id]?.name ?? id })),
-    ...(hasUnassigned ? [{ value: UNASSIGNED_KEY, label: "Unassigned" }] : []),
-  ];
+  // Option universes per facet. Priority/stage are static; label/assignee are
+  // derived from the parent-supplied universes, so memoize on those inputs (the
+  // parent re-derives them only when its task base changes).
+  const priorityOptions = useMemo(
+    () => (Object.keys(PRIORITY) as PriorityKey[]).map((key) => ({ value: key, label: PRIORITY[key].label })),
+    []
+  );
+  const stageOptions = useMemo(
+    () => STAGES.map((stage) => ({ value: stage.key, label: stage.name })),
+    []
+  );
+  const labelOptions = useMemo(() => labels.map((label) => ({ value: label, label })), [labels]);
+  const assigneeOptions = useMemo(
+    () => [
+      ...assignees.map((id) => ({ value: id, label: ACTORS[id]?.name ?? id })),
+      ...(hasUnassigned ? [{ value: UNASSIGNED_KEY, label: "Unassigned" }] : []),
+    ],
+    [assignees, hasUnassigned]
+  );
 
   const active = hasActiveFilters(filters);
 
@@ -113,86 +139,71 @@ export const FilterBar = forwardRef<HTMLInputElement, FilterBarProps>(function F
   const toggleAssignee = (value: string) =>
     onChange({ ...filters, assignee: toggleValue(filters.assignee, value) });
   const clearAll = () => onChange({});
+  // Stable so FacetPopover's outside-click effect isn't re-bound every render.
+  const closeFacet = useCallback(() => setOpenFacet(null), []);
+
+  // One config map: facet → { label, options, selection, toggle }. Both the
+  // facet buttons and the active-filter chips read from this, so adding a 5th
+  // facet is a single entry, not a new ternary arm in three places.
+  const facetConfig: Record<Facet, FacetConfig> = {
+    priority: { label: "Priority", options: priorityOptions, selected: new Set(filters.priority ?? []), onToggle: togglePriority },
+    assignee: { label: "Assignee", options: assigneeOptions, selected: new Set(filters.assignee ?? []), onToggle: toggleAssignee },
+    label: { label: "Label", options: labelOptions, selected: new Set(filters.label ?? []), onToggle: toggleLabel },
+    stage: { label: "Stage", options: stageOptions, selected: new Set(filters.stage ?? []), onToggle: toggleStage },
+  };
 
   // Active-filter chips (removable, click clears the value); the live count
-  // sits to the right and updates as the parent re-derives `resultCount`.
-  const chips: Array<{ key: string; label: string; onRemove: () => void }> = [];
-  for (const key of filters.priority ?? []) {
-    chips.push({
-      key: `priority:${key}`,
-      label: `Priority · ${PRIORITY[key]?.label ?? key}`,
-      onRemove: () => togglePriority(key),
-    });
-  }
-  for (const key of filters.stage ?? []) {
-    const stage = STAGES.find((s) => s.key === key);
-    chips.push({
-      key: `stage:${key}`,
-      label: `Stage · ${stage?.name ?? key}`,
-      onRemove: () => toggleStage(key),
-    });
-  }
-  for (const id of filters.assignee ?? []) {
-    chips.push({
-      key: `assignee:${id}`,
-      label: `Assignee · ${id === UNASSIGNED_KEY ? "Unassigned" : (ACTORS[id]?.name ?? id)}`,
-      onRemove: () => toggleAssignee(id),
-    });
-  }
-  for (const label of filters.label ?? []) {
-    chips.push({
-      key: `label:${label}`,
-      label: `Label · ${label}`,
-      onRemove: () => toggleLabel(label),
-    });
-  }
+  // sits to the right and updates as the parent re-derives `resultCount`. Only
+  // the facet selections drive the chips, so they re-derive only when those
+  // change (typing in the text input no longer rebuilds the chip row).
+  const chips = useMemo(() => {
+    const out: Array<{ key: string; label: string; onRemove: () => void }> = [];
+    for (const key of filters.priority ?? []) {
+      out.push({ key: `priority:${key}`, label: `Priority · ${PRIORITY[key]?.label ?? key}`, onRemove: () => togglePriority(key) });
+    }
+    for (const key of filters.stage ?? []) {
+      const stage = STAGES.find((s) => s.key === key);
+      out.push({ key: `stage:${key}`, label: `Stage · ${stage?.name ?? key}`, onRemove: () => toggleStage(key) });
+    }
+    for (const id of filters.assignee ?? []) {
+      out.push({
+        key: `assignee:${id}`,
+        label: `Assignee · ${id === UNASSIGNED_KEY ? "Unassigned" : (ACTORS[id]?.name ?? id)}`,
+        onRemove: () => toggleAssignee(id),
+      });
+    }
+    for (const label of filters.label ?? []) {
+      out.push({ key: `label:${label}`, label: `Label · ${label}`, onRemove: () => toggleLabel(label) });
+    }
+    return out;
+    // togglePriority/etc. close over `filters` + `onChange`; `filters` is the
+    // real input, so depend on the four selection arrays (re-derive on change).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filters.priority, filters.stage, filters.assignee, filters.label]);
 
-  const facetButton = (facet: Facet, label: string) => (
-    <div className="fb-facet">
-      <button
-        type="button"
-        className={`pill fb-pill${openFacet === facet ? " on" : ""}`}
-        onClick={() => setOpenFacet((prev) => (prev === facet ? null : facet))}
-      >
-        + {label}
-      </button>
-      {openFacet === facet ? (
-        <FacetPopover
-          label={label}
-          options={
-            facet === "priority"
-              ? priorityOptions
-              : facet === "stage"
-                ? stageOptions
-                : facet === "assignee"
-                  ? assigneeOptions
-                  : labelOptions
-          }
-          selected={
-            new Set(
-              facet === "priority"
-                ? (filters.priority ?? [])
-                : facet === "stage"
-                  ? (filters.stage ?? [])
-                  : facet === "assignee"
-                    ? (filters.assignee ?? [])
-                    : (filters.label ?? [])
-            )
-          }
-          onToggle={
-            facet === "priority"
-              ? togglePriority
-              : facet === "stage"
-                ? toggleStage
-                : facet === "assignee"
-                  ? toggleAssignee
-                  : toggleLabel
-          }
-          onClose={() => setOpenFacet(null)}
-        />
-      ) : null}
-    </div>
-  );
+  const facetButton = (facet: Facet) => {
+    const config = facetConfig[facet];
+    return (
+      <div className="fb-facet">
+        <button
+          type="button"
+          className={`pill fb-pill${openFacet === facet ? " on" : ""}`}
+          onClick={() => setOpenFacet((prev) => (prev === facet ? null : facet))}
+        >
+          + {config.label}
+        </button>
+        {openFacet === facet ? (
+          <FacetPopover
+            label={config.label}
+            options={config.options}
+            selected={config.selected}
+            onToggle={config.onToggle}
+            onClose={closeFacet}
+          />
+        ) : null}
+      </div>
+    );
+  };
 
   return (
     <div className="filterbar">
@@ -220,10 +231,9 @@ export const FilterBar = forwardRef<HTMLInputElement, FilterBarProps>(function F
       </div>
 
       <div className="fb-facets">
-        {facetButton("priority", "Priority")}
-        {facetButton("assignee", "Assignee")}
-        {facetButton("label", "Label")}
-        {facetButton("stage", "Stage")}
+        {FACET_ORDER.map(({ facet }) => (
+          <Fragment key={facet}>{facetButton(facet)}</Fragment>
+        ))}
       </div>
 
       {chips.length > 0 ? (
