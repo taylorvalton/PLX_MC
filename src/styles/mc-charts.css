@@ -164,8 +164,11 @@
    length) to shown (offset 0); bars grow from scaleX(0). Default (above) is the
    final state, so reduced-motion users skip the tween (SPEC §3.B.4). */
 @media (prefers-reduced-motion: no-preference) {
+  /* Reveal at the shared task-interaction tempo (--p-dur, 180ms) so the donut
+     arc-in and the category bar-in below speak one timing voice on a refresh —
+     a slower duration read as hesitation against the snappier bars. */
   .mc .donut .arc {
-    animation: mc-arc-in var(--p-dur-slow) var(--p-ease) both;
+    animation: mc-arc-in var(--p-dur) var(--p-ease) both;
   }
   @keyframes mc-arc-in {
     from {
@@ -207,6 +210,9 @@
 
 .mc .catrow:disabled {
   cursor: default;
+  /* Inert (zero-value) rows read as suppressed at a glance — same opacity family
+     as the dragging card / disabled KPI, so enabled vs. disabled is unambiguous. */
+  opacity: 0.55;
 }
 
 .mc .catrow:not(:disabled):hover {
@@ -316,6 +322,8 @@
 
 .mc .clegend .row:disabled {
   cursor: default;
+  /* Match the disabled category row: an inert legend row is visibly suppressed. */
+  opacity: 0.55;
 }
 
 .mc .clegend .row:not(:disabled):hover {

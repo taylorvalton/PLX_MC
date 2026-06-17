@@ -203,12 +203,17 @@ function DuePopover({
           </button>
         );
       })}
-      {hasRange ? (
-        <button type="button" className="fb-opt fb-due-clear" onClick={onClear}>
-          <span className="fb-check" aria-hidden />
-          Clear due range
-        </button>
-      ) : null}
+      {/* Always rendered (disabled when no range) so the popover layout + tab order
+          stay stable when a preset is applied and the popover re-opens. */}
+      <button
+        type="button"
+        className="fb-opt fb-due-clear"
+        disabled={!hasRange}
+        onClick={onClear}
+      >
+        <span className="fb-check" aria-hidden />
+        Clear due range
+      </button>
     </div>
   );
 }
@@ -590,6 +595,10 @@ export const FilterBar = forwardRef<HTMLInputElement, FilterBarProps>(function F
                   </span>
                 ) : null}
               </>
+            ) : savedViews && savedViews.length === 0 ? (
+              // No active view AND nothing saved yet — hint the primary action
+              // (save the current state) rather than the ambiguous bare "Views".
+              "Save view"
             ) : (
               "Views"
             )}{" "}
