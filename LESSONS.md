@@ -16,6 +16,47 @@
 
 ## Lessons
 
+### 2026-06-17 (ET) — `--delete-branch` mid-stack closed the next stacked PR
+
+- **What happened:** Merging the bottom of the Cycle-2 stack (#30) with
+  `gh pr merge --merge --delete-branch` deleted its head branch, which **closed**
+  the next PR in the stack (#27) instead of retargeting it to `main`. A closed PR
+  whose base branch no longer exists then deadlocks: "cannot change the base
+  branch of a closed pull request" *and* "state cannot be changed, the branch has
+  been deleted."
+- **Root cause:** GitHub's auto-retarget-on-base-deletion is unreliable for
+  stacked PRs; deleting a base branch that still has dependent open PRs can close
+  them rather than reparent them.
+- **Rule going forward:** When merging a stacked chain bottom-up, do **not** pass
+  `--delete-branch` mid-stack. Merge each PR with `--merge` only, retarget the next
+  child to `main` first (`gh api repos/<o>/<r>/pulls/<n> -X PATCH -f base=main`),
+  then merge it; delete all head branches at the very end. To recover a
+  wrongly-closed stacked PR, recreate its deleted base at the old SHA
+  (`git push origin <sha>:refs/heads/<branch>`), reopen via REST
+  (`gh api .../pulls/<n> -X PATCH -f state=open`), then retarget to `main`.
+
+### 2026-06-17 (ET) — ⌘K command-palette E2E flakes on hydration timing
+
+- **What happened:** An intermediate `push: main` CI run failed on
+  `e2e/my-tasks.spec.ts:33` ("reachable via the ⌘K command palette"):
+  `.mc-cmdk` not visible within 10s after `keyboard.press("ControlOrMeta+k")`.
+  The identical test passed in three other runs — the later CI on a superset
+  commit, the final `main` CI, and the local full `pre-push`.
+- **Root cause:** `waitForHydration` anchored on the topbar sync-pill label,
+  which is **server-rendered** (`"Synced"` from default store state) and so
+  present in the SSR HTML. The wait resolved before React hydrated and before
+  the shell's global keydown listener attached; `page.keyboard.press` has no
+  actionability delay (unlike `.click()`, which is why only the keyboard test
+  flaked), so it raced the handler and the keypress was dropped under CI load.
+- **Rule going forward:** A hydration-readiness wait must anchor on a signal
+  that only exists *after* client effects run — never on SSR-present DOM. Treat a
+  lone 10s "element not found" after a key shortcut as a hydration flake: confirm
+  with a re-run and harden the wait, don't chase a non-existent logic bug.
+  **Fixed in #31:** the shell exposes a post-mount `data-mc-ready` marker
+  (flipped only after the keydown effect attaches) and `waitForHydration` now
+  waits on `[data-mc-ready='true']` (`toBeAttached`) — deterministic, no
+  retries/sleeps, and it hardens every spec that waits for hydration.
+
 ### 2026-06-16 (ET) — Static asset imports fail CI typecheck (gitignored next-env.d.ts)
 
 - **What happened:** Adding `import logo from "../../../public/brand/logo-horizontal-ink.png"`
