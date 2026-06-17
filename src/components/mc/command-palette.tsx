@@ -77,6 +77,7 @@ export function CommandPalette({
       { key: "nav:list", icon: "≣", label: "Go to List", run: () => nav("list") },
       { key: "nav:timeline", icon: "▭", label: "Go to Timeline", run: () => nav("timeline") },
       { key: "nav:mine", icon: "☉", label: "Go to My Tasks", run: () => nav("mine") },
+      { key: "nav:insights", icon: "◔", label: "Go to Insights", run: () => nav("insights") },
       { key: "nav:matrix", icon: "⊞", label: "Go to Traceability", run: () => nav("matrix") },
       { key: "nav:feed", icon: "◉", label: "Go to Agent activity", run: () => nav("feed") },
       {

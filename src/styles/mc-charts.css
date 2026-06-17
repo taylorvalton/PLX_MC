@@ -1,0 +1,348 @@
+/* Insights charts lane (Module E) — native-SVG donut + category bars + KPI strip
+   + shared status legend. Scoped under .mc; TOKENS ONLY (no raw hex). The donut
+   arcs and bars render their FINAL state by default; the grow-in animation is
+   gated behind @media (prefers-reduced-motion: no-preference), so reduced-motion
+   users get the correct chart instantly with no tween (SPEC §3.B.4, mirroring the
+   mc-views.css reduced-motion posture). */
+
+/* ════════ INSIGHTS SHELL ════════ */
+.mc .insights {
+  padding: 0 0 80px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+/* ──── KPI strip ──── */
+.mc .insights .kpis {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 12px;
+}
+
+.mc .insights .kpi {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 16px 18px;
+  border: 1px solid var(--p-grid);
+  border-radius: var(--p-radius);
+  background: var(--p-card);
+  text-align: left;
+}
+
+.mc .insights .kpi .v {
+  font-family: var(--mono);
+  font-size: 28px;
+  font-variant-numeric: tabular-nums;
+  color: var(--p-ink);
+  line-height: 1;
+}
+
+.mc .insights .kpi .k {
+  font-family: var(--mono);
+  font-size: 9.5px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--p-muted);
+}
+
+/* Tone cues — overdue/blocked go warm when nonzero (SPEC §3.B.6). */
+.mc .insights .kpi.hot .v {
+  color: var(--p-hot);
+}
+.mc .insights .kpi.warn .v {
+  color: var(--p-warn);
+}
+
+/* A clickable KPI (Unassigned) reads as interactive; disabled when zero. */
+.mc .insights .kpi.clickable {
+  cursor: pointer;
+}
+.mc .insights .kpi.clickable:disabled {
+  cursor: default;
+  opacity: 0.65;
+}
+.mc .insights .kpi.clickable:not(:disabled):hover {
+  border-color: var(--p-accent);
+  background: var(--p-accent-soft);
+}
+.mc .insights .kpi.clickable:focus-visible {
+  outline: 2px solid var(--p-accent);
+  outline-offset: 2px;
+}
+
+/* ──── Chart grid ──── */
+.mc .insights .chartgrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 14px;
+  align-items: start;
+}
+
+.mc .insights .chartcard {
+  border: 1px solid var(--p-grid);
+  border-radius: var(--p-radius);
+  background: var(--p-card);
+  padding: 16px 18px;
+}
+
+.mc .insights .chartcard-title,
+.mc .insights .catbar-title {
+  font-family: var(--mono);
+  font-size: 9.5px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--p-ink);
+  margin-bottom: 12px;
+}
+
+/* The donut card pairs the ring with the legend; reflow to a column on narrow. */
+.mc .insights .donutwrap {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  flex-wrap: wrap;
+}
+
+/* ════════ DONUT ════════ */
+.mc .donut {
+  flex: 0 0 160px;
+  max-width: 200px;
+}
+
+.mc .donut svg {
+  display: block;
+  overflow: visible;
+}
+
+.mc .donut .track {
+  opacity: 0.6;
+}
+
+/* Each arc is POSITIONED by a per-arc rotate() (inline style) about the circle
+   center, and REVEALED by stroke-dashoffset. Final state = offset 0 (fully
+   shown) is the default OUTSIDE the reduced-motion query. */
+.mc .donut .arc {
+  transform-box: view-box;
+  transform-origin: 90px 90px; /* SIZE/2, SIZE/2 — the circle center */
+  stroke-dashoffset: 0;
+  cursor: default;
+}
+
+.mc .donut .arc[role="button"] {
+  cursor: pointer;
+}
+
+.mc .donut .arc[role="button"]:hover {
+  stroke-width: 30;
+}
+
+.mc .donut .arc:focus-visible {
+  outline: none;
+  stroke-width: 30;
+}
+
+.mc .donut .total {
+  font-family: var(--mono);
+  font-size: 30px;
+  font-variant-numeric: tabular-nums;
+  fill: var(--p-ink);
+  dominant-baseline: middle;
+}
+
+.mc .donut .total-cap {
+  font-family: var(--mono);
+  font-size: 9px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  fill: var(--p-muted);
+  dominant-baseline: middle;
+}
+
+/* Reduced-motion-gated grow-in: arcs sweep from hidden (offset = their dash
+   length) to shown (offset 0); bars grow from scaleX(0). Default (above) is the
+   final state, so reduced-motion users skip the tween (SPEC §3.B.4). */
+@media (prefers-reduced-motion: no-preference) {
+  .mc .donut .arc {
+    animation: mc-arc-in var(--p-dur-slow) var(--p-ease) both;
+  }
+  @keyframes mc-arc-in {
+    from {
+      stroke-dashoffset: var(--arc-dash);
+    }
+    to {
+      stroke-dashoffset: 0;
+    }
+  }
+}
+
+/* ════════ CATEGORY BARS ════════ */
+.mc .catbar-rows {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.mc .catbar-rows li {
+  margin: 0;
+}
+
+.mc .catrow {
+  display: grid;
+  grid-template-columns: minmax(90px, 0.9fr) 1.6fr auto;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 5px 6px;
+  border: 0;
+  border-radius: var(--p-radius-sm);
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+}
+
+.mc .catrow:disabled {
+  cursor: default;
+}
+
+.mc .catrow:not(:disabled):hover {
+  background: var(--p-accent-soft);
+}
+
+.mc .catrow:focus-visible {
+  outline: 2px solid var(--p-accent);
+  outline-offset: 1px;
+}
+
+.mc .catrow .nm {
+  font-size: 12px;
+  color: var(--p-ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.mc .catrow .bar {
+  display: block;
+  width: 100%;
+  line-height: 0;
+}
+
+.mc .catrow .bar .track {
+  opacity: 0.55;
+}
+
+/* The fill bar grows from the left; transform-origin left, scaleX gated below. */
+.mc .catrow .bar .fill {
+  transform-box: fill-box;
+  transform-origin: left center;
+  transform: scaleX(1);
+}
+
+.mc .catrow .ct {
+  font-family: var(--mono);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  color: var(--p-ink-2);
+  text-align: right;
+  min-width: 24px;
+}
+
+/* Empty category (no present rows) — a hairline placeholder, never a clickable. */
+.mc .catbar-empty {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 0;
+}
+.mc .catbar-empty .rule {
+  flex: 1;
+  height: 1px;
+  background: var(--p-grid);
+}
+.mc .catbar-empty .cap {
+  font-family: var(--mono);
+  font-size: 9.5px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--p-muted);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .mc .catrow .bar .fill {
+    animation: mc-bar-in var(--p-dur) var(--p-ease) both;
+  }
+  @keyframes mc-bar-in {
+    from {
+      transform: scaleX(0);
+    }
+    to {
+      transform: scaleX(1);
+    }
+  }
+}
+
+/* ════════ SHARED STATUS LEGEND ════════ */
+.mc .clegend {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 130px;
+}
+
+.mc .clegend li {
+  margin: 0;
+}
+
+.mc .clegend .row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 4px 6px;
+  border: 0;
+  border-radius: var(--p-radius-sm);
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+}
+
+.mc .clegend .row:disabled {
+  cursor: default;
+}
+
+.mc .clegend .row:not(:disabled):hover {
+  background: var(--p-accent-soft);
+}
+
+.mc .clegend .row:focus-visible {
+  outline: 2px solid var(--p-accent);
+  outline-offset: 1px;
+}
+
+.mc .clegend .sw {
+  width: 11px;
+  height: 11px;
+  border-radius: 3px;
+  flex: 0 0 auto;
+}
+
+.mc .clegend .nm {
+  flex: 1;
+  font-size: 12px;
+  color: var(--p-ink);
+}
+
+.mc .clegend .ct {
+  font-family: var(--mono);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  color: var(--p-ink-2);
+}

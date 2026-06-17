@@ -5,6 +5,7 @@ import { AgentFeed } from "./agent-feed";
 import { BucketDetail } from "./bucket-detail";
 import { FilesView } from "./files-view";
 import { InboxView } from "./inbox";
+import { InsightsView } from "./insights";
 import { ReposView } from "./repos-view";
 import type { Screen, ScreenProps } from "./route";
 import { SyncConsole } from "./sync-console";
@@ -19,6 +20,7 @@ export const SCREENS: Record<Screen, ComponentType<ScreenProps>> = {
   timeline: WorkViews,
   // My Tasks reuses WorkViews, pre-filtered to the current user (do not fork).
   mine: WorkViews,
+  insights: InsightsView,
   matrix: TraceabilityMatrix,
   feed: AgentFeed,
   bucket: BucketDetail,

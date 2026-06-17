@@ -53,8 +53,8 @@ export function MissionControlShell() {
     setNewTaskCtx(undefined);
   }, []);
 
-  // Pending `g`-prefix for two-key view chords (g b / g l / g t / g m). A ref
-  // (not state) so arming the prefix never triggers a render.
+  // Pending `g`-prefix for two-key view chords (g b / g l / g t / g m / g i). A
+  // ref (not state) so arming the prefix never triggers a render.
   const gPrefix = useRef<number | null>(null);
 
   useEffect(() => {
@@ -68,6 +68,9 @@ export function MissionControlShell() {
       l: "list",
       t: "timeline",
       m: "mine",
+      // `g i` (Insights) is the Module E chord; rides the same guard as g b/l/t/m
+      // (newTaskOpen || paletteOpen + the input/textarea/contenteditable check).
+      i: "insights",
     };
 
     const onKeyDown = (event: KeyboardEvent) => {
