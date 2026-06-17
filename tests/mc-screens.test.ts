@@ -16,6 +16,7 @@ const EXPECTED_SCREENS = {
   list: true,
   timeline: true,
   mine: true,
+  insights: true,
   matrix: true,
   feed: true,
   bucket: true,

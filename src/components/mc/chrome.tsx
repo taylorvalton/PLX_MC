@@ -119,6 +119,7 @@ export function Sidebar({ route, nav }: { route: Route; nav: Nav }) {
         {item("list", "≣", "List")}
         {item("timeline", "▭", "Timeline")}
         {item("mine", "☉", "My Tasks")}
+        {item("insights", "◔", "Insights")}
         {item("matrix", "⊞", "Traceability")}
         {item("feed", "◉", "Agent activity", <span className="badge acc">{live} live</span>)}
       </div>
