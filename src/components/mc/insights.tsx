@@ -53,10 +53,26 @@ export function InsightsView({ nav }: ScreenProps) {
         </div>
       </div>
 
-      {/* KPI strip — Total · Overdue · Unassigned · Blocked. KPIs that map cleanly
-          to a facet are clickable; Total/Overdue are display-only in Cycle-2
-          (overdue needs G's due-range to express as a filter — SPEC §3.B.5). */}
+      {/* With zero tasks the KPIs/donut/bars would render as a silent wall of 0s
+          (reads as a failed load, not a "no data" state). Insights is workspace-
+          wide with no incoming filter, so an empty workspace is genuinely "no
+          tasks yet" — show a calm message + a path back, mirroring the board's
+          .empty block, and render the data surfaces only when there's data. */}
+      {model.total === 0 ? (
+        <div className="empty">
+          <h3>Nothing to chart yet</h3>
+          <p>Insights breaks down the work across every initiative. Once there are tasks, the status donut and breakdown bars appear here.</p>
+          <div className="acts">
+            <button type="button" className="btn ghost" onClick={() => nav("board")}>
+              Go to the board
+            </button>
+          </div>
+        </div>
+      ) : (
       <div className="insights">
+        {/* KPI strip — Total · Overdue · Unassigned · Blocked. KPIs that map cleanly
+            to a facet are clickable; Total/Overdue are display-only in Cycle-2
+            (overdue needs G's due-range to express as a filter — SPEC §3.B.5). */}
         <div className="kpis">
           <div className="kpi">
             <span className="v">{model.total}</span>
@@ -124,6 +140,7 @@ export function InsightsView({ nav }: ScreenProps) {
           </div>
         </div>
       </div>
+      )}
     </div>
   );
 }

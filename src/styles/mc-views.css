@@ -760,6 +760,11 @@
 .mc .filterbar .fb-viewapply {
   flex: 1;
   min-width: 0;
+  /* A long saved-view name truncates cleanly instead of wrapping or shoving the
+     per-row delete button (the popover is min-width:220px). */
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
 }
 
 .mc .filterbar .fb-viewdel {
@@ -831,6 +836,12 @@
   color: var(--p-muted);
 }
 
-.mc .filterbar .fb-due-pop .fb-due-clear:hover {
+.mc .filterbar .fb-due-pop .fb-due-clear:hover:not(:disabled) {
   color: var(--p-hot);
+}
+
+/* Disabled = no range to clear (kept in the layout + tab order, never hidden). */
+.mc .filterbar .fb-due-pop .fb-due-clear:disabled {
+  opacity: 0.5;
+  cursor: default;
 }
