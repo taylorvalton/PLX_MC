@@ -78,11 +78,43 @@ describe("outbound task mapping", () => {
     expect(fields.PRDRequirements).toBe("REQ-2");
   });
 
-  it("never emits person or lookup columns (directory increment)", () => {
-    expect(Object.keys(fields)).not.toContain("AssignedTo");
-    expect(Object.keys(fields)).not.toContain("AccountableOwner");
-    expect(Object.keys(fields)).not.toContain("Reporter");
+  it("emits person columns as <Name>LookupId from pre-resolved ids, never the bare column or the Initiative lookup", () => {
+    // The person mirror is now wired (Item 1): the engine resolves each MC actor
+    // to its site User Information List id and passes it in `persons`; the pure
+    // layer emits `<InternalName>LookupId`. With no `persons` opt nothing is
+    // emitted (back-compat). The Initiative lookup stays deferred.
+    expect(Object.keys(fields)).not.toContain("AssignedToLookupId");
     expect(Object.keys(fields)).not.toContain("Initiative");
+
+    const resolved = outboundFields("task", task as never, {
+      creating: true,
+      persons: { assignee: 23, accountableOwner: 7, reporter: 42 },
+    });
+    expect(resolved.AssignedToLookupId).toBe(23);
+    expect(resolved.AccountableOwnerLookupId).toBe(7);
+    expect(resolved.ReporterLookupId).toBe(42);
+    // never the bare person column name, never the still-deferred Initiative lookup
+    expect(Object.keys(resolved)).not.toContain("AssignedTo");
+    expect(Object.keys(resolved)).not.toContain("Initiative");
+  });
+
+  it("emits a null LookupId to CLEAR a person, and omits a field absent from `persons`", () => {
+    const cleared = outboundFields("task", task as never, { persons: { assignee: null } });
+    // null is sent to clear the SharePoint person column (unassign), not omitted…
+    expect("AssignedToLookupId" in cleared).toBe(true);
+    expect(cleared.AssignedToLookupId).toBeNull();
+    // …while a field not present in the map is left untouched (omitted).
+    expect("AccountableOwnerLookupId" in cleared).toBe(false);
+    expect("ReporterLookupId" in cleared).toBe(false);
+  });
+
+  it("honors the `only` filter for a targeted person push", () => {
+    const out = outboundFields("task", task as never, {
+      only: ["assignee"],
+      persons: { assignee: 9, accountableOwner: 7, reporter: 42 },
+    });
+    expect(Object.keys(out)).toEqual(["AssignedToLookupId"]);
+    expect(out.AssignedToLookupId).toBe(9);
   });
 
   it("never emits the Cycle-1 DB-only fields outbound (bucket/labels/coassignees) — locks the DB-only tier; promotion must be a conscious test edit", () => {

@@ -116,29 +116,30 @@ export async function createTask(input: CreateTaskInput): Promise<Task> {
 }
 
 export interface PatchTaskInput {
-  assignee?: string | null; // already wired — copy-only fix in PR-0
+  assignee?: string | null; // Item 1 — pushed to the Assigned To person column (two-way)
   title?: string;
   stage?: Task["stage"];
   priority?: Task["priority"];
   due?: string;
   description?: string;
-  bucket?: string; // NEW — DB-only (see §4)
-  labels?: string[]; // NEW — DB-only
-  coassignees?: string[]; // NEW — DB-only
-  subtasks?: Task["subtasks"]; // NEW — DB-only (Subtask[], enriched in WS-3)
+  bucket?: string; // DB-only (see §4)
+  labels?: string[]; // DB-only
+  coassignees?: string[]; // DB-only
+  subtasks?: Task["subtasks"]; // DB-only (Subtask[], enriched in WS-3)
   comments?: Task["comments"]; // EN-001 / WS-3 — DB-only, app-only (never pushed)
-  accountableOwner?: string | null; // EN-003 — DB-only (person column, deferred mirror)
+  accountableOwner?: string | null; // Item 1 — pushed to the Accountable Owner person column (push-only)
   humanOnly?: boolean; // EN-003 — DB-only assignment policy
 }
 
-// Persistence tiers (Cycle 1):
-//   SP  (pushed): title, stage, priority, due, description  ── below
-//   DB  (jsonb-only, NOT pushed):
-//       newly-added this cycle: bucket, labels, coassignees, subtasks
-//       already-wired (copy-only fix, not a new allow-list entry): assignee
-//       bucket/labels promote to SP in Cycle 2 once the Initiative lookup-id
-//       resolution and a Labels SP column exist (see mapping.ts:6-8).
-const PUSHED_FIELDS = ["title", "stage", "priority", "due", "description"];
+// Persistence tiers:
+//   SP  (pushed): title, stage, priority, due, description, plus the person
+//       columns assignee/accountableOwner/reporter (Item 1 — the engine resolves
+//       each actor to its site-user lookup id on the sweep). A person-only patch
+//       re-queues the entity for push.
+//   DB  (jsonb-only, NOT pushed): bucket, labels, coassignees, subtasks, comments,
+//       humanOnly. bucket/labels promote to SP once the Initiative lookup + a
+//       Labels column exist; subtasks promote to a push-only column in Item 3.
+const PUSHED_FIELDS = ["title", "stage", "priority", "due", "description", "assignee", "accountableOwner", "reporter"];
 
 export async function patchTask(id: string, patch: PatchTaskInput, actor: string): Promise<Task | null> {
   await ensureSeeded();
@@ -169,8 +170,8 @@ export async function patchTask(id: string, patch: PatchTaskInput, actor: string
 
   await repo.updateEntity("task", id, {
     patch: Object.fromEntries(entries),
-    // Person columns (assignee) are not mirrored yet (directory increment) —
-    // an assignee-only patch does not re-queue the entity for push.
+    // Person columns are pushed now (Item 1), so a person-only patch re-queues
+    // the entity for the next outbound sweep.
     syncState: pushedDirty.length > 0 ? "pending" : undefined,
     dirtyFields: dirty,
   });
@@ -179,13 +180,16 @@ export async function patchTask(id: string, patch: PatchTaskInput, actor: string
     await repo.appendAudit(
       actor,
       patch.assignee === null
-        ? `Unassigned ${id} — Assigned To mirror deferred to the directory increment.`
-        : `Reassigned ${id} — Assigned To mirror deferred to the directory increment.`,
+        ? `Unassigned ${id} — clearing Assigned To on the next SharePoint sync.`
+        : `Reassigned ${id} — Assigned To mirrors to SharePoint on the next sync.`,
       "pending"
     );
   }
-  if (pushedDirty.length > 0) {
-    await repo.appendAudit(actor, `Edited ${id} (${pushedDirty.join(", ")}) — pending push.`, "pending");
+  // The remaining pushed fields (incl. Accountable Owner / Reporter) log the
+  // honest pending-push trail; assignee already has its own line above.
+  const loggable = pushedDirty.filter((k) => k !== "assignee");
+  if (loggable.length > 0) {
+    await repo.appendAudit(actor, `Edited ${id} (${loggable.join(", ")}) — pending push.`, "pending");
   }
   const updated = await repo.getEntity("task", id);
   return (updated?.data ?? null) as Task | null;

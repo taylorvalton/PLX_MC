@@ -164,8 +164,8 @@ describe("patchTask — per-field tier at the server boundary", () => {
   });
 });
 
-describe("patchTask — accountableOwner / humanOnly round-trip (EN-003, DB-only)", () => {
-  it("persists accountableOwner + humanOnly into the jsonb blob without re-queuing a push", async () => {
+describe("patchTask — accountableOwner pushed (Item 1) / humanOnly DB-only round-trip", () => {
+  it("persists both into the jsonb blob; the Accountable Owner person column re-queues a push, humanOnly does not", async () => {
     seedTask({ accountableOwner: null });
     const updated = await patchTask(
       "TASK-900",
@@ -177,8 +177,19 @@ describe("patchTask — accountableOwner / humanOnly round-trip (EN-003, DB-only
     const row = store.rows.get("task:TASK-900")!;
     expect(row.data.accountableOwner).toBe("greg");
     expect(row.data.humanOnly).toBe(true);
-    expect(row.sync_state).toBe("synced"); // DB-only — never re-queued for push
-    expect(row.dirty_fields).toEqual([]);
+    // Item 1: Accountable Owner is a pushed person column → re-queues for the
+    // next sweep and dirties ONLY that field; humanOnly stays a DB-only policy.
+    expect(row.sync_state).toBe("pending");
+    expect(row.dirty_fields).toEqual(["accountableOwner"]);
+  });
+
+  it("an assignee-only patch re-queues a push (Assigned To is two-way)", async () => {
+    seedTask({ assignee: null });
+    await patchTask("TASK-900", { assignee: "greg" }, "vince");
+    const row = store.rows.get("task:TASK-900")!;
+    expect(row.data.assignee).toBe("greg");
+    expect(row.sync_state).toBe("pending");
+    expect(row.dirty_fields).toEqual(["assignee"]);
   });
 });
 

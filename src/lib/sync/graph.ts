@@ -146,6 +146,67 @@ export async function findItemByField(
   return result.value[0] ?? null;
 }
 
+// ─── Site-user resolution for Person columns ─────────────────────────────────
+
+// SharePoint Person columns store a user's id in the site's hidden User
+// Information List (UIL), written as `<Column>LookupId` — not an email. We read
+// the UIL once per site and cache both directions. App-only client-credentials
+// CANNOT call `_api/web/ensureUser` ("Unsupported app only token"), so a user
+// not already present in the UIL resolves to null; the engine then skips that
+// person column and records an honest audit note (never fabricates a person).
+interface UilCache {
+  byEmail: Map<string, number>;
+  byId: Map<number, string>;
+}
+interface UilItemsPage {
+  value: { id: string; fields?: Record<string, unknown> }[];
+  "@odata.nextLink"?: string;
+}
+const uilCacheBySite = new Map<string, UilCache>();
+
+async function loadUil(ctx: SiteContext): Promise<UilCache> {
+  const cached = uilCacheBySite.get(ctx.siteId);
+  if (cached) return cached;
+  const cache: UilCache = { byEmail: new Map(), byId: new Map() };
+  // The UIL is addressable by its (hidden) display name.
+  const list = await graphFetch<{ id: string }>(
+    `/sites/${ctx.siteId}/lists/User%20Information%20List?$select=id`
+  );
+  let url: string | undefined =
+    `/sites/${ctx.siteId}/lists/${list.id}/items?$expand=fields($select=EMail,UserName)&$select=id&$top=200`;
+  while (url) {
+    const page: UilItemsPage = await graphFetch<UilItemsPage>(url);
+    for (const item of page.value) {
+      const id = Number(item.id);
+      const email = String(item.fields?.EMail ?? item.fields?.UserName ?? "").toLowerCase();
+      if (!Number.isNaN(id) && email) {
+        cache.byEmail.set(email, id);
+        cache.byId.set(id, email);
+      }
+    }
+    url = page["@odata.nextLink"];
+  }
+  uilCacheBySite.set(ctx.siteId, cache);
+  return cache;
+}
+
+// email → site-user lookup id (null when the user is not yet in the UIL).
+export async function resolveSiteUserLookupId(ctx: SiteContext, email: string): Promise<number | null> {
+  const cache = await loadUil(ctx);
+  return cache.byEmail.get(email.toLowerCase()) ?? null;
+}
+
+// lookup id → email (inbound assignee mirroring).
+export async function resolveEmailByLookupId(ctx: SiteContext, lookupId: number): Promise<string | null> {
+  const cache = await loadUil(ctx);
+  return cache.byId.get(lookupId) ?? null;
+}
+
+// Test/ops seam: drop the UIL cache (the sweep process is long-lived).
+export function clearUilCache(): void {
+  uilCacheBySite.clear();
+}
+
 // Walk a delta query to completion: returns every changed item plus the next
 // deltaLink to persist (SHAREPOINT_INTEGRATION.md §6 inbound).
 export async function listDelta(

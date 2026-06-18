@@ -3,18 +3,18 @@
 // come from config/sharepoint-schema.json; directions mirror SP_LISTS in
 // src/lib/mc-data/data.ts (keep all three aligned — the spec wins).
 //
-// Person and lookup columns (Assigned To, Accountable Owner, Reporter, Owner,
-// Initiative) are deliberately NOT mapped yet: the columns are defined in the
-// system-of-record schema (config/sharepoint-schema.json + SP_LISTS), but
-// person-column two-way sync belongs to the deferred directory/notification
-// increment. EN-003 / WS-1 made the directory real; wiring the person push is
-// the next sync increment (see WS1-NOTES.md).
+// Person columns on ToDos (Assigned To ↔, Accountable Owner →, Reporter →) ARE
+// mapped (Item 1): SharePoint stores a Person as `<InternalName>LookupId` — the
+// numeric id of the user in the site User Information List — so this pure layer
+// emits a PRE-RESOLVED id passed in `opts.persons`; the engine (graph.ts) does
+// the email→lookupId resolution + caching and the honest fail-visible miss path.
+// The Initiative lookup column stays deferred (no lookup-id resolution yet).
 //
 // §5.2: the Risk Register's Likelihood column stores High/Med/Low BY DESIGN;
 // this layer normalizes MC's "Medium" → "Med" outbound and back inbound —
 // exactly the bug class the error queue exists to surface.
 
-import { PRIORITY, STAGES } from "@/lib/mc-data/data";
+import { ACTORS, HUMANS, PRIORITY, STAGES } from "@/lib/mc-data/data";
 import { evidenceComplete } from "@/lib/mc-data/helpers";
 import type { Risk, StageKey, Task } from "@/lib/mc-data/types";
 
@@ -53,6 +53,55 @@ const STATUS_TO_STAGE = Object.fromEntries(STAGES.map((s) => [s.name, s.key]));
 
 const capitalize = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 
+// ─── Person columns (ToDos) ──────────────────────────────────────────────────
+
+// MC actor field → SharePoint Person column (internal name) + direction. A
+// Person column is written via `<sp>LookupId`; the resolved id is supplied by
+// the engine in `outboundFields(..., { persons })`. assignee is two-way; the
+// accountable owner + reporter are push-only (SP_LISTS / schema is the authority).
+export type TaskPersonMc = "assignee" | "accountableOwner" | "reporter";
+export const TASK_PERSON_FIELDS: { mc: TaskPersonMc; sp: string; dir: "two-way" | "push" }[] = [
+  { mc: "assignee", sp: "AssignedTo", dir: "two-way" },
+  { mc: "accountableOwner", sp: "AccountableOwner", dir: "push" },
+  { mc: "reporter", sp: "Reporter", dir: "push" },
+];
+
+// What the engine must do for each person column on a task, decided purely
+// (no I/O) so it is unit-testable: `clear` (no actor → send a null LookupId to
+// empty the column), `resolve` (a human with an email → resolve to a site-user
+// lookup id), or `skip` (an agent / actor with no SharePoint identity → leave
+// the column untouched, never fabricate a person). UIL-miss is decided by the
+// engine after resolution (a resolve target whose id comes back null).
+export interface PersonPlan {
+  clear: TaskPersonMc[];
+  resolve: { mc: TaskPersonMc; sp: string; actorId: string; email: string }[];
+  skip: { mc: TaskPersonMc; actorId: string }[];
+}
+
+export function planTaskPersons(task: Pick<Task, TaskPersonMc>): PersonPlan {
+  const plan: PersonPlan = { clear: [], resolve: [], skip: [] };
+  for (const { mc, sp } of TASK_PERSON_FIELDS) {
+    const actorId = task[mc];
+    if (!actorId) {
+      plan.clear.push(mc);
+      continue;
+    }
+    const human = HUMANS[actorId];
+    if (human?.email) plan.resolve.push({ mc, sp, actorId, email: human.email });
+    else plan.skip.push({ mc, actorId }); // agent or unknown — no SharePoint person
+  }
+  return plan;
+}
+
+// Reverse of the directory email lookup, for inbound assignee mirroring: a
+// SharePoint site-user email → the MC human actor id (or null when no human
+// matches — never guess).
+export function actorIdByEmail(email: string): string | null {
+  const needle = String(email).toLowerCase();
+  const hit = Object.values(HUMANS).find((h) => (h.email ?? "").toLowerCase() === needle);
+  return hit?.id ?? null;
+}
+
 // ─── Outbound (push + two-way columns) ───────────────────────────────────────
 
 // Returns the Graph `fields` payload for an entity. `creating` additionally
@@ -61,7 +110,7 @@ const capitalize = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 export function outboundFields(
   type: EntityType,
   data: EntityData,
-  opts: { creating?: boolean; only?: string[] } = {}
+  opts: { creating?: boolean; only?: string[]; persons?: Partial<Record<TaskPersonMc, number | null>> } = {}
 ): Record<string, unknown> {
   const include = (mcField: string) => !opts.only || opts.only.includes(mcField);
   const out: Record<string, unknown> = {};
@@ -81,6 +130,16 @@ export function outboundFields(
     if (include("estimate")) out.Estimate = t.estimate;
     if (include("repos")) out.Repos = (t.repos ?? []).join("\n");
     if (include("evidence")) out.EvidenceComplete = evidenceComplete(t.evidence);
+    // Person columns: emit `<sp>LookupId` from the pre-resolved `persons` map.
+    // A number sets the person, `null` clears it; a field absent from the map is
+    // left untouched (the engine omits UIL-miss / agent persons — never faked).
+    if (opts.persons) {
+      for (const { mc, sp } of TASK_PERSON_FIELDS) {
+        if (!include(mc)) continue;
+        const lookupId = opts.persons[mc];
+        if (lookupId !== undefined) out[`${sp}LookupId`] = lookupId;
+      }
+    }
     return out;
   }
 
@@ -157,6 +216,9 @@ const FIELD_DISPLAY: Record<EntityType, Record<string, string>> = {
     priority: "Priority",
     due: "Due Date",
     description: "Description",
+    assignee: "Assigned To",
+    accountableOwner: "Accountable Owner",
+    reporter: "Reporter",
     reqs: "PRD Requirements",
     estimate: "Estimate",
     repos: "Repos",
@@ -183,6 +245,13 @@ export function parseFieldValue(type: EntityType, mcField: string, raw: string):
       case "title":
       case "description":
         return raw;
+      case "assignee":
+      case "accountableOwner":
+      case "reporter":
+        // The engine resolves an inbound person to an MC actor id BEFORE a
+        // conflict is raised, so the SharePoint side of a person conflict is an
+        // actor id — validate it against the directory, never guess.
+        return raw in ACTORS ? raw : undefined;
       case "stage":
         if (raw in STAGE_TO_STATUS) return raw;
         return STATUS_TO_STAGE[raw];

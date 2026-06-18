@@ -800,14 +800,18 @@ export const setCoassignees = (taskId: string, ids: string[]) => {
 };
 
 // Set the human accountable owner (EN-003). Rejects an agent — accountability
-// is always human. DB-only: the Accountable Owner person column is part of the
-// deferred directory mirror, so no sync claim is made here.
+// is always human. The Accountable Owner person column now mirrors to SharePoint
+// on the next sync (Item 1, push-only), so the trail says so honestly.
 export const setAccountableOwner = (taskId: string, ownerId: string | null) => {
   if (isAgentId(ownerId)) {
     pushNotice("Accountability is always human — an agent can't be the accountable owner.");
     return;
   }
-  patchTaskFields(taskId, { accountableOwner: ownerId }, { activity: "set the accountable owner" });
+  patchTaskFields(
+    taskId,
+    { accountableOwner: ownerId },
+    { activity: "set the accountable owner — Accountable Owner mirrors to SharePoint on the next sync" }
+  );
 };
 
 // Toggle the per-task human-only policy. Turning it on while an agent is the
@@ -1019,9 +1023,10 @@ export function deleteBucketComment(bucketId: string, commentId: string, actor: 
 }
 
 // Reassign a task (null = unassign). Thin wrapper over the shared mutation
-// spine. The Assigned To person column is NOT mirrored yet (M365 directory
-// increment) — the activity + audit copy reflect that deferral honestly, the
-// server (state.ts) likewise does not re-queue the entity for push.
+// spine. The Assigned To person column now mirrors to SharePoint on the next
+// sync (Item 1) — the server (state.ts) re-queues the entity for push and the
+// engine resolves the actor to a site-user id. A Teams/email notification on
+// assignment is still deferred, so the trail never claims that delivery.
 export function reassignTask(taskId: string, actorId: string | null) {
   const t = taskById(taskId);
   if (!t) return;
@@ -1036,13 +1041,13 @@ export function reassignTask(taskId: string, actorId: string | null) {
     if (t.assignee === null) return;
     pushAudit(
       CURRENT_USER,
-      `Unassigned ${taskId} — Assigned To mirror deferred to the directory increment.`,
+      `Unassigned ${taskId} — clearing Assigned To on the next SharePoint sync.`,
       "pending"
     );
     patchTaskFields(
       taskId,
       { assignee: null },
-      { activity: "unassigned — Assigned To mirror deferred to the directory increment" }
+      { activity: "unassigned — Assigned To clears on the next SharePoint sync" }
     );
     return;
   }
@@ -1052,13 +1057,13 @@ export function reassignTask(taskId: string, actorId: string | null) {
   // the server audit (state.ts) omits it — a documented divergence, not parity.
   pushAudit(
     CURRENT_USER,
-    `Reassigned ${taskId} to ${who.name} — Assigned To mirror deferred to the directory increment.`,
+    `Reassigned ${taskId} to ${who.name} — Assigned To mirrors to SharePoint on the next sync.`,
     "pending"
   );
   patchTaskFields(
     taskId,
     { assignee: actorId },
-    { activity: `reassigned to ${who.name} — Assigned To mirror deferred to the directory increment` }
+    { activity: `reassigned to ${who.name} — Assigned To mirrors to SharePoint on the next sync` }
   );
 }
 

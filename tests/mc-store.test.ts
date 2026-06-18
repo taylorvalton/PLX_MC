@@ -104,43 +104,49 @@ describe("invitePerson", () => {
 });
 
 describe("reassignTask", () => {
-  it("sets the assignee and logs the honest deferred-mirror trail (not a fabricated push)", () => {
+  it("sets the assignee and logs the honest SharePoint-mirror trail (real push, no fabricated Teams/email)", () => {
     reassignTask("TASK-221", "ricardo");
     const t = taskById("TASK-221");
     expect(t?.assignee).toBe("ricardo");
-    // The mirror is deferred to the directory increment — the trail must say so
-    // and must NOT claim a SharePoint mirror / Teams notify that did not happen.
-    expect(t?.activity[0]?.what).not.toContain("mirrored to SharePoint");
+    // Item 1: the Assigned To person column now mirrors to SharePoint on the next
+    // sync — the trail says so. It must NOT claim a Teams/email delivery that did
+    // not happen (notification delivery is still deferred), nor revert to the old
+    // "deferred to the directory increment" narrative.
+    expect(t?.activity[0]?.what).toContain("Assigned To");
+    expect(t?.activity[0]?.what).toContain("SharePoint");
     expect(t?.activity[0]?.what).not.toContain("notified via Teams");
-    expect(t?.activity[0]?.what).toContain("deferred to the directory increment");
+    expect(t?.activity[0]?.what).not.toContain("deferred to the directory increment");
   });
 
-  it("supports unassigning with the honest deferred-mirror trail", () => {
+  it("supports unassigning with the honest SharePoint-mirror trail", () => {
     reassignTask("TASK-222", "rishi");
     reassignTask("TASK-222", null);
     const t = taskById("TASK-222");
     expect(t?.assignee).toBeNull();
     expect(t?.activity[0]?.what).toContain("unassigned");
-    expect(t?.activity[0]?.what).toContain("deferred to the directory increment");
+    expect(t?.activity[0]?.what).toContain("SharePoint");
+    expect(t?.activity[0]?.what).not.toContain("deferred to the directory increment");
   });
 });
 
-describe("assignee-mirror audit honesty (the untested unassign/reassign lie)", () => {
-  it("reassign audit reads the deferred-mirror truth and is state=pending, not synced", () => {
+describe("assignee-mirror audit honesty (now a real push, still pending until the sweep)", () => {
+  it("reassign audit claims the real SharePoint mirror and is state=pending (until the sweep), not synced", () => {
     reassignTask("TASK-221", "ricardo");
     const top = auditLog()[0];
-    expect(top.body).toContain("deferred to the directory increment");
-    expect(top.body).not.toContain("Assigned To mirrored");
-    expect(top.body).not.toContain("cleared in SharePoint");
+    expect(top.body).toContain("SharePoint");
+    expect(top.body).not.toContain("deferred to the directory increment");
+    expect(top.body).not.toContain("notified via Teams");
+    // Pending: the value is queued for the next outbound sweep, not yet written —
+    // claiming "synced" here would fabricate sync evidence.
     expect(top.state).toBe("pending");
   });
 
-  it("unassign audit reads the deferred-mirror truth and is state=pending, not synced", () => {
+  it("unassign audit claims clearing Assigned To and is state=pending, not synced", () => {
     reassignTask("TASK-222", "rishi");
     reassignTask("TASK-222", null);
     const top = auditLog()[0];
-    expect(top.body).toContain("deferred to the directory increment");
-    expect(top.body).not.toContain("cleared in SharePoint");
+    expect(top.body).toContain("Assigned To");
+    expect(top.body).not.toContain("deferred to the directory increment");
     expect(top.state).toBe("pending");
   });
 });
