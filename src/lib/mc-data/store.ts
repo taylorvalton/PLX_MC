@@ -1155,10 +1155,31 @@ function bucketIdFromName(name: string, existing: Set<string>): string {
   return `${base}-${n}`;
 }
 
+// The bucket-create POST mirror seam (parallels bucketUpdateMirror): default
+// issues the real POST; tests inject a deterministic mirror to exercise the
+// reconcile (adopt server id) / rollback (remove optimistic + notice) paths.
+type BucketCreateMirror = (input: NewBucketInput & { repos: string[] }) => Promise<Bucket>;
+const defaultBucketCreateMirror: BucketCreateMirror = (input) =>
+  api<Bucket>("/buckets", { method: "POST", body: JSON.stringify(input) });
+let bucketCreateMirror = defaultBucketCreateMirror;
+let bucketCreateMirrorInjected = false;
+let bucketCreateInFlight: Promise<void> = Promise.resolve();
+
+export function __setBucketCreateMirrorForTests(fn: BucketCreateMirror | null) {
+  bucketCreateMirror = fn ?? defaultBucketCreateMirror;
+  bucketCreateMirrorInjected = fn !== null;
+}
+
+export function __bucketCreateSettled(): Promise<void> {
+  return bucketCreateInFlight;
+}
+
 // Create an initiative/bucket. Optimistic-local (client id from the name) +
 // mirror to POST /api/buckets; the server owns the id, so adopt its bucket if
-// the optimistic id raced/collided (mirrors addTask). Repos are clamped to the
-// allow-list at the boundary with a non-silent notice (EN-002).
+// the optimistic id raced/collided. On a FAILED mirror the optimistic bucket is
+// rolled back with a non-silent notice — a created initiative is never silently
+// dropped (it would otherwise vanish on the next hydrate). Repos are clamped to
+// the allow-list at the boundary with a non-silent notice (EN-002).
 export function addBucket(input: NewBucketInput): Bucket {
   const name = (input.name ?? "").trim();
   const id = bucketIdFromName(name, new Set(Object.keys(state.buckets)));
@@ -1184,14 +1205,27 @@ export function addBucket(input: NewBucketInput): Bucket {
   state.buckets = { ...state.buckets, [id]: bucket };
   pushAudit(bucket.owner, `Created initiative ${id} (${name}) — pending Roadmap mirror.`, "pending");
   emit();
-  serverCall(async () => {
-    const created = await api<Bucket>("/buckets", { method: "POST", body: JSON.stringify({ ...input, repos }) });
-    const next = { ...state.buckets };
-    if (created.id !== id) delete next[id]; // adopt the server's id
-    next[created.id] = created;
-    state.buckets = next;
-    emit();
-  });
+  if (typeof window === "undefined" && !bucketCreateMirrorInjected) return bucket;
+  bucketCreateInFlight = bucketCreateMirror({ ...input, repos }).then(
+    (created) => {
+      const next = { ...state.buckets };
+      if (created.id !== id) delete next[id]; // adopt the server's id
+      next[created.id] = created;
+      state.buckets = next;
+      emit();
+    },
+    (err) => {
+      const next = { ...state.buckets };
+      delete next[id]; // never leave an unpersisted initiative that vanishes on reload
+      state.buckets = next;
+      pushNotice(
+        `Couldn't save the new initiative "${name}" — it was rolled back. ${
+          err instanceof Error ? err.message : "The server rejected it."
+        }`
+      );
+      emit();
+    }
+  );
   return bucket;
 }
 
@@ -1431,5 +1465,8 @@ export function resetStore() {
   bucketUpdateMirror = defaultBucketUpdateMirror;
   bucketUpdateMirrorInjected = false;
   bucketUpdateInFlight = Promise.resolve();
+  bucketCreateMirror = defaultBucketCreateMirror;
+  bucketCreateMirrorInjected = false;
+  bucketCreateInFlight = Promise.resolve();
   emit();
 }

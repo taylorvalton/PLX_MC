@@ -86,4 +86,18 @@ describe("patchBucket (EN-005)", () => {
 
     expect(await patchBucket("BKT-NOPE", { health: "off" }, "vince")).toBeNull();
   });
+
+  it("seeds the registry then validates edited repos against the PERSISTED allow-list", async () => {
+    const engine = await import("@/lib/sync/engine");
+    store.buckets = [
+      { id: "BKT-FIN", name: "Finance", owner: "vince", health: "track", target: "—", started: "2026.06.11", desc: "", repos: [], sync: { state: "pending", ts: "—", sp: "Roadmap · unprovisioned" }, prd: null },
+    ];
+    await expect(patchBucket("BKT-FIN", { repos: ["ghost-repo"] }, "vince")).rejects.toMatchObject({
+      code: "repo_not_allowed",
+    });
+    const ok = await patchBucket("BKT-FIN", { repos: ["plx-mc"] }, "vince");
+    expect(ok?.repos).toEqual(["plx-mc"]);
+    // The registry is seeded before the allow-list check (else fresh-DB edits would wrongly reject).
+    expect(engine.ensureReposSeeded).toHaveBeenCalled();
+  });
 });

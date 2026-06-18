@@ -6,7 +6,6 @@ import {
   CURRENT_USER,
   MILESTONES,
   PRDS,
-  REPOS,
   STAGES,
   STAGE_IDX,
   TRACE,
@@ -18,6 +17,7 @@ import {
 import { useMcVersion } from "@/lib/mc-data/hooks";
 import {
   addBucketComment,
+  allRepos,
   allRisks,
   allTasks,
   bucketById,
@@ -352,7 +352,7 @@ export function BucketDetail({ route, nav }: ScreenProps) {
                 {bucket.repos.map((repoId) => (
                   <button type="button" className="dl" key={repoId} onClick={() => nav("repos")}>
                     <span className="ic">{"</>"}</span>
-                    <span className="t">{REPOS[repoId].name}</span>
+                    <span className="t">{allRepos()[repoId]?.name ?? repoId}</span>
                     <span className="ms">GitHub</span>
                     <span className="ext">↗</span>
                   </button>

@@ -180,6 +180,7 @@ export async function patchBucket(id: string, patch: PatchBucketInput, actor: st
   const existing = (await repo.getBuckets()).find((b) => b.id === id);
   if (!existing) return null;
   if (patch.repos) {
+    await ensureReposSeeded();
     const registry = await repo.getRepos();
     const registryMap = Object.fromEntries(registry.map((r) => [r.id, r]));
     const offlist = disallowedRepos(patch.repos, registryMap);

@@ -6,7 +6,9 @@
 import { beforeEach, describe, expect, it } from "vitest";
 
 import {
+  __bucketCreateSettled,
   __bucketUpdateSettled,
+  __setBucketCreateMirrorForTests,
   __setBucketUpdateMirrorForTests,
   activeNotices,
   addBucket,
@@ -15,6 +17,21 @@ import {
   resetStore,
   updateBucket,
 } from "@/lib/mc-data/store";
+import type { Bucket } from "@/lib/mc-data";
+
+const serverBucket = (over: Partial<Bucket>): Bucket => ({
+  id: "BKT-SERVER",
+  name: "Server",
+  owner: "vince",
+  health: "track",
+  target: "—",
+  started: "2026.06.18",
+  desc: "",
+  repos: [],
+  sync: { state: "pending", ts: "—", sp: "Roadmap · unprovisioned" },
+  prd: null,
+  ...over,
+});
 
 beforeEach(() => resetStore());
 
@@ -38,6 +55,25 @@ describe("addBucket (EN-005)", () => {
     const b = addBucket({ name: "Infra X", repos: ["plx-mc", "ghost-repo"] });
     expect(b.repos).toEqual(["plx-mc"]); // ghost-repo dropped
     expect(activeNotices().some((n) => /not in the registry/.test(n.body))).toBe(true);
+  });
+
+  it("adopts the server's bucket on a resolved create mirror", async () => {
+    __setBucketCreateMirrorForTests(async (input) => serverBucket({ id: "BKT-SERVER", name: input.name }));
+    const optimistic = addBucket({ name: "Server Owned" });
+    await __bucketCreateSettled();
+    expect(bucketById(optimistic.id)).toBeUndefined(); // optimistic id replaced by server id
+    expect(bucketById("BKT-SERVER")?.name).toBe("Server Owned");
+  });
+
+  it("rolls back the optimistic bucket + notices when the create mirror rejects (never a silent drop)", async () => {
+    __setBucketCreateMirrorForTests(async () => {
+      throw new Error("POST 500");
+    });
+    const b = addBucket({ name: "Doomed Initiative" });
+    expect(bucketById(b.id)).toBeDefined(); // present optimistically
+    await __bucketCreateSettled();
+    expect(bucketById(b.id)).toBeUndefined(); // rolled back, not silently kept
+    expect(activeNotices().some((n) => /rolled back/i.test(n.body))).toBe(true);
   });
 });
 
