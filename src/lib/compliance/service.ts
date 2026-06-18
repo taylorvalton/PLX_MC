@@ -11,6 +11,7 @@ import { getEntity } from "@/lib/sync/repo";
 import { classifyRiskTier } from "./risk";
 import { verifyCompliance } from "./verify";
 import * as repo from "./repo";
+import type { PrEvent } from "./webhook";
 import type { ActorKind, RiskTier, VerifyResult } from "./types";
 
 // Checkout credentials are short-lived (decision 14).
@@ -141,6 +142,67 @@ export async function verifyPr(input: VerifyPrInput): Promise<VerifyPrResult> {
   });
 
   return { ...result, tier, actorKind, taskId };
+}
+
+// ─── git → MC ingestion (decision 8, the auto-maintained record) ─────────────
+
+export interface IngestResult {
+  action: string;
+  actorKind: ActorKind;
+  taskId: string | null;
+  recorded: boolean;
+}
+
+// Maintain the system-of-record from the PR lifecycle. This records the PR as
+// typed events (the event log IS the record, decision 13); it does NOT mutate
+// the sync Task entity — that projection is owned by the sync/task layer and is
+// emitted here as a `task.promotion.requested` seam (kept out of scope so this
+// phase never writes src/lib/sync/**). The verdict gate is the verify route, not
+// this path. Actor + task come from the checkout credential, never git metadata.
+export async function ingestPullRequest(evt: PrEvent): Promise<IngestResult> {
+  let actorKind: ActorKind = "operator";
+  let taskId: string | null = null;
+  if (evt.checkoutId) {
+    const d = await repo.getDispatch(evt.checkoutId);
+    if (d && !d.revoked) {
+      actorKind = d.actorKind;
+      taskId = d.taskId;
+    }
+  }
+
+  if (evt.action === "closed" && evt.merged) {
+    await repo.appendEvent({
+      kind: "pr.merged",
+      actor: actorKind,
+      repo: evt.repo,
+      taskId,
+      pr: String(evt.prNumber),
+      payload: { sha: evt.headSha, branch: evt.branch, title: evt.title },
+    });
+    await repo.appendEvent({
+      kind: "task.promotion.requested",
+      actor: actorKind,
+      repo: evt.repo,
+      taskId,
+      pr: String(evt.prNumber),
+      payload: { sha: evt.headSha },
+    });
+    return { action: evt.action, actorKind, taskId, recorded: true };
+  }
+
+  // opened / reopened / synchronize → record the PR. An operator PR with no
+  // checkout is still recorded (decision 5), attributed to its author and
+  // flagged sparse (ungated, no task yet).
+  const sparse = actorKind === "operator" && !taskId;
+  await repo.appendEvent({
+    kind: evt.action === "synchronize" ? "pr.synchronized" : "pr.opened",
+    actor: actorKind === "operator" ? evt.author || "operator" : actorKind,
+    repo: evt.repo,
+    taskId,
+    pr: String(evt.prNumber),
+    payload: { branch: evt.branch, title: evt.title, author: evt.author, headSha: evt.headSha, actorKind, sparse },
+  });
+  return { action: evt.action, actorKind, taskId, recorded: true };
 }
 
 // ─── Event export (the Second-Brain feed) ────────────────────────────────────
