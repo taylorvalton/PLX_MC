@@ -279,6 +279,8 @@ interface ServerSnapshot {
   // EN-002 / Item 2 — the persisted repo registry + request queue.
   repos?: Repo[];
   repoRequests?: RepoRequest[];
+  // EN-001 / Item 4 — persisted bucket discussion threads.
+  bucketComments?: Record<string, Comment[]>;
 }
 
 // Adopt the server's truth for everything the engine owns; notifications,
@@ -295,6 +297,9 @@ function applyServerState(snapshot: ServerSnapshot) {
   // and requests survive a reload (the server is the source of truth on hydrate).
   if (snapshot.repos) state.repos = Object.fromEntries(snapshot.repos.map((r) => [r.id, r]));
   if (snapshot.repoRequests) state.repoRequests = snapshot.repoRequests;
+  // EN-001 / Item 4 — adopt the persisted bucket threads so they survive a
+  // reload (the server is the source of truth on hydrate).
+  if (snapshot.bucketComments) state.bucketComments = snapshot.bucketComments;
   for (const list of state.lists) {
     const counts = snapshot.counts[list.key];
     if (counts) {
@@ -1006,17 +1011,73 @@ export function deleteComment(taskId: string, commentId: string, actor: string =
   );
 }
 
-// ─── Bucket comments (store-authoritative — no bucket server layer yet) ───────
+// ─── Bucket comments (EN-001 / Item 4 — persisted, app-only) ─────────────────
+// Buckets have no entity row, so their threads persist in a dedicated table via
+// PATCH /api/buckets/{id}/comments (the whole array round-trips, the same shape
+// task comments use). Each mutation applies optimistically, then mirrors through
+// the same reconcile-on-success / rollback+notice-on-failure spine as
+// patchTaskFields, so a thread the user saw survives the next hydrate and a
+// failed write is never silently dropped. Comments stay app-only (never pushed
+// to SharePoint, per the EN-001 decision).
+
+type BucketCommentMirror = (bucketId: string, comments: Comment[]) => Promise<Comment[]>;
+
+const defaultBucketCommentMirror: BucketCommentMirror = (bucketId, comments) =>
+  api<Comment[]>(`/buckets/${bucketId}/comments`, {
+    method: "PATCH",
+    body: JSON.stringify({ actor: CURRENT_USER, comments }),
+  });
+
+let bucketCommentMirror = defaultBucketCommentMirror;
+let bucketCommentMirrorInjected = false;
+let bucketMirrorInFlight: Promise<void> = Promise.resolve();
+
+// Test seam (mirrors __setPatchMirrorForTests): inject a deterministic mirror so
+// the reconcile/rollback path runs under the Node test env. Pass null to restore.
+export function __setBucketCommentMirrorForTests(fn: BucketCommentMirror | null) {
+  bucketCommentMirror = fn ?? defaultBucketCommentMirror;
+  bucketCommentMirrorInjected = fn !== null;
+}
+
+// Test seam: await the in-flight bucket-thread mirror (like __repoValidationSettled).
+export function __bucketMirrorSettled(): Promise<void> {
+  return bucketMirrorInFlight;
+}
+
+// Mirror the bucket's CURRENT thread to the server; reconcile to the stored
+// result on success, restore `prior` + surface a notice on failure. No-op under
+// SSR/tests with no injected mirror (the optimistic state stands).
+function persistBucketThread(bucketId: string, prior: Comment[]): void {
+  if (typeof window === "undefined" && !bucketCommentMirrorInjected) return;
+  const next = state.bucketComments[bucketId] ?? [];
+  bucketMirrorInFlight = bucketCommentMirror(bucketId, next).then(
+    (saved) => {
+      state.bucketComments = { ...state.bucketComments, [bucketId]: saved };
+      emit();
+    },
+    (err) => {
+      state.bucketComments = { ...state.bucketComments, [bucketId]: prior };
+      pushNotice(
+        `Couldn't save the comment on ${bucketId} — it was rolled back. ${
+          err instanceof Error ? err.message : "The server rejected the update."
+        }`
+      );
+      emit();
+    }
+  );
+}
 
 export function addBucketComment(bucketId: string, body: string, author: string = CURRENT_USER): Comment | null {
   const comment = buildComment(body, author);
   if (!comment) return null;
+  const prior = clone(state.bucketComments[bucketId] ?? []);
   state.bucketComments = {
     ...state.bucketComments,
     [bucketId]: [...(state.bucketComments[bucketId] ?? []), comment],
   };
   emit();
   notifyMentions(comment.mentions, author, { label: bucketId });
+  persistBucketThread(bucketId, prior);
   return comment;
 }
 
@@ -1026,6 +1087,7 @@ export function editBucketComment(bucketId: string, commentId: string, body: str
   const list = state.bucketComments[bucketId] ?? [];
   const existing = list.find((c) => c.id === commentId);
   if (!existing || existing.author !== editor) return;
+  const prior = clone(list);
   const mentions = parseMentions(text, mentionableIdSet());
   const added = mentions.filter((id) => !existing.mentions.includes(id));
   state.bucketComments = {
@@ -1036,17 +1098,20 @@ export function editBucketComment(bucketId: string, commentId: string, body: str
   };
   emit();
   if (added.length) notifyMentions(added, editor, { label: bucketId });
+  persistBucketThread(bucketId, prior);
 }
 
 export function deleteBucketComment(bucketId: string, commentId: string, actor: string = CURRENT_USER) {
   const list = state.bucketComments[bucketId] ?? [];
   const existing = list.find((c) => c.id === commentId);
   if (!existing || existing.author !== actor) return;
+  const prior = clone(list);
   state.bucketComments = {
     ...state.bucketComments,
     [bucketId]: list.filter((c) => c.id !== commentId),
   };
   emit();
+  persistBucketThread(bucketId, prior);
 }
 
 // Reassign a task (null = unassign). Thin wrapper over the shared mutation
@@ -1219,5 +1284,8 @@ export function resetStore() {
   repoValidatorInjected = false;
   repoRequestSeq = 0;
   repoValidationInFlight = Promise.resolve();
+  bucketCommentMirror = defaultBucketCommentMirror;
+  bucketCommentMirrorInjected = false;
+  bucketMirrorInFlight = Promise.resolve();
   emit();
 }

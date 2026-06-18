@@ -9,6 +9,7 @@ import { assignmentViolation, isAgentId, stageAdvanceViolation } from "@/lib/mc-
 import { disallowedRepos } from "@/lib/mc-data/repos";
 import type {
   AuditRow,
+  Comment,
   FileEntry,
   Repo,
   RepoRequest,
@@ -34,12 +35,15 @@ export interface StateSnapshot {
   // so approvals survive a reload.
   repos: Repo[];
   repoRequests: RepoRequest[];
+  // EN-001 / Item 4 — persisted bucket discussion threads (keyed by bucket id),
+  // so they survive a reload. App-only (never mirrored to SharePoint).
+  bucketComments: Record<string, Comment[]>;
 }
 
 export async function snapshot(): Promise<StateSnapshot> {
   await ensureSeeded();
   await ensureReposSeeded();
-  const [tasks, risks, files, conflicts, errors, audit, counts, repos, repoRequests] = await Promise.all([
+  const [tasks, risks, files, conflicts, errors, audit, counts, repos, repoRequests, bucketComments] = await Promise.all([
     repo.getEntities("task"),
     repo.getEntities("risk"),
     repo.getEntities("file"),
@@ -49,6 +53,7 @@ export async function snapshot(): Promise<StateSnapshot> {
     repo.countsByList(),
     repo.getRepos(),
     repo.getRepoRequests(),
+    repo.bucketCommentsByBucket(),
   ]);
   return {
     tasks: tasks.map((r) => r.data as unknown as Task),
@@ -69,10 +74,19 @@ export async function snapshot(): Promise<StateSnapshot> {
       scope,
     })),
     repoRequests,
+    bucketComments,
     // Lists not yet mirrored (roadmap, milestones) keep their fixture counts;
     // mirrored lists report live counts. The store merges via SP_LISTS keys.
     lastSweep: audit.find((a) => a.body.startsWith("Sweep completed"))?.ts ?? SP_LISTS[0].lastSync,
   };
+}
+
+// Replace a bucket's discussion thread (EN-001 / Item 4). The store mirrors the
+// whole array (the same shape task comments round-trip), so the server replaces
+// the thread atomically and returns the stored comments. App-only — bucket
+// comments are never pushed to SharePoint.
+export async function setBucketComments(bucketId: string, comments: Comment[]): Promise<Comment[]> {
+  return repo.replaceBucketComments(bucketId, comments);
 }
 
 export interface CreateTaskInput {

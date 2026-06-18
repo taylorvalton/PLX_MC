@@ -68,6 +68,13 @@ tenant against the committed schema with exit codes.
 - Sub-tasks (landed 2026-06-18, Item 3): a push-only `Subtasks` ToDos column —
   `serializeSubtasks` renders one human-readable line per sub-task; MC owns the
   structured array, so it is never read back.
+- Bucket comments (landed 2026-06-18, Item 4): bucket discussion threads now
+  persist in a dedicated `bucket_comments` table (migration `006`) via
+  `PATCH /api/buckets/{id}/comments` (atomic replace-thread on `db.withTransaction`)
+  and hydrate from the snapshot, so they survive a reload. The store mirrors each
+  add/edit/delete optimistically (reconcile-on-success / rollback+notice-on-failure,
+  the same spine as `patchTaskFields`). App-only — bucket comments are NEVER
+  pushed to SharePoint (the EN-001 decision).
 - Still deferred to the public-deploy increment: Graph change webhooks,
   notification DELIVERY (Teams/email — assignment/mention still in-app + audit
   only), lookup columns (Initiative), and Project Documents (driveItem) sync —
