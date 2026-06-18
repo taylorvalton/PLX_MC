@@ -3,7 +3,6 @@
 import {
   ACTORS,
   BUCKETS,
-  BUCKET_IDX,
   CURRENT_USER,
   MILESTONES,
   PRDS,
@@ -21,6 +20,7 @@ import {
   addBucketComment,
   allRisks,
   allTasks,
+  bucketById,
   commentsForBucket,
   deleteBucketComment,
   editBucketComment,
@@ -31,7 +31,9 @@ import { Avatar, AvatarStack, HealthPill, PMark, ReqChip, SyncTick } from "./ato
 import type { ScreenProps } from "./route";
 import { Timeline } from "./timeline";
 
-const FALLBACK_BUCKET_ID = BUCKETS[0].id;
+// A static fallback (first fixture initiative) so the detail view always
+// resolves to a real bucket; live resolution goes through bucketById (EN-005).
+const FALLBACK_BUCKET = BUCKETS[0];
 
 interface BucketRollups {
   tasks: Task[];
@@ -68,7 +70,7 @@ export function summarizeTrace(trace: Trace | null): TraceSummary {
 export function BucketDetail({ route, nav }: ScreenProps) {
   useMcVersion();
 
-  const bucket = BUCKET_IDX[route.bucketId ?? FALLBACK_BUCKET_ID] ?? BUCKET_IDX[FALLBACK_BUCKET_ID];
+  const bucket = bucketById(route.bucketId ?? FALLBACK_BUCKET.id) ?? FALLBACK_BUCKET;
   const rollups = rollupsForBucket(bucket.id, allTasks(), MILESTONES, allRisks());
   const prd = bucket.prd ? PRDS[bucket.prd] : null;
   const trace = TRACE.bucket === bucket.id ? TRACE : null;
