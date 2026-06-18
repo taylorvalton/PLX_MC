@@ -35,10 +35,18 @@ truth table is proven before any plumbing exists.
   agent PRs must carry a human accountable owner (EN-003) + the tier bundle. The
   soft-vs-hard (warn vs block) decision belongs to the caller.
 
-Deferred to later phases (see `docs/product/SYSTEM_OF_RECORD.md`): the checkout +
-dispatch ledger and `/api/compliance/*` routes (P1b), the GitHub App + branch
-protection + git→MC ingestion + reconciliation queue (P3), and the first-class
-`mc_events` event log / Second-Brain substrate (P5).
+Landed in P1b: the checkout/complete/verify handshake (`service.ts` + `repo.ts` +
+`/api/compliance/*`), the dispatch ledger + compliance-check ledger, and the
+first-class append-only `mc_events` log with keyset export (`GET /api/events`) —
+schema in `db/migrations/005_compliance.sql`. The service resolves actor + task
+from the checkout credential (never git metadata) and records every verdict as an
+event. Server logic is proven hermetically (mocked DB seam,
+`tests/compliance-server.test.ts`); applying the migration + live integration on
+staging is the deploy step.
+
+Deferred to later phases (see `docs/product/SYSTEM_OF_RECORD.md`): the GitHub App +
+branch protection + git→MC ingestion + reconciliation queue (P3), Cursor/Claude
+auto-checkout hooks (P2), and the embedding/index feed over the event log (P5).
 
 ## Dependencies
 
@@ -52,8 +60,13 @@ GitHub status-check workflow.
 - `src/lib/compliance/risk.ts` — risk-tier classifier + per-tier bundle floor
 - `src/lib/compliance/verify.ts` — `evidenceCompleteForTier` + `verifyCompliance`
 - `src/lib/compliance/types.ts` — `RiskTier`, `ActorKind`, `VerifyInput/Result`
-- `src/lib/compliance/index.ts` — barrel (import through here)
-- `tests/compliance.test.ts` — risk truth table + verifier verdicts
+- `src/lib/compliance/index.ts` — pure-core barrel (import through here)
+- `src/lib/compliance/service.ts` — server service: checkout / complete / verifyPr / listEvents (subpath import, like `mc-data/store`)
+- `src/lib/compliance/repo.ts` — Postgres accessors (dispatch ledger, mc_events, check ledger)
+- `src/app/api/compliance/{checkout,complete,verify}/route.ts`, `src/app/api/events/route.ts` — the API surface
+- `db/migrations/005_compliance.sql` — `mc_events`, `mc_dispatch`, `mc_compliance_check`
+- `tests/compliance.test.ts` — risk truth table + verifier verdicts (pure)
+- `tests/compliance-server.test.ts` — service orchestration (mocked DB seam)
 - `docs/product/SYSTEM_OF_RECORD.md` — the governing spec (EN-007)
 
 ## Owner
