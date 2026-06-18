@@ -3,8 +3,8 @@
 // its SyncRef; the relational sync columns are updated in the same statement
 // so there is exactly one write path and no drift.
 
-import { query } from "@/lib/db";
-import type { AuditRow, SpConflict, SpError, SyncState } from "@/lib/mc-data/types";
+import { query, withTransaction } from "@/lib/db";
+import type { AuditRow, Comment, SpConflict, SpError, SyncState } from "@/lib/mc-data/types";
 import type { EntityData, EntityType } from "./mapping";
 import { LIST_KEY_FOR } from "./mapping";
 
@@ -295,4 +295,54 @@ export async function countsByList(): Promise<Record<string, ListCounts>> {
     out[key][r.sync_state] += Number(r.n);
   }
   return out;
+}
+
+// ─── Bucket comments (EN-001 / Item 4 — app-only, never pushed to SharePoint) ─
+
+interface BucketCommentRow {
+  bucket_id: string;
+  id: string;
+  author: string;
+  body: string;
+  mentions: unknown;
+  ts: string;
+  edited_ts: string | null;
+}
+
+const toComment = (r: BucketCommentRow): Comment => ({
+  id: r.id,
+  author: r.author,
+  body: r.body,
+  ts: r.ts,
+  mentions: Array.isArray(r.mentions) ? (r.mentions as string[]) : [],
+  ...(r.edited_ts ? { editedTs: r.edited_ts } : {}),
+});
+
+// All bucket threads, grouped by bucket id and ordered by their stored position.
+export async function bucketCommentsByBucket(): Promise<Record<string, Comment[]>> {
+  const rows = await query<BucketCommentRow>(
+    `SELECT bucket_id, id, author, body, mentions, ts, edited_ts
+       FROM bucket_comments ORDER BY bucket_id, position`
+  );
+  const out: Record<string, Comment[]> = {};
+  for (const r of rows) (out[r.bucket_id] ??= []).push(toComment(r));
+  return out;
+}
+
+// Replace a bucket's whole thread atomically (mirrors the task-comment "send the
+// whole array" round-trip). delete-by-bucket (always a WHERE) + re-insert in
+// array order, in one transaction. Returns the stored comments.
+export async function replaceBucketComments(bucketId: string, comments: Comment[]): Promise<Comment[]> {
+  await withTransaction(async (q) => {
+    await q("DELETE FROM bucket_comments WHERE bucket_id = $1", [bucketId]);
+    for (let i = 0; i < comments.length; i++) {
+      const c = comments[i];
+      await q(
+        `INSERT INTO bucket_comments (bucket_id, id, position, author, body, mentions, ts, edited_ts)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+        [bucketId, c.id, i, c.author, c.body, JSON.stringify(c.mentions ?? []), c.ts, c.editedTs ?? null]
+      );
+    }
+  });
+  return comments;
 }

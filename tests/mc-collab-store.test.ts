@@ -8,7 +8,10 @@
 import { beforeEach, describe, expect, it } from "vitest";
 
 import {
+  __bucketMirrorSettled,
+  __setBucketCommentMirrorForTests,
   __setPatchMirrorForTests,
+  activeNotices,
   addBucketComment,
   addComment,
   addSubtask,
@@ -162,11 +165,12 @@ describe("editable description (SP-tier — claims a pending push, then reconcil
   });
 });
 
-describe("bucket discussion thread (store-authoritative for v1)", () => {
+describe("bucket discussion thread (persisted + optimistic — Item 4)", () => {
   it("adds / edits / deletes a bucket comment and fires the mention audit", () => {
     const c = addBucketComment("BKT-WMS", "kickoff thread @greg", "vince")!;
     expect(commentsForBucket("BKT-WMS")).toHaveLength(1);
     expect(c.mentions).toEqual(["greg"]);
+    // The @mention Teams/email DELIVERY is still deferred (in-app + audit only).
     expect(auditLog()[0].body).toContain("deferred to the directory/notification increment");
 
     editBucketComment("BKT-WMS", c.id, "kickoff revised", "vince");
@@ -183,6 +187,29 @@ describe("bucket discussion thread (store-authoritative for v1)", () => {
     deleteBucketComment("BKT-WMS", c.id, "greg");
     expect(commentsForBucket("BKT-WMS")).toHaveLength(1);
     expect(commentsForBucket("BKT-WMS")[0].body).toBe("mine");
+  });
+
+  it("persists through the mirror and reconciles to the server's stored thread", async () => {
+    // Echo server: returns exactly what was sent (the durable thread).
+    __setBucketCommentMirrorForTests(async (_bucketId, comments) => comments);
+    addBucketComment("BKT-WMS", "kickoff @greg", "vince");
+    await __bucketMirrorSettled();
+    expect(commentsForBucket("BKT-WMS")).toHaveLength(1);
+    expect(activeNotices()).toHaveLength(0); // success path surfaces no notice
+  });
+
+  it("rolls back + surfaces a non-silent notice when the mirror rejects", async () => {
+    __setBucketCommentMirrorForTests(async () => {
+      throw new Error("PATCH 500");
+    });
+    addBucketComment("BKT-WMS", "doomed comment", "vince");
+    await __bucketMirrorSettled();
+    // The optimistic comment is rolled back (durability guard, no silent drop)…
+    expect(commentsForBucket("BKT-WMS")).toHaveLength(0);
+    const notices = activeNotices();
+    expect(notices).toHaveLength(1);
+    expect(notices[0].body).toContain("BKT-WMS");
+    expect(notices[0].body.toLowerCase()).toContain("rolled back");
   });
 });
 

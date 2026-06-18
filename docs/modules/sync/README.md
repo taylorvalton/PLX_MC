@@ -50,6 +50,13 @@ tenant against the committed schema with exit codes.
   `POST /api/sync/sweep` runs one on demand. API surface per spec §6 under
   `src/app/api/` (shared wrapper + zod). Evidence:
   `artifacts/sync/2026-06-11-sync-engine/`.
+- Bucket comments (landed 2026-06-18, Item 4): bucket discussion threads now
+  persist in a dedicated `bucket_comments` table (migration `006`) via
+  `PATCH /api/buckets/{id}/comments` (atomic replace-thread on `db.withTransaction`)
+  and hydrate from the snapshot, so they survive a reload. The store mirrors each
+  add/edit/delete optimistically (reconcile-on-success / rollback+notice-on-failure,
+  the same spine as `patchTaskFields`). App-only — bucket comments are NEVER
+  pushed to SharePoint (the EN-001 decision).
 - Deferred to the public-deploy increment: Graph change webhooks, the
   directory module (person columns: Assigned To / Reporter / Owner),
   notifications, lookup columns (Initiative), and Project Documents

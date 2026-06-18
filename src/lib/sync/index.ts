@@ -17,6 +17,7 @@ export { startSyncScheduler, syncEnabled } from "./scheduler";
 export {
   createTask,
   patchTask,
+  setBucketComments,
   snapshot,
   type CreateTaskInput,
   type PatchTaskInput,
