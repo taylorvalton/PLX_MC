@@ -478,3 +478,17 @@ WS-4 lands last (depends on the directory, triage promotion, and repo linkage).
   matching the existing `patchTaskFields` reconcile/rollback pattern.
 - **Identity provisioning:** invited-but-unprovisioned people (e.g. Greg,
   Stephen) handling in WS‑1.
+
+### Follow-on increment — SharePoint sync + durability (2026‑06‑18)
+
+The four items WS‑1…WS‑3 explicitly deferred are now resolved, in two PRs:
+
+| # | Deferred item (was) | Resolution | PR |
+|---|---|---|---|
+| 1 | EN‑003 person columns (Assigned To / Accountable Owner / Reporter) "deferred to the directory increment" — `mapping.ts` never emitted them | Mirrored via `<Column>LookupId` (site User Information List id, cached resolver in `graph.ts`); `assignee` two‑way, owner/reporter push‑only; UIL‑miss / agent persons skipped + audited (app‑only cannot `ensureUser`). Teams/email notification **delivery** stays deferred (in‑app + audit only). | PR‑A `feat/enh-sharepoint-sync` |
+| 2 | EN‑002 repo registry + requests in‑memory only; no SharePoint list | `repos` / `repo_requests` persisted in the `plx_mc` DB (migration `005`) + hydrated by the store so approvals survive reload; push‑only "Repo Registry" SharePoint list (declared in `config/integrations.yaml`). | PR‑A `feat/enh-sharepoint-sync` |
+| 3 | EN‑001 sub‑task fields → SharePoint mirror | Push‑only `Subtasks` ToDos column (`serializeSubtasks`); MC owns the structured array (never read back). | PR‑A `feat/enh-sharepoint-sync` |
+| 4 | EN‑001 bucket‑comment durability (store‑only, lost on reload) | Bucket comments persisted (migration `006`, `PATCH /api/buckets/{id}/comments`) + hydrated; app‑only (never pushed to SharePoint). | PR‑B `feat/bucket-comment-durability` |
+
+Still deferred (honestly): Teams/email notification delivery, Graph change
+webhooks, the Initiative lookup column, and Project Documents (driveItem) sync.

@@ -189,10 +189,10 @@ export function NotifyTrail({ id }: { id: string | null }) {
   return (
     <span
       className="notify-trail"
-      title={`Assigned To mirror for ${person.name} deferred to the directory increment`}
+      title={`Assigned To for ${person.name} mirrors to SharePoint on the next sync (Teams/email notification still deferred)`}
     >
       <span className="d" />
-      Assigned To mirror deferred to the directory increment
+      Assigned To mirrors to SharePoint on the next sync
     </span>
   );
 }

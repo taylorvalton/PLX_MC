@@ -4,7 +4,17 @@
 // so there is exactly one write path and no drift.
 
 import { query, withTransaction } from "@/lib/db";
-import type { AuditRow, Comment, SpConflict, SpError, SyncState } from "@/lib/mc-data/types";
+import type {
+  AuditRow,
+  Comment,
+  Repo,
+  RepoRequest,
+  RepoRequestStatus,
+  RepoVisibility,
+  SpConflict,
+  SpError,
+  SyncState,
+} from "@/lib/mc-data/types";
 import type { EntityData, EntityType } from "./mapping";
 import { LIST_KEY_FOR } from "./mapping";
 
@@ -294,6 +304,15 @@ export async function countsByList(): Promise<Record<string, ListCounts>> {
     out[key] ??= { synced: 0, pending: 0, conflict: 0, error: 0 };
     out[key][r.sync_state] += Number(r.n);
   }
+  // Repo Registry (EN-002 / Item 2) is a separate table; surface its live counts
+  // under the same `reporegistry` list key the UI reads.
+  const repoRows = await query<{ sync_state: SyncState; n: string }>(
+    "SELECT sync_state, count(*) AS n FROM repos GROUP BY sync_state"
+  );
+  for (const r of repoRows) {
+    out.reporegistry ??= { synced: 0, pending: 0, conflict: 0, error: 0 };
+    out.reporegistry[r.sync_state] += Number(r.n);
+  }
   return out;
 }
 
@@ -345,4 +364,152 @@ export async function replaceBucketComments(bucketId: string, comments: Comment[
     }
   });
   return comments;
+}
+
+// ─── Repo registry + request queue (EN-002 / Item 2) ─────────────────────────
+
+interface RepoRow {
+  id: string;
+  name: string;
+  lang: string;
+  def_branch: string;
+  owner: string;
+  visibility: RepoVisibility;
+  scope: string;
+  sync_state: SyncState;
+  sp_item_id: string | null;
+}
+
+export interface RepoWithSync extends Repo {
+  syncState: SyncState;
+  spItemId: string | null;
+}
+
+const toRepoWithSync = (r: RepoRow): RepoWithSync => ({
+  id: r.id,
+  name: r.name,
+  lang: r.lang,
+  def: r.def_branch,
+  owner: r.owner,
+  visibility: r.visibility,
+  scope: r.scope,
+  syncState: r.sync_state,
+  spItemId: r.sp_item_id,
+});
+
+export async function getRepos(): Promise<RepoWithSync[]> {
+  const rows = await query<RepoRow>(
+    `SELECT id, name, lang, def_branch, owner, visibility, scope, sync_state, sp_item_id
+       FROM repos ORDER BY id`
+  );
+  return rows.map(toRepoWithSync);
+}
+
+// Idempotent seed of the canonical registry from the REPOS fixture — never
+// disturbs an existing row (ON CONFLICT DO NOTHING), so an approved repo or a
+// sync-state change is preserved across boots.
+export async function seedRepos(repos: Repo[]): Promise<void> {
+  for (const r of repos) {
+    await query(
+      `INSERT INTO repos (id, name, lang, def_branch, owner, visibility, scope, sync_state)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, 'pending')
+       ON CONFLICT (id) DO NOTHING`,
+      [r.id, r.name, r.lang, r.def, r.owner, r.visibility, r.scope]
+    );
+  }
+}
+
+// Upsert a registry repo (an approval) — registry edits re-queue the push-only
+// SharePoint mirror (sync_state -> pending), preserving the prior sp_item_id.
+export async function upsertRepo(r: Repo): Promise<void> {
+  await query(
+    `INSERT INTO repos (id, name, lang, def_branch, owner, visibility, scope, sync_state)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, 'pending')
+     ON CONFLICT (id) DO UPDATE SET
+       name = $2, lang = $3, def_branch = $4, owner = $5,
+       visibility = $6, scope = $7, sync_state = 'pending', updated_at = now()`,
+    [r.id, r.name, r.lang, r.def, r.owner, r.visibility, r.scope]
+  );
+}
+
+export async function setRepoSync(id: string, syncState: SyncState, spItemId?: string): Promise<void> {
+  await query(
+    `UPDATE repos SET sync_state = $2, sp_item_id = COALESCE($3, sp_item_id), updated_at = now()
+      WHERE id = $1`,
+    [id, syncState, spItemId ?? null]
+  );
+}
+
+interface RepoRequestRow {
+  id: string;
+  name: string;
+  owner: string;
+  lang: string | null;
+  visibility: RepoVisibility | null;
+  scope: string | null;
+  def_branch: string | null;
+  requested_by: string;
+  requested_ts: string;
+  status: RepoRequestStatus;
+  verified: boolean;
+  note: string | null;
+  decided_by: string | null;
+  decided_ts: string | null;
+}
+
+const toRepoRequest = (r: RepoRequestRow): RepoRequest => ({
+  id: r.id,
+  name: r.name,
+  owner: r.owner,
+  lang: r.lang ?? undefined,
+  visibility: r.visibility ?? undefined,
+  scope: r.scope ?? undefined,
+  def: r.def_branch ?? undefined,
+  requestedBy: r.requested_by,
+  requestedTs: r.requested_ts,
+  status: r.status,
+  verified: r.verified,
+  note: r.note ?? undefined,
+  decidedBy: r.decided_by ?? undefined,
+  decidedTs: r.decided_ts ?? undefined,
+});
+
+export async function getRepoRequests(): Promise<RepoRequest[]> {
+  const rows = await query<RepoRequestRow>(
+    `SELECT id, name, owner, lang, visibility, scope, def_branch, requested_by,
+            requested_ts, status, verified, note, decided_by, decided_ts
+       FROM repo_requests ORDER BY created_at DESC`
+  );
+  return rows.map(toRepoRequest);
+}
+
+// Upsert the full request row (create, post-validation verify, and decision all
+// mirror through here — idempotent on id).
+export async function upsertRepoRequest(req: RepoRequest): Promise<void> {
+  await query(
+    `INSERT INTO repo_requests
+       (id, name, owner, lang, visibility, scope, def_branch, requested_by,
+        requested_ts, status, verified, note, decided_by, decided_ts)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)
+     ON CONFLICT (id) DO UPDATE SET
+       name = $2, owner = $3, lang = $4, visibility = $5, scope = $6, def_branch = $7,
+       status = $10, verified = $11, note = $12, decided_by = $13, decided_ts = $14,
+       updated_at = now()`,
+    [
+      req.id,
+      req.name,
+      req.owner,
+      req.lang ?? null,
+      req.visibility ?? null,
+      req.scope ?? null,
+      req.def ?? null,
+      req.requestedBy,
+      req.requestedTs,
+      req.status,
+      req.verified,
+      req.note ?? null,
+      req.decidedBy ?? null,
+      req.decidedTs ?? null,
+    ]
+  );
 }
