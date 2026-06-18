@@ -59,6 +59,261 @@ them from the entry. Keep slugs lowercase kebab‑case.
 ---
 -->
 
+### EN‑007 — PLX MC as the enforced system of record (cross‑repo compliance gate)
+
+| | |
+|---|---|
+| **Status** | Aligned |
+| **Type** | Feature |
+| **Area** | New capability — cross‑repo enforcement; touches a new MC verification/API surface, the task/bucket data model (`types.ts`, `store.ts`, `sync/state.ts`), the completion/accountability gate (`policy.ts`), repo governance (EN‑002), and a GitHub PR status‑check + webhook integration in each tracked repo |
+| **Screenshot** | _none (open‑ended architecture ask)_ |
+| **Priority** | TBD (set during planning) |
+
+**The ask (operator)**
+
+Make PLX MC the **enforced, self‑authorizing, automatically‑maintained database of
+project record** for the whole company. Any work against a PLX‑MC‑tracked repo must
+follow the same governed process at commit/PR time. Agents are held to a strict
+contract; operators have optionality. End state: **all PLX work flows through MC**,
+and MC becomes the backbone of Petra's Second Brain.
+
+**The compliance contract**
+
+- **Agents (strict, gated):** every effort resolves to `bucket → task → sub‑task`.
+  If the operator didn't provide one at dispatch, the agent **derives** the
+  bucket/task/description. To merge a PR, the linked task must carry a complete
+  bundle — **rollback plan, PRD, and evidence (screenshots / change‑appropriate
+  proof)** — enforced **once per PR**.
+- **Operators (optional detail, still recorded):** operator work must still
+  **attach to an MC task** (a record always exists), but detail is optional and
+  operators are **not blocked** by the bundle gate.
+
+**Aligned decisions (this session)**
+
+1. **Authority — PLX MC is its own company‑wide system of record**, separate from
+   VMC (Vince's personal MC). Borrow VMC's proven patterns (checkout →
+   complete‑with‑evidence loop; `agent_done → qa‑review → merged → deployed`
+   promotion ladder) as a **reference design only — no runtime coupling** to the
+   vmc‑context MCP. Folding VMC pieces in later stays optional.
+2. **Gate — a required GitHub PR status check** that **blocks merge**
+   (authoritative, server‑side) on every tracked repo.
+3. **Linkage — checkout handshake:** an agent must **check out an MC task before
+   working**; the PR gate verifies the active checkout ↔ this PR (commit SHA /
+   branch). Hardest to fake; mirrors VMC's checkout loop.
+4. **Granularity — one full bundle per PR** (per shippable unit), not per commit.
+5. **Operator floor — operator work is still recorded** in MC (a task exists;
+   detail optional). Nothing merges without *a* task; only the *bundle* is
+   operator‑optional.
+6. **Self‑authorizing — auto‑accept when the bundle is complete:** MC
+   self‑authorizes an agent‑created bucket/task and the gate passes; humans review
+   only exceptions / at QA.
+7. **Accountability — defaults to the dispatching operator:** agent‑initiated work
+   is accountable to the human who dispatched it (satisfies EN‑003's "a human is
+   always accountable"); reassignable.
+8. **Auto‑maintained — git → MC ingestion:** PR events (opened **and** merged) flow
+   back into MC and update/attach the task automatically (SHA + PR link, stage
+   promotion). This is the inbound direction EN‑006 didn't cover.
+9. **Identity follows the checkout credential** — *not* the git author (Cursor/Claude
+   commit as the human and freely spawn ephemeral sub‑agents, so git metadata can't
+   classify the actor). Agent runs authenticate with a per‑dispatch **agent token**
+   (scoped to task + dispatching human); humans use SSO; sub‑agents inherit the
+   parent run's token. The "registry" is **agent runtime credentials + a dispatch
+   ledger** (token → task → accountable human → repo), **not** named personas. Every
+   PR resolves to a task: human no‑checkout → auto/one‑click **sparse task**
+   (recorded, ungated); agent → active checkout + complete bundle, or blocked.
+10. **Failure mode — fail‑closed with a reconciliation queue.** While MC/the gate is
+    unreachable the required check stays **pending (merge held)** and never silently
+    passes; verification requests + inbound git events **queue durably and
+    auto‑resolve on recovery** (reuse EN‑006's sync push‑error/sweep + conflict
+    queue). Audited **break‑glass** override for emergencies.
+11. **Cross‑repo authority granted.** One **uniform** reusable workflow / GitHub App
+    + branch protection on every tracked repo; respects the staging‑branch rules
+    (required status check on protected branches; master keeps explicit approval).
+    Roll out **soft → hard, dogfooding `PLX_MC` first**, then `agentic-swarm`, then
+    `plx-customer-portal` (no big‑bang on the live go‑live repo).
+12. **Bundle — risk‑tiered, change‑appropriate.** *High* (DB migrations, prod deploy,
+    auth/permissions, infra, external integrations) → full rollback plan + PRD +
+    evidence; *standard* (feature/fix) → evidence + rollback note; *low* (docs/chore)
+    → minimal evidence. **PRD lives per‑bucket** (reuse EN‑003 bucket‑PRD; tasks carry
+    description/acceptance per EN‑001). **Evidence is change‑appropriate** (UI =
+    screenshot, backend = test/log/API output, data = query result).
+13. **Second Brain seam is first‑class.** MC's canonical record is an append‑only,
+    well‑typed **event log** (every governed action = a typed event; extend EN‑006's
+    `sync_audit_log`), exposed as a clean export + event stream and built
+    retrieval/embedding‑ready — a core module, not an afterthought.
+14. **Token minting + seamless capture.** MC mints a **short‑lived per‑dispatch agent
+    token**; **Cursor/Claude hooks auto‑checkout + stamp the PR** at run start, so
+    undefined or spawned sub‑agents are captured with zero manual steps (the PR
+    carries the task pointer the gate verifies).
+15. **Break‑glass = role override + debt.** A named role (repo owner/admin) can
+    override a held PR; MC records a **debt event** and **auto‑creates a
+    reconciliation task**; a bounded pending window then escalates. Never silent.
+
+**What this implies (architecture)**
+
+- A **CI‑reachable MC verification API**: the PR check asks *"is this PR's task
+  checked out by this actor, bundle complete, human accountable owner present?"* →
+  pass/fail. (Overlaps EN‑006's "where does MC's public endpoint live" question.)
+- **Task model grows:** `rollbackPlan`, `prd` (or link), and `evidence/screenshots`
+  attachments on the task, gated complete before merge (extends EN‑003's evidence
+  gate + EN‑001's description/PRD surface).
+- A **PR ↔ task link** record (checkout issues a handle the PR carries; MC stores
+  the mapping) + the **git → MC ingestion** path (a GitHub App / webhook per repo).
+- **Identity = the checkout credential, not the git author.** Actor type is set
+  server‑side at checkout (agent token vs human SSO); ephemeral sub‑agents inherit
+  the parent run's token + dispatcher. The gate resolves PR → task → actor from the
+  **dispatch ledger**, so it never has to trust git metadata.
+- A **reconciliation queue** (reuse EN‑006's sync push‑error/sweep + conflict infra)
+  holds verification requests + inbound git events while MC is unreachable and
+  **auto‑resolves on recovery**; held checks stay pending (fail‑closed).
+- A **first‑class, append‑only event log** (extend EN‑006's `sync_audit_log`) is
+  MC's canonical record *and* the Second‑Brain substrate — clean export + stream,
+  retrieval/embedding‑ready.
+
+**Agent's recommendation**
+
+- This is the **capstone** that ties EN‑002 (repo allow‑list), EN‑003
+  (accountability + evidence gate), and EN‑006 (enforcement plumbing + reverse
+  mirror) into one enforced loop — build it **on** those, don't duplicate.
+- Ship behind a **per‑repo feature flag in "soft" mode first** (record + warn,
+  don't block) to populate MC and surface false positives, then flip to hard‑block
+  per repo (consistent with the local‑CI rule against promoting gates to `error`
+  with unfixed violations).
+- Start the enforced rollout on **`PLX_MC` itself** (we own it; dogfood), then
+  `agentic-swarm`, then `plx-customer-portal`.
+
+**Open for alignment** _(only build/PRD‑time details remain; decisions 1–15 cover the rest)_
+
+1. **Event‑log schema & substrate:** canonical event types + storage (extend
+   `sync_audit_log` vs a dedicated event store), the export/stream contract for the
+   Second Brain, and whether an embedding/index feed is in v1.
+2. **Hosting/auth** of the verification API + GitHub App (shared with EN‑006).
+
+**Dependencies:** EN‑002 (repo registry/allow‑list — done), EN‑003 (accountability +
+evidence gate — done), EN‑006 (enforcement plumbing + reverse mirror — proposed).
+Sequence after EN‑006's webhook/endpoint hosting decision.
+
+---
+
+### EN‑006 — Two‑way mirror completeness, compliance & enforcement
+
+| | |
+|---|---|
+| **Status** | Triage |
+| **Type** | Feature + Enhancement |
+| **Area** | `sync` module (`src/lib/sync/*`: `engine.ts`, `mapping.ts`, `graph.ts`, `state.ts`, `repo.ts`, `scheduler.ts`), `config/sharepoint-schema.json`, `SP_LISTS` (`data.ts`); governance tooling (`config/governance-contract.yaml`, `scripts/generate-governance-surfaces.py`, `scripts/check-repo-hygiene.py`, `scripts/preflight.sh`, `.pre-commit-config.yaml`, `.github/workflows/ci.yml`) |
+| **Screenshot** | _none (architecture / code investigation)_ |
+| **Priority** | TBD (set during alignment) |
+
+**Context (important correction):** the sync engine is **shipped v1, not "planned."** There is a real two‑way mirror for **ToDos + Risk Register** — opt‑in 5‑minute in‑process scheduler (`PLX_MC_SYNC_ENABLED=1`), inbound Graph delta + outbound sweep, conflict/error queues, and a Postgres audit log — evidenced in `artifacts/sync/2026-06-11-sync-engine/REPORT.md`. This entry is about **completeness + enforcement**, not greenfield. Governance drift, repo hygiene, and migration serialization are already gated in `preflight`/CI; module‑contract and most TypeScript doctrine rules are still documented‑only.
+
+**Observed / current behavior**
+
+_Mirroring:_
+
+1. **Only 2 of 5 registers sync.** Engine covers ToDos + Risk Register; Roadmap, Milestone Register, and Project Documents are provisioned in `sharepoint-schema.json`/`SP_LISTS` but excluded from `DELTA_LISTS`/`PUSHABLE` (`engine.ts`, `state.ts`).
+2. **Outbound is sweep‑batched, not "on mutation."** A mutation marks `pending`/`dirty_fields`; the actual Graph PATCH only runs in `runSweep` (`state.ts`, `engine.ts`). The spec §6 wording implies push‑on‑mutation.
+3. **No Graph change webhooks** (spec §1/§6) — polling only, default **off** (`scheduler.ts`).
+4. **Person + lookup columns deliberately not mapped.** Assigned To, Accountable Owner, Reporter, Owner, and Initiative/bucket are deferred to the directory/notification increment (explicit comment in `mapping.ts`, `$comment` in `sharepoint-schema.json`).
+5. **Several task fields push on create only.** `reqs`, `estimate`, `repos`, `evidence` are in `outboundFields` but excluded from `PUSHED_FIELDS` (`state.ts`), so edits don't re‑push.
+6. **No Document‑library delta;** engine defaults to the `‑dev` site path even though the schema defines the production site (`graph.ts`).
+
+_Compliance / enforcement:_
+
+7. **Enforced today (preflight policy + CI):** contract→surface drift gate (`generate-governance-surfaces.py --check`), repo hygiene (`check-repo-hygiene.py`), migration‑prefix serialization, ruff, canary pytest, `npm run typecheck`. Full pytest/vitest/build/Playwright on `pre-push`/CI.
+8. **Documented‑only (NOT gated):** module‑README existence; the TS doctrine rules (Zod on every mutating route, shared route/fetch wrapper, `{ data } | { error }` envelope, `--p-*` tokens, barrel‑shadowing); shim‑expiry. `npm run lint` exists but is **not** in `preflight`.
+9. **`AGENTS.md` architecture is stale** — sync is labeled "(planned)" and "no cron jobs, webhooks, or services yet," contradicting the shipped engine + scheduler.
+
+**Desired behavior / requirement** _(to align)_
+
+_Mirror completeness:_ extend the engine to the remaining registers (Roadmap, Milestones, Documents) per the `SHAREPOINT_INTEGRATION` mapping; resolve person + lookup columns (depends on the directory increment); dirty‑track and re‑push the push‑only fields; decide the outbound‑latency model (keep sweep vs add near‑real‑time PATCH and/or Graph webhooks + subscription renewal); define the production‑site cutover.
+
+_Compliance / enforcement:_ promote selected governance rules from documented → gated (candidate first: a module‑README coverage gate + an API‑envelope/Zod lint in `preflight`); add sync mapping‑coverage contract tests (a new model field must be classified mirrored or deferred); fix the `AGENTS.md` "planned" drift.
+
+**Agent's recommendation**
+
+- Treat as two sub‑tracks under one theme: **(a) mirror completeness** (more lists + fields + identity) and **(b) enforcement** (move rules from prose to gates). They share the "SharePoint is the system of record + everything is enforced" mission and co‑evolve.
+- Sequence anything identity‑related **behind the person‑column/directory increment** (EN‑003 gave us real identities; the sync layer still has to map them).
+- Keep **webhooks as a later phase** — spec'd but needs a public endpoint + renewal job; declare per External Integrations before building.
+- For enforcement, graduate **one or two high‑value gates first** (module‑README presence; envelope/Zod lint) rather than promoting every documented rule to `error` at once (per the local‑CI‑before‑push rule: never promote to `error` with unfixed violations).
+
+**Open questions / for alignment**
+
+1. Outbound latency: is sweep acceptable, or must some fields PATCH synchronously on mutation?
+2. Webhook hosting surface (Vercel staging vs a dedicated worker) for the public `notificationUrl`?
+3. Register priority after person/lookup: Roadmap, Milestones, or Documents first?
+4. Should `reqs`/`repos`/`estimate`/`evidence` become dirty‑tracked + re‑pushed on change?
+5. Which TS doctrine rules graduate to preflight‑enforced first?
+6. When to cut `PLX_MC_SHAREPOINT_SITE_PATH` from `‑dev` to production?
+7. Fix the `AGENTS.md` "planned" drift inside this workstream or as a separate hygiene PR?
+
+**Dependencies:** person/lookup mirroring depends on the EN‑003 directory increment; overlaps with EN‑005 (a SharePoint "Repo Registry" list could land as part of this sync work).
+
+---
+
+### EN‑005 — Agent roster management & repo‑registry governance (next increment)
+
+| | |
+|---|---|
+| **Status** | Triage |
+| **Type** | Enhancement + Feature |
+| **Area** | Agents (`src/lib/mc-data/data.ts` `AGENTS`, `types.ts` `Agent`, `people-picker.tsx`, `agent-feed.tsx`, `command-palette.tsx`, `store.ts`); Repos (`mc-data/repos.ts`, `REPOS`, `store.ts` registry, `sync/state.ts`, `atoms.tsx` `RepoChip`, `repos-view.tsx`) |
+| **Screenshot** | _none (code investigation; follows EN‑002/EN‑003)_ |
+| **Priority** | TBD (set during alignment) |
+
+**Context:** builds on **EN‑002** (repo governance — delivered) and **EN‑003** (directory/accountability — delivered, *except* its agent‑roster items, which are still open). This is the "make agents and repos real and persisted" increment.
+
+**Observed / current behavior**
+
+_Agents:_
+
+1. **Roster is still the 4 prototype agents** (Vibes, Atlas, Sentry, Scribe) with fabricated `online: true`. EN‑003's "trim `AGENTS` to the real roster" was **never executed** — humans were fixed in WS‑1, agents were not (`data.ts`).
+2. **No agent operational model.** `Agent` has no capabilities/permissions/repo‑binding/health; `mode: auto|approve`, `team`, and `model` are display‑only labels (the `MODE` map is unused) with no enforcement (`types.ts`, `data.ts`).
+3. **Agent activity is empty / stubbed.** `AGENT_FEED = []`; the command‑palette "assign open task to {agent}" commands are no‑ops (`run: () => {}`); there is no pickup / autonomous‑assignment loop (`agent-feed.tsx`, `command-palette.tsx`).
+4. **Presence/health is a static fixture** (all agents hardcoded online); no heartbeat or run status (`chrome.tsx`, `helpers.ts`).
+5. **No agent governance flow** — repos have request→approve; agents have no equivalent registration/governance.
+
+_Repos (hardening the EN‑002 prototype):_
+
+6. **Registry + requests are in‑memory only** — `resetStore()` wipes them; no persistence and no SharePoint "Repo Registry" list (`store.ts`, `docs/WS2-NOTES.md` "Deferred").
+7. **Client/server registry drift (correctness bug).** Client `addTask`/`allRepos()` use runtime `state.repos`, but server `createTask` validates against the **static `REPOS` import** — a repo approved in the UI fails the server mirror on `POST /api/tasks` (`sync/state.ts`).
+8. **UI inconsistency:** `RepoChip` reads static `REPOS`, so a newly‑approved repo renders as a raw id (`atoms.tsx`).
+9. **Task repos are read‑only after creation** — no patch path for `repos` (`task-detail.tsx`).
+10. **No per‑agent↔repo binding** (an agent can be assigned to any task regardless of `task.repos`); **no in‑app repo health** (the `vmc_get_repo_health` MCP tool is out‑of‑band).
+11. **Doc debt:** no `docs/modules/agents/` or `docs/modules/repos/` contract README; `docs/product/DATA_MODEL.md` is stale (still shows fake humans + `openPRs`).
+
+**Desired behavior / requirement** _(to align)_
+
+1. **Real agent roster** — replace/validate the 4 prototype agents against the actual agentic‑swarm roster; choose the source of truth (fixture+API vs DB vs SharePoint).
+2. **Agent operational model** — capabilities / default repos / autonomy mode that actually gate assignment + stage advance (make `mode: approve` mean something).
+3. **Agent activity** — populate the feed from real task events / swarm signals; wire (or remove) the stubbed pickup + palette assignment.
+4. **Real presence/health** instead of hardcoded online.
+5. **Repo registry as system‑of‑record** — persist registry + requests (Postgres and/or a SharePoint "Repo Registry" list) and make the **server read the same allow‑list as the client** (kill the static‑`REPOS` drift).
+6. **Repo UX consistency** — `RepoChip`/server use the runtime registry; allow editing a task's `repos` post‑creation (allow‑list enforced).
+7. _(Optional)_ per‑agent repo binding + an in‑app repo‑health surface.
+8. **Module contracts** for agents + repos; refresh `DATA_MODEL.md`.
+
+**Agent's recommendation**
+
+- Two tightly‑related sub‑tracks under one theme: **(a)** finish the EN‑003 agent leftovers + give agents a real operational model, and **(b)** harden EN‑002 from "in‑store prototype" to a **persisted, server‑consistent registry.**
+- **Resolve the client/server allow‑list drift first** — it's a correctness bug (an approved repo can't be used server‑side), not polish.
+- **Reuse the repo request→approve pattern** for agent registration rather than inventing a new governance shape.
+- Keep **agent↔repo binding optional for v1** (the shared task‑level allow‑list already governs humans and agents); add hard constraints only if the operator wants them.
+
+**Open questions / for alignment**
+
+1. Authoritative agent roster — the same 4 with real backing, or a different real set from agentic‑swarm? What's the source of truth?
+2. Persist registry/agents in Postgres, SharePoint, or both? (overlaps the EN‑006 sync increment)
+3. Is agent↔repo binding in scope for v1, or is the shared task allow‑list enough?
+4. Repo health in the MC UI, MCP‑only, or both (+ refresh cadence)?
+5. Is agent pickup autonomous (swarm pulls tasks) or operator‑driven assignment only?
+6. Should `mode: approve` require an inbox approval before stage advance?
+7. Split vs combine: land the EN‑003 agent‑trim as its own small PR, or inside this epic?
+
+**Dependencies:** EN‑002 (done) and EN‑003 (done minus agent items); registry persistence overlaps the EN‑006 sync person‑column increment.
+
+---
+
 ### EN‑004 — Meeting → Mission Control bridge (Teams capture to governed tasks)
 
 | | |
@@ -467,6 +722,55 @@ WS-4 lands last (depends on the directory, triage promotion, and repo linkage).
 | **Draft → triage** | Scribe agent normalizes action items into **proposed tasks** in a Meeting Intake triage UI (reuse Inbox patterns), owner resolved via WS‑1 (`ownerDisplayName`/mentions), transcript snippet attached as evidence. |
 | **Promote** | Human confirm → `addTask` (governed), repo linkage via WS‑2, mirror to SharePoint, keep meeting source as traceability artifact. |
 | **Verify** | Adapter unit tests on fixture payloads; extraction eval; promotion creates a governed task; integration disabled-by-default assertion. `preflight`. |
+
+### WS‑5 — Agent roster & repo‑registry hardening · resolves **EN‑005** · _proposed (pending alignment)_ · P1
+
+> Not yet formalized — depends on the EN‑005 open questions (authoritative
+> roster, persistence target, binding scope). Captured here as the proposed
+> build approach.
+
+| | |
+|---|---|
+| **Agents** | Replace/validate `AGENTS` against the real swarm roster; extend `Agent` with capabilities / default‑repos / health; enforce `mode: auto\|approve` in the picker + stage advance; populate `AGENT_FEED` from task events and wire (or remove) the stubbed palette pickup. |
+| **Repo persistence** | Persist `repos` + `repoRequests` (Postgres, mirroring the sync entity store) and/or a SharePoint "Repo Registry" list in `sharepoint-schema.json` + `SP_LISTS` + `mapping.ts`; make `sync/state.ts createTask` read the **runtime** registry, not the static `REPOS` (fix the client/server drift). |
+| **Repo UX** | `RepoChip` + server use `allRepos()`/runtime registry; allow editing a task's `repos` post‑create (allow‑list enforced; add `repos` to the patch path + server `PatchTaskInput`). |
+| **Governance reuse** | Reuse the repo request→approve pattern for agent registration if agents become governed; agents stay bound to the shared task allow‑list (optional per‑agent repo binding only if aligned). |
+| **Docs** | Add `docs/modules/agents/README.md` + `docs/modules/repos/README.md` (What/Why/How/Dependencies/Owner); refresh `docs/product/DATA_MODEL.md`. |
+| **Verify** | Unit: roster shape, mode enforcement, registry‑persistence round‑trip, server/client allow‑list parity, repos patch. `preflight --mode pre-push`. |
+
+### WS‑6 — Mirror completeness, compliance & enforcement · resolves **EN‑006** · _proposed (pending alignment)_ · P2
+
+> Not yet formalized — depends on the EN‑006 open questions (latency model,
+> webhook hosting, register priority, which rules graduate to gates). Sequence
+> identity‑related mirroring behind the directory increment.
+
+| | |
+|---|---|
+| **Registers** | Extend engine `PUSHABLE`/`DELTA_LISTS` to Roadmap, Milestone Register, and Project Documents per the `SHAREPOINT_INTEGRATION` mapping; add the Document‑library delta. |
+| **Fields** | Dirty‑track + re‑push `reqs`/`repos`/`estimate`/`evidence` (add to `PUSHED_FIELDS`); map person + lookup columns once the directory increment lands. |
+| **Latency / webhooks** | Decide sweep vs synchronous outbound; _(later phase)_ Graph change‑notification endpoint + subscription‑renewal job, declared per External Integrations. |
+| **Enforcement** | Promote 1–2 governance rules documented → gated: a module‑README coverage gate + an API‑envelope/Zod lint in `preflight`; add sync mapping‑coverage contract tests. |
+| **Hygiene** | Fix the `AGENTS.md` architecture drift (sync = shipped v1, not planned); define the production‑site cutover path. |
+| **Verify** | Unit/integration: per‑register round‑trip, field dirty‑tracking, mapping‑coverage test, new‑gate exit‑code tests. `preflight --mode pre-push`. |
+
+### WS‑7 — PLX MC enforced system of record · resolves **EN‑007** · _proposed (pending alignment)_ · P1
+
+> Core semantics aligned (EN‑007 decisions 1–13); remaining open items are
+> token‑minting, break‑glass, event‑log schema, hosting. Build on EN‑002/003/006,
+> reuse the sync queue + audit log; roll out soft → hard, dogfooding `PLX_MC` first.
+
+| | |
+|---|---|
+| **Verification API** | New CI‑reachable MC endpoint: given a PR (repo + branch + head SHA), return pass/fail on `{ task checked out by this actor, bundle complete, human accountable owner }`. Standard `{ data } \| { error }` envelope; auth for external‑repo CI. |
+| **Task model + bundle** | Add `rollbackPlan`, `prd` (per‑bucket, reuse EN‑003), and **change‑appropriate evidence** (UI screenshot / backend test‑log / API output / data query) to the task; **risk‑tiered** requirement (high/standard/low); extend `policy.ts` so a PR can't pass the gate until the tier's bundle is complete (agents). |
+| **Checkout handshake** | MC `checkout` issues a PR‑linkable handle; gate maps PR ↔ task ↔ actor. Reference VMC's checkout/complete loop (no runtime coupling). |
+| **PR status check** | One **uniform** GitHub App / reusable workflow on every tracked repo + **branch protection** (required check on protected branches; master keeps explicit‑approval); soft (warn) → hard (block) per‑repo flag; dogfood `PLX_MC` → `agentic-swarm` → `plx-customer-portal`. |
+| **Git → MC ingestion** | Webhook per repo: PR opened ⇒ attach/create + move to in‑progress; PR merged ⇒ promote task (merged/deployed) + attach SHA/PR. Operator PR with no task ⇒ auto‑create a sparse task (accountable = author). |
+| **Reconciliation queue** | **Reuse EN‑006's sync push‑error/sweep + conflict queue:** while MC is unreachable, hold verification requests + inbound git events and auto‑resolve on recovery; held PR checks stay pending (fail‑closed). **Break‑glass:** role override → **debt event + auto‑created reconciliation task**, bounded window then escalate. |
+| **Event log (Second Brain)** | First‑class append‑only event log (extend `sync_audit_log`): every governed action = a typed event; clean export + stream, retrieval/embedding‑ready. The canonical record substrate, not an add‑on. |
+| **Identity** | Actor type from the **checkout credential** (MC‑minted short‑lived agent token vs human SSO), not git author; **dispatch ledger** (token → task → accountable human → repo); sub‑agents inherit the parent token. **Cursor/Claude hooks auto‑checkout + stamp the PR** (zero‑friction capture). Declare the GitHub App + webhook per External Integrations contract. |
+| **Docs** | Module README for the gate; update `AGENTS.md` (MC = enforced system of record, not just a mirror); SOPs. |
+| **Verify** | Unit: bundle‑complete gate, actor‑type resolution, sparse‑task auto‑create, stage promotion on merge. Integration: PR‑check pass/fail against fixtures; soft‑mode default. `preflight --mode pre-push`. |
 
 ### Risks / dependencies to confirm before build
 
