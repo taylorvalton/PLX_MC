@@ -9,7 +9,7 @@
 // site-user lookup ids. Documents (driveItem content) and the Initiative lookup
 // column land with a later increment (see docs/modules/sync/README.md).
 
-import { ACTORS, FILES, RISKS, SP_CONFLICTS, SP_ERRORS, TASKS } from "@/lib/mc-data/data";
+import { ACTORS, FILES, REPOS, RISKS, SP_CONFLICTS, SP_ERRORS, TASKS } from "@/lib/mc-data/data";
 import type { SyncState, Task } from "@/lib/mc-data/types";
 import {
   createListItem,
@@ -17,6 +17,7 @@ import {
   GraphError,
   listDelta,
   patchListItemFields,
+  REPO_REGISTRY_KEY,
   resolveEmailByLookupId,
   resolveSiteUserLookupId,
   siteContext,
@@ -32,6 +33,7 @@ import {
   parseFieldValue,
   planTaskPersons,
   reconcileInbound,
+  repoOutboundFields,
   TASK_PERSON_FIELDS,
   type EntityData,
   type EntityType,
@@ -143,6 +145,14 @@ export async function ensureSeeded(): Promise<boolean> {
   return true;
 }
 
+// Idempotent seed of the canonical repo registry (EN-002 / Item 2) from the
+// REPOS fixture — the single source of truth. Never disturbs an existing or
+// approved row (ON CONFLICT DO NOTHING), so a fresh DB gets the 3 canonical
+// repos and approvals persist across boots.
+export async function ensureReposSeeded(): Promise<void> {
+  await repo.seedRepos(Object.values(REPOS));
+}
+
 // ─── Outbound (push) ─────────────────────────────────────────────────────────
 
 const PUSHABLE: EntityType[] = ["task", "risk"];
@@ -220,6 +230,48 @@ async function pushEntity(ctx: SiteContext, row: repo.EntityRow): Promise<"synce
     }
     throw err;
   }
+}
+
+// Push-only mirror of the repo registry to the "Repo Registry" list (Item 2).
+// Mission Control is authoritative for the allow-list, so the list is never read
+// back. Skips with an honest audit when the list isn't provisioned — a missing
+// optional list never blocks the core task/risk sweep.
+async function pushRepoRegistry(ctx: SiteContext): Promise<number> {
+  const pending = (await repo.getRepos()).filter((r) => r.syncState === "pending");
+  if (pending.length === 0) return 0;
+  if (!ctx.listIds[REPO_REGISTRY_KEY]) {
+    await repo.appendAudit(
+      SYNC_ACTOR,
+      "Repo Registry list not provisioned — registry mirror skipped (run scripts/provision-sharepoint.py).",
+      "pending"
+    );
+    return 0;
+  }
+  let pushed = 0;
+  for (const r of pending) {
+    try {
+      if (r.spItemId) {
+        await patchListItemFields(ctx, REPO_REGISTRY_KEY, r.spItemId, repoOutboundFields(r));
+        await repo.setRepoSync(r.id, "synced");
+      } else {
+        const existing = await findItemByField(ctx, REPO_REGISTRY_KEY, "RepoID", r.id);
+        const itemId = existing
+          ? existing.id
+          : await createListItem(ctx, REPO_REGISTRY_KEY, repoOutboundFields(r, { creating: true }));
+        if (existing) await patchListItemFields(ctx, REPO_REGISTRY_KEY, itemId, repoOutboundFields(r));
+        await repo.setRepoSync(r.id, "synced", itemId);
+      }
+      pushed += 1;
+    } catch (err) {
+      if (err instanceof GraphError && err.status < 500) {
+        await repo.setRepoSync(r.id, "error");
+        await repo.appendAudit(SYNC_ACTOR, `Repo Registry push failed for ${r.id} — ${err.body.slice(0, 120)}`, "error");
+      } else {
+        throw err;
+      }
+    }
+  }
+  return pushed;
 }
 
 // ─── Inbound (delta pull) ────────────────────────────────────────────────────
@@ -328,6 +380,7 @@ export interface SweepResult {
 
 export async function runSweep(actor: string = SYNC_ACTOR): Promise<SweepResult> {
   await ensureSeeded();
+  await ensureReposSeeded();
   const ctx = await siteContext();
 
   // Inbound FIRST: SharePoint-side edits must be seen — and dirty-field
@@ -355,6 +408,8 @@ export async function runSweep(actor: string = SYNC_ACTOR): Promise<SweepResult>
       else pushErrors += 1;
     }
   }
+  // Push-only repo-registry mirror (Item 2) — counted with the outbound pushes.
+  pushed += await pushRepoRegistry(ctx);
 
   const lastSweep = repo.stamp();
   await repo.appendAudit(

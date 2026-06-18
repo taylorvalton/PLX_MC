@@ -419,6 +419,22 @@ export const SP_LISTS: SpListDef[] = [
       { name: "Modified By", type: "Person", mc: "modifiedBy", dir: "pull" },
     ],
   },
+  {
+    // EN-002 / Item 2 — push-only mirror of the repo registry/allow-list. MC is
+    // authoritative; persistence + approvals live in the plx_mc DB.
+    key: "reporegistry", title: "Repo Registry", kind: "list", entity: "Repo", icon: "⎇",
+    maps: "Repo registry / allow-list", itemCount: 3, direction: "push",
+    lastSync: "—", counts: { synced: 0, pending: 3, conflict: 0, error: 0 },
+    columns: [
+      { name: "Repo ID", type: "Single line of text", mc: "id", dir: "push", required: true, note: "indexed · unique key" },
+      { name: "Title", type: "Single line of text", mc: "name", dir: "push", required: true },
+      { name: "Owner", type: "Single line of text", mc: "owner", dir: "push" },
+      { name: "Visibility", type: "Choice", mc: "visibility", dir: "push", note: "Public/Private" },
+      { name: "Default Branch", type: "Single line of text", mc: "def", dir: "push" },
+      { name: "Language", type: "Single line of text", mc: "lang", dir: "push" },
+      { name: "Scope", type: "Multi line of text", mc: "scope", dir: "push" },
+    ],
+  },
 ];
 
 // Conflict review queue (manual resolution — a human picks the winner).

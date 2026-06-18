@@ -84,6 +84,20 @@
         { "name": "Initiative", "displayName": "Initiative", "type": "lookup", "lookupList": "roadmap" },
         { "name": "DocumentType", "displayName": "Document Type", "type": "choice", "choices": ["PRD", "Evidence", "Deed", "Report", "Spec", "Export"] }
       ]
+    },
+    {
+      "key": "reporegistry",
+      "displayName": "Repo Registry",
+      "template": "genericList",
+      "description": "Repo registry / allow-list (EN-002). Push-only mirror — Mission Control is authoritative; SharePoint is never read back. Persistence + approvals live in the plx_mc DB (repos / repo_requests).",
+      "columns": [
+        { "name": "RepoID", "displayName": "Repo ID", "type": "text", "required": true, "indexed": true, "unique": true },
+        { "name": "Owner", "displayName": "Owner", "type": "text", "$comment": "GitHub org/owner (text — not a SharePoint person)." },
+        { "name": "Visibility", "displayName": "Visibility", "type": "choice", "choices": ["Public", "Private"] },
+        { "name": "DefaultBranch", "displayName": "Default Branch", "type": "text" },
+        { "name": "Language", "displayName": "Language", "type": "text" },
+        { "name": "Scope", "displayName": "Scope", "type": "multiline" }
+      ]
     }
   ],
   "documentFolders": {

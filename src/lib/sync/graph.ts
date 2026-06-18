@@ -76,6 +76,11 @@ export const LIST_DISPLAY_NAMES: Record<string, string> = {
   documents: "Project Documents",
 };
 
+// Optional lists resolved only when provisioned (a missing one must NOT block
+// the core sweep). The push-only Repo Registry mirror (EN-002 / Item 2).
+export const REPO_REGISTRY_DISPLAY = "Repo Registry";
+export const REPO_REGISTRY_KEY = "reporegistry";
+
 export interface SiteContext {
   siteId: string;
   listIds: Record<string, string>;
@@ -96,6 +101,10 @@ export async function siteContext(): Promise<SiteContext> {
     if (!id) throw new Error(`list "${displayName}" not found on ${sitePath()} — run the provisioner`);
     listIds[key] = id;
   }
+  // Optional lists: resolved when present, never required (a missing one can't
+  // block the core sweep). The push-only Repo Registry mirror (Item 2).
+  const repoRegistry = byName.get(REPO_REGISTRY_DISPLAY);
+  if (repoRegistry) listIds[REPO_REGISTRY_KEY] = repoRegistry;
   cachedSite = { siteId: site.id, listIds };
   return cachedSite;
 }

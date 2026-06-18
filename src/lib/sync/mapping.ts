@@ -16,7 +16,7 @@
 
 import { ACTORS, HUMANS, PRIORITY, STAGES } from "@/lib/mc-data/data";
 import { evidenceComplete } from "@/lib/mc-data/helpers";
-import type { Risk, StageKey, Task } from "@/lib/mc-data/types";
+import type { Repo, Risk, StageKey, Task } from "@/lib/mc-data/types";
 
 export type EntityType = "task" | "risk" | "file";
 export type EntityData = Record<string, unknown>;
@@ -156,6 +156,24 @@ export function outboundFields(
 
   // Documents (file content + driveItem metadata) are a later increment.
   throw new Error(`outbound mapping not implemented for entity type "${type}"`);
+}
+
+// ─── Repo Registry list (EN-002 / Item 2) ────────────────────────────────────
+
+// The repo registry is push-only — Mission Control is authoritative for the
+// allow-list, so the "Repo Registry" list is a one-way mirror (never read back).
+// RepoID is the indexed unique key, set on the first write (like Task ID).
+export function repoOutboundFields(repo: Repo, opts: { creating?: boolean } = {}): Record<string, unknown> {
+  const out: Record<string, unknown> = {
+    Title: repo.name,
+    Owner: repo.owner,
+    Visibility: repo.visibility === "public" ? "Public" : "Private",
+    DefaultBranch: repo.def,
+    Language: repo.lang,
+    Scope: repo.scope,
+  };
+  if (opts.creating) out.RepoID = repo.id;
+  return out;
 }
 
 // ─── Inbound (pull + two-way columns) ────────────────────────────────────────

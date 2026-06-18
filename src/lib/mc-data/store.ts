@@ -276,6 +276,9 @@ interface ServerSnapshot {
   audit: AuditRow[];
   counts: Record<string, { synced: number; pending: number; conflict: number; error: number }>;
   lastSweep: string;
+  // EN-002 / Item 2 — the persisted repo registry + request queue.
+  repos?: Repo[];
+  repoRequests?: RepoRequest[];
 }
 
 // Adopt the server's truth for everything the engine owns; notifications,
@@ -288,6 +291,10 @@ function applyServerState(snapshot: ServerSnapshot) {
   state.errors = snapshot.errors;
   state.audit = snapshot.audit;
   state.lastSweep = snapshot.lastSweep;
+  // EN-002 / Item 2 — adopt the persisted registry + request queue so approvals
+  // and requests survive a reload (the server is the source of truth on hydrate).
+  if (snapshot.repos) state.repos = Object.fromEntries(snapshot.repos.map((r) => [r.id, r]));
+  if (snapshot.repoRequests) state.repoRequests = snapshot.repoRequests;
   for (const list of state.lists) {
     const counts = snapshot.counts[list.key];
     if (counts) {
@@ -296,6 +303,14 @@ function applyServerState(snapshot: ServerSnapshot) {
     }
   }
   emit();
+}
+
+// Mirror a repo request to the server (persist). Fire-and-forget; a no-op under
+// SSR/tests, like every other serverCall — the optimistic state stands.
+function mirrorRepoRequest(request: RepoRequest) {
+  serverCall(async () => {
+    await api("/repos/requests", { method: "POST", body: JSON.stringify(request) });
+  });
 }
 
 async function refreshFromServer() {
@@ -530,6 +545,9 @@ export function requestRepo(input: NewRepoRequestInput, actorId: string = CURREN
   state.repoRequests = [request, ...state.repoRequests];
   pushAudit(actorId, `Requested repo ${name} — pending GitHub-org validation and approval.`, "pending");
   emit();
+  // Persist the pending request immediately so it survives a reload even if
+  // validation never settles; the verified update is mirrored on reconcile.
+  mirrorRepoRequest(request);
 
   const reconcile = (result: RepoValidationResult) => {
     const r = state.repoRequests.find((x) => x.id === id);
@@ -544,6 +562,7 @@ export function requestRepo(input: NewRepoRequestInput, actorId: string = CURREN
       r.note = result.note ?? "Could not be validated against the org.";
     }
     emit();
+    mirrorRepoRequest(r);
   };
   const onError = (err: unknown) => {
     const r = state.repoRequests.find((x) => x.id === id);
@@ -551,6 +570,7 @@ export function requestRepo(input: NewRepoRequestInput, actorId: string = CURREN
     r.verified = false;
     r.note = `Validation failed: ${err instanceof Error ? err.message : "unknown error"}.`;
     emit();
+    mirrorRepoRequest(r);
   };
 
   // SSR/tests with no injected validator: leave the request unverified (no
@@ -584,6 +604,12 @@ export function approveRepo(requestId: string, actorId: string = CURRENT_USER): 
   state.repos = { ...state.repos, [repo.id]: repo };
   pushAudit(actorId, `Approved repo ${req.name} — added to the registry allow-list.`, "pending");
   emit();
+  // Persist the decision + the new registry repo (the repo route re-checks the
+  // approver gate server-side) so the approval survives a reload.
+  mirrorRepoRequest(req);
+  serverCall(async () => {
+    await api("/repos", { method: "POST", body: JSON.stringify({ actor: actorId, repo }) });
+  });
   return true;
 }
 
@@ -600,6 +626,7 @@ export function rejectRepo(requestId: string, actorId: string = CURRENT_USER): b
   req.decidedTs = stamp();
   pushAudit(actorId, `Rejected repo request ${req.name}.`, "pending");
   emit();
+  mirrorRepoRequest(req); // persist the decision
   return true;
 }
 

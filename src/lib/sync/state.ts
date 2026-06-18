@@ -7,8 +7,17 @@ import { ApiError } from "@/lib/api/route";
 import { REPOS, SP_LISTS } from "@/lib/mc-data/data";
 import { assignmentViolation, isAgentId, stageAdvanceViolation } from "@/lib/mc-data/policy";
 import { disallowedRepos } from "@/lib/mc-data/repos";
-import type { AuditRow, FileEntry, Risk, SpConflict, SpError, Task } from "@/lib/mc-data/types";
-import { ensureSeeded } from "./engine";
+import type {
+  AuditRow,
+  FileEntry,
+  Repo,
+  RepoRequest,
+  Risk,
+  SpConflict,
+  SpError,
+  Task,
+} from "@/lib/mc-data/types";
+import { ensureReposSeeded, ensureSeeded } from "./engine";
 import type { EntityData } from "./mapping";
 import * as repo from "./repo";
 
@@ -21,11 +30,16 @@ export interface StateSnapshot {
   audit: AuditRow[];
   counts: Record<string, repo.ListCounts>;
   lastSweep: string;
+  // EN-002 / Item 2 — the persisted repo registry (allow-list) + request queue,
+  // so approvals survive a reload.
+  repos: Repo[];
+  repoRequests: RepoRequest[];
 }
 
 export async function snapshot(): Promise<StateSnapshot> {
   await ensureSeeded();
-  const [tasks, risks, files, conflicts, errors, audit, counts] = await Promise.all([
+  await ensureReposSeeded();
+  const [tasks, risks, files, conflicts, errors, audit, counts, repos, repoRequests] = await Promise.all([
     repo.getEntities("task"),
     repo.getEntities("risk"),
     repo.getEntities("file"),
@@ -33,6 +47,8 @@ export async function snapshot(): Promise<StateSnapshot> {
     repo.openErrors(),
     repo.auditRows(),
     repo.countsByList(),
+    repo.getRepos(),
+    repo.getRepoRequests(),
   ]);
   return {
     tasks: tasks.map((r) => r.data as unknown as Task),
@@ -42,6 +58,17 @@ export async function snapshot(): Promise<StateSnapshot> {
     errors,
     audit,
     counts,
+    // Strip the internal sync bookkeeping — the store consumes the Repo shape.
+    repos: repos.map(({ id, name, lang, def, owner, visibility, scope }) => ({
+      id,
+      name,
+      lang,
+      def,
+      owner,
+      visibility,
+      scope,
+    })),
+    repoRequests,
     // Lists not yet mirrored (roadmap, milestones) keep their fixture counts;
     // mirrored lists report live counts. The store merges via SP_LISTS keys.
     lastSweep: audit.find((a) => a.body.startsWith("Sweep completed"))?.ts ?? SP_LISTS[0].lastSync,
