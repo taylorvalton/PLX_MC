@@ -205,6 +205,72 @@ export async function ingestPullRequest(evt: PrEvent): Promise<IngestResult> {
   return { action: evt.action, actorKind, taskId, recorded: true };
 }
 
+// ─── Fail-closed reconciliation (decision 10) ────────────────────────────────
+
+export interface QueuedOutcome {
+  verdict: "pending";
+  reasons: string[];
+  queued: true;
+}
+
+// Wrap the gate so a transient failure NEVER returns `pass`: it holds (pending)
+// and enqueues for replay on recovery. The status check treats non-pass as a
+// hold, so the PR cannot merge while MC is degraded.
+export async function verifyPrOrQueue(input: VerifyPrInput): Promise<VerifyPrResult | QueuedOutcome> {
+  try {
+    return await verifyPr(input);
+  } catch {
+    try {
+      await repo.enqueueReconcile("verify", input as unknown as Record<string, unknown>);
+    } catch {
+      // best-effort: even if the queue write fails we still hold (never pass).
+    }
+    return { verdict: "pending", reasons: ["MC unavailable — held for reconciliation (fail-closed)"], queued: true };
+  }
+}
+
+export async function ingestOrQueue(evt: PrEvent): Promise<IngestResult | { ingested: false; queued: true }> {
+  try {
+    return await ingestPullRequest(evt);
+  } catch {
+    try {
+      await repo.enqueueReconcile("ingest", evt as unknown as Record<string, unknown>);
+    } catch {
+      // best-effort
+    }
+    return { ingested: false, queued: true };
+  }
+}
+
+export interface ReconcileSweepResult {
+  processed: number;
+  resolved: number;
+  failed: number;
+}
+
+// Replay queued work when MC recovers (driven by POST /api/compliance/reconcile
+// or the sync scheduler cadence). Resolved rows drop out of the pending set.
+export async function reconcileSweep(): Promise<ReconcileSweepResult> {
+  const pending = await repo.pendingReconcile();
+  let resolved = 0;
+  let failed = 0;
+  for (const row of pending) {
+    try {
+      if (row.kind === "verify") {
+        await verifyPr(row.payload as unknown as VerifyPrInput);
+      } else {
+        await ingestPullRequest(row.payload as unknown as PrEvent);
+      }
+      await repo.resolveReconcile(row.id);
+      resolved++;
+    } catch (err) {
+      await repo.bumpReconcileAttempt(row.id, err instanceof Error ? err.message : String(err));
+      failed++;
+    }
+  }
+  return { processed: pending.length, resolved, failed };
+}
+
 // ─── Event export (the Second-Brain feed) ────────────────────────────────────
 
 export async function listEvents(afterSeq: number, limit: number) {

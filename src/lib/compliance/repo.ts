@@ -151,3 +151,35 @@ export async function recordCheck(c: {
     [c.id, c.repo, c.prNumber, c.headSha, c.taskId ?? null, c.actorKind, c.verdict, JSON.stringify(c.reasons)]
   );
 }
+
+// ─── Reconciliation queue (fail-closed; replays on recovery, P2) ─────────────
+
+export type ReconcileKind = "verify" | "ingest";
+
+export interface ReconcileRow {
+  id: string;
+  kind: ReconcileKind;
+  payload: Record<string, unknown>;
+  attempts: number;
+}
+
+export async function enqueueReconcile(kind: ReconcileKind, payload: Record<string, unknown>): Promise<void> {
+  await query(`INSERT INTO mc_reconcile_queue (kind, payload) VALUES ($1, $2)`, [kind, JSON.stringify(payload)]);
+}
+
+export async function pendingReconcile(limit = 100): Promise<ReconcileRow[]> {
+  const rows = await query<{ id: string; kind: ReconcileKind; payload: Record<string, unknown>; attempts: number }>(
+    `SELECT id, kind, payload, attempts FROM mc_reconcile_queue
+      WHERE resolved_at IS NULL ORDER BY created_at ASC LIMIT $1`,
+    [limit]
+  );
+  return rows.map((r) => ({ id: String(r.id), kind: r.kind, payload: r.payload, attempts: r.attempts }));
+}
+
+export async function resolveReconcile(id: string): Promise<void> {
+  await query(`UPDATE mc_reconcile_queue SET resolved_at = now() WHERE id = $1`, [id]);
+}
+
+export async function bumpReconcileAttempt(id: string, error: string): Promise<void> {
+  await query(`UPDATE mc_reconcile_queue SET attempts = attempts + 1, last_error = $2 WHERE id = $1`, [id, error]);
+}

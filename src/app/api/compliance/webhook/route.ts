@@ -6,7 +6,7 @@
 
 import { ApiError, route } from "@/lib/api/route";
 import { complianceWebhookConfigured, complianceWebhookSecret } from "@/lib/secrets";
-import { ingestPullRequest } from "@/lib/compliance/service";
+import { ingestOrQueue } from "@/lib/compliance/service";
 import { parsePullRequestEvent, verifyGithubSignature } from "@/lib/compliance/webhook";
 
 export const POST = route(async (req) => {
@@ -26,5 +26,5 @@ export const POST = route(async (req) => {
   }
   const evt = parsePullRequestEvent(payload);
   if (!evt) return { ingested: false };
-  return { ingested: true, result: await ingestPullRequest(evt) };
+  return ingestOrQueue(evt);
 });

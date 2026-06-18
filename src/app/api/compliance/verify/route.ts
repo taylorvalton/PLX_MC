@@ -5,7 +5,7 @@
 
 import { z } from "zod";
 import { parseBody, route } from "@/lib/api/route";
-import { verifyPr } from "@/lib/compliance/service";
+import { verifyPrOrQueue } from "@/lib/compliance/service";
 
 const verifySchema = z.object({
   repo: z.string().min(1),
@@ -17,4 +17,4 @@ const verifySchema = z.object({
   taskId: z.string().optional(),
 });
 
-export const POST = route(async (req) => verifyPr(await parseBody(req, verifySchema)));
+export const POST = route(async (req) => verifyPrOrQueue(await parseBody(req, verifySchema)));
