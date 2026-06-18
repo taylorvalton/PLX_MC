@@ -40,8 +40,9 @@ export interface EventRow {
   payload: Record<string, unknown>;
 }
 
-// Keyset pagination on the monotonic `seq` — the clean export cursor.
-export async function eventsAfter(afterSeq = 0, limit = 100): Promise<EventRow[]> {
+// Keyset pagination on the monotonic `seq` — the clean export cursor. Optional
+// `kind` filter for a typed consumer (e.g. only gate.* or pr.* events).
+export async function eventsAfter(afterSeq = 0, limit = 100, kind: string | null = null): Promise<EventRow[]> {
   const rows = await query<{
     seq: string;
     ts: Date;
@@ -53,8 +54,10 @@ export async function eventsAfter(afterSeq = 0, limit = 100): Promise<EventRow[]
     payload: Record<string, unknown>;
   }>(
     `SELECT seq, ts, kind, actor, repo, task_id, pr, payload
-       FROM mc_events WHERE seq > $1 ORDER BY seq ASC LIMIT $2`,
-    [afterSeq, limit]
+       FROM mc_events
+      WHERE seq > $1 AND ($3::text IS NULL OR kind = $3)
+      ORDER BY seq ASC LIMIT $2`,
+    [afterSeq, limit, kind]
   );
   return rows.map((r) => ({
     seq: String(r.seq),

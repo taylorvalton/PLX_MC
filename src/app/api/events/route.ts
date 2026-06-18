@@ -1,17 +1,14 @@
-// GET /api/events?after=<seq>&limit=<n> — the append-only event log export
-// (EN-007 decision 13, the Second-Brain feed). Keyset pagination on the
-// monotonic `seq`; the canonical record substrate, retrieval/embedding-ready.
+// GET /api/events?after=<seq>&limit=<n>&kind=<kind> — the append-only event log
+// export (EN-007 decision 13, the Second-Brain feed). Keyset pagination on the
+// monotonic `seq`: page forward with `after=<nextCursor>`. Optional `kind` filter.
 
 import { route } from "@/lib/api/route";
+import { parseEventsQuery } from "@/lib/compliance/events";
 import { listEvents } from "@/lib/compliance/service";
 
 export const GET = route(async (req) => {
-  const url = new URL(req.url);
-  const after = Number(url.searchParams.get("after") ?? "0");
-  const limit = Number(url.searchParams.get("limit") ?? "100");
-  const events = await listEvents(
-    Number.isFinite(after) ? after : 0,
-    Math.min(Number.isFinite(limit) ? limit : 100, 500)
-  );
-  return { events };
+  const q = parseEventsQuery(new URL(req.url).searchParams);
+  const events = await listEvents(q);
+  const nextCursor = events.length > 0 ? events[events.length - 1].seq : null;
+  return { events, nextCursor };
 });

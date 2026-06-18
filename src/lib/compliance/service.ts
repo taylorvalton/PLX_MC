@@ -11,6 +11,7 @@ import { getEntity } from "@/lib/sync/repo";
 import { classifyRiskTier } from "./risk";
 import { verifyCompliance } from "./verify";
 import * as repo from "./repo";
+import type { EventsQuery } from "./events";
 import type { PrEvent } from "./webhook";
 import type { ActorKind, RiskTier, VerifyResult } from "./types";
 
@@ -273,6 +274,6 @@ export async function reconcileSweep(): Promise<ReconcileSweepResult> {
 
 // ─── Event export (the Second-Brain feed) ────────────────────────────────────
 
-export async function listEvents(afterSeq: number, limit: number) {
-  return repo.eventsAfter(afterSeq, limit);
+export async function listEvents(q: EventsQuery) {
+  return repo.eventsAfter(q.afterSeq, q.limit, q.kind);
 }

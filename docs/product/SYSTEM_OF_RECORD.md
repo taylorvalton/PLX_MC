@@ -199,6 +199,15 @@ payload    JSONB NOT NULL
   Second Brain reads it; it is not a side table. (Open item resolved: extend the
   audit log into `mc_events`; embedding feed lands in Phase 5.)
 
+**Consumer contract (shipped):** `GET /api/events?after=<seq>&limit=<n>&kind=<kind>`
+returns `{ data: { events, nextCursor } }`. Pagination is **keyset** on the
+monotonic `seq` — a consumer pages forward with `after=<nextCursor>` until
+`nextCursor` is null, and never misses or double-reads an event (append-only ⇒
+replayable). `limit` is clamped to 500; `kind` optionally filters to one event type
+(e.g. `gate.blocked`, `pr.merged`). Each event is `{ seq, ts, kind, actor, repo,
+taskId, pr, payload }`. The Second-Brain feed is exactly this stream; the embedding/
+index build (P5) consumes it without new coupling.
+
 ## 8. External Integrations declaration (governance‑required)
 
 The GitHub App is a new external provider — declared per the governance contract
