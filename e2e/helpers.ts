@@ -22,7 +22,12 @@ export async function gotoBoard(page: Page): Promise<void> {
 // under load (page.keyboard.press has no actionability delay, unlike .click()).
 // See LESSONS 2026-06-17.
 export async function waitForHydration(page: Page): Promise<void> {
-  await expect(page.locator("[data-mc-ready='true']")).toBeAttached();
+  // A cold Next/Turbopack route compile on a loaded box can exceed the default
+  // 10s expect budget on the FIRST hit to a route, so the ready marker races the
+  // compile and flakes. Give it the navigation budget (30s): a genuinely
+  // non-hydrating app still fails the assertion, just later — no masking.
+  // (Hardening 2026-06-18: timeline-filter cold-compile flake.)
+  await expect(page.locator("[data-mc-ready='true']")).toBeAttached({ timeout: 30_000 });
 }
 
 export async function openSidebar(page: Page, label: string): Promise<void> {

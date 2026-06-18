@@ -4,35 +4,81 @@
 // reconciliation. Runs inside the Next.js server process (scheduler.ts) until
 // webhooks force a public deploy.
 //
-// Scope of this increment: ToDos + Risk Register lists. Documents (driveItem
-// content), person columns, and lookup columns land with the directory /
-// notification increment (see docs/modules/sync/README.md).
+// Scope of this increment: ToDos + Risk Register lists, including the ToDos
+// person columns (Assigned To ↔, Accountable Owner →, Reporter →) resolved to
+// site-user lookup ids. Documents (driveItem content) and the Initiative lookup
+// column land with a later increment (see docs/modules/sync/README.md).
 
-import { FILES, RISKS, SP_CONFLICTS, SP_ERRORS, TASKS } from "@/lib/mc-data/data";
-import type { SyncState } from "@/lib/mc-data/types";
+import { ACTORS, FILES, REPOS, RISKS, SP_CONFLICTS, SP_ERRORS, TASKS } from "@/lib/mc-data/data";
+import type { SyncState, Task } from "@/lib/mc-data/types";
 import {
   createListItem,
   findItemByField,
   GraphError,
   listDelta,
   patchListItemFields,
+  REPO_REGISTRY_KEY,
+  resolveEmailByLookupId,
+  resolveSiteUserLookupId,
   siteContext,
   type SiteContext,
 } from "./graph";
 import {
+  actorIdByEmail,
   displayFieldFor,
   displayValue,
   inboundPatches,
   mcFieldFor,
   outboundFields,
   parseFieldValue,
+  planTaskPersons,
   reconcileInbound,
+  repoOutboundFields,
+  TASK_PERSON_FIELDS,
   type EntityData,
   type EntityType,
+  type TaskPersonMc,
 } from "./mapping";
 import * as repo from "./repo";
 
 const SYNC_ACTOR = "scribe"; // the ops agent persona attributed to engine sweeps
+
+// ─── Person-column resolution (Item 1) ───────────────────────────────────────
+
+export interface ResolvedPersons {
+  // Pre-resolved `<Column>LookupId` values for outboundFields: a number sets the
+  // person, `null` clears it, an absent key leaves the column untouched.
+  persons: Partial<Record<TaskPersonMc, number | null>>;
+  // Humans assigned but not resolvable to a site-user id (not in the UIL) — the
+  // column is left untouched and the miss is audited (fail visible, never faked).
+  unresolved: { mc: TaskPersonMc; actorId: string }[];
+}
+
+// Resolve a task's three person columns to site-user lookup ids. Pure planning
+// (planTaskPersons) + injectable async resolution, so the classification is
+// unit-testable without Graph. A resolution failure degrades to "unresolved"
+// (skip + audit) and never blocks the rest of the task push.
+export async function resolveTaskPersons(
+  ctx: SiteContext,
+  task: Pick<Task, TaskPersonMc>,
+  resolve: (ctx: SiteContext, email: string) => Promise<number | null> = resolveSiteUserLookupId
+): Promise<ResolvedPersons> {
+  const plan = planTaskPersons(task);
+  const persons: Partial<Record<TaskPersonMc, number | null>> = {};
+  const unresolved: { mc: TaskPersonMc; actorId: string }[] = [];
+  for (const mc of plan.clear) persons[mc] = null;
+  for (const { mc, actorId, email } of plan.resolve) {
+    let id: number | null = null;
+    try {
+      id = await resolve(ctx, email);
+    } catch {
+      id = null; // resolution failure → treat as unresolved (audited), never blocks the push
+    }
+    if (id == null) unresolved.push({ mc, actorId });
+    else persons[mc] = id;
+  }
+  return { persons, unresolved };
+}
 
 // ─── Seed bootstrap ──────────────────────────────────────────────────────────
 
@@ -99,17 +145,49 @@ export async function ensureSeeded(): Promise<boolean> {
   return true;
 }
 
+// Idempotent seed of the canonical repo registry (EN-002 / Item 2) from the
+// REPOS fixture — the single source of truth. Never disturbs an existing or
+// approved row (ON CONFLICT DO NOTHING), so a fresh DB gets the 3 canonical
+// repos and approvals persist across boots.
+export async function ensureReposSeeded(): Promise<void> {
+  await repo.seedRepos(Object.values(REPOS));
+}
+
 // ─── Outbound (push) ─────────────────────────────────────────────────────────
 
 const PUSHABLE: EntityType[] = ["task", "risk"];
 
+// Audit any human assigned to a person column that could not be mirrored
+// (not in the dev-site User Information List) — once per push, never silently.
+async function auditUnresolvedPersons(row: repo.EntityRow, resolved: ResolvedPersons | null): Promise<void> {
+  if (!resolved || resolved.unresolved.length === 0) return;
+  for (const { mc, actorId } of resolved.unresolved) {
+    const sp = TASK_PERSON_FIELDS.find((f) => f.mc === mc)?.sp ?? mc;
+    const name = ACTORS[actorId]?.name ?? actorId;
+    await repo.appendAudit(
+      SYNC_ACTOR,
+      `${row.id} · ${sp}: ${name} is not yet in the site directory (User Information List) — person mirror skipped; other fields pushed.`,
+      "pending"
+    );
+  }
+}
+
 async function pushEntity(ctx: SiteContext, row: repo.EntityRow): Promise<"synced" | "error"> {
   const listKey = row.entity_type === "task" ? "todos" : "risks";
+  // Resolve person columns up front (tasks only); failures degrade to skip+audit
+  // and never throw, so they cannot block the rest of the push.
+  const resolved =
+    row.entity_type === "task"
+      ? await resolveTaskPersons(ctx, row.data as unknown as Task)
+      : null;
+  const withPersons = <T extends object>(opts: T): T & { persons?: ResolvedPersons["persons"] } =>
+    resolved ? { ...opts, persons: resolved.persons } : opts;
   try {
     if (row.sp_item_id) {
       const only = row.dirty_fields.length > 0 ? row.dirty_fields : undefined;
-      await patchListItemFields(ctx, listKey, row.sp_item_id, outboundFields(row.entity_type, row.data, { only }));
+      await patchListItemFields(ctx, listKey, row.sp_item_id, outboundFields(row.entity_type, row.data, withPersons({ only })));
       await repo.updateEntity(row.entity_type, row.id, { syncState: "synced", dirtyFields: [] });
+      await auditUnresolvedPersons(row, resolved);
       return "synced";
     }
     // No item yet: adopt an existing one by unique key (tasks only), else create.
@@ -118,11 +196,11 @@ async function pushEntity(ctx: SiteContext, row: repo.EntityRow): Promise<"synce
       const existing = await findItemByField(ctx, "todos", "TaskID", row.id);
       if (existing) {
         itemId = existing.id;
-        await patchListItemFields(ctx, listKey, itemId, outboundFields("task", row.data));
+        await patchListItemFields(ctx, listKey, itemId, outboundFields("task", row.data, withPersons({})));
       }
     }
     if (!itemId) {
-      itemId = await createListItem(ctx, listKey, outboundFields(row.entity_type, row.data, { creating: true }));
+      itemId = await createListItem(ctx, listKey, outboundFields(row.entity_type, row.data, withPersons({ creating: true })));
     }
     await repo.updateEntity(row.entity_type, row.id, {
       syncState: "synced",
@@ -130,6 +208,7 @@ async function pushEntity(ctx: SiteContext, row: repo.EntityRow): Promise<"synce
       dirtyFields: [],
       syncExtras: { sp: `${listKey === "todos" ? "ToDos" : "Risk Register"} · item ${itemId}` },
     });
+    await auditUnresolvedPersons(row, resolved);
     return "synced";
   } catch (err) {
     if (err instanceof GraphError && err.status < 500) {
@@ -151,6 +230,48 @@ async function pushEntity(ctx: SiteContext, row: repo.EntityRow): Promise<"synce
     }
     throw err;
   }
+}
+
+// Push-only mirror of the repo registry to the "Repo Registry" list (Item 2).
+// Mission Control is authoritative for the allow-list, so the list is never read
+// back. Skips with an honest audit when the list isn't provisioned — a missing
+// optional list never blocks the core task/risk sweep.
+async function pushRepoRegistry(ctx: SiteContext): Promise<number> {
+  const pending = (await repo.getRepos()).filter((r) => r.syncState === "pending");
+  if (pending.length === 0) return 0;
+  if (!ctx.listIds[REPO_REGISTRY_KEY]) {
+    await repo.appendAudit(
+      SYNC_ACTOR,
+      "Repo Registry list not provisioned — registry mirror skipped (run scripts/provision-sharepoint.py).",
+      "pending"
+    );
+    return 0;
+  }
+  let pushed = 0;
+  for (const r of pending) {
+    try {
+      if (r.spItemId) {
+        await patchListItemFields(ctx, REPO_REGISTRY_KEY, r.spItemId, repoOutboundFields(r));
+        await repo.setRepoSync(r.id, "synced");
+      } else {
+        const existing = await findItemByField(ctx, REPO_REGISTRY_KEY, "RepoID", r.id);
+        const itemId = existing
+          ? existing.id
+          : await createListItem(ctx, REPO_REGISTRY_KEY, repoOutboundFields(r, { creating: true }));
+        if (existing) await patchListItemFields(ctx, REPO_REGISTRY_KEY, itemId, repoOutboundFields(r));
+        await repo.setRepoSync(r.id, "synced", itemId);
+      }
+      pushed += 1;
+    } catch (err) {
+      if (err instanceof GraphError && err.status < 500) {
+        await repo.setRepoSync(r.id, "error");
+        await repo.appendAudit(SYNC_ACTOR, `Repo Registry push failed for ${r.id} — ${err.body.slice(0, 120)}`, "error");
+      } else {
+        throw err;
+      }
+    }
+  }
+  return pushed;
 }
 
 // ─── Inbound (delta pull) ────────────────────────────────────────────────────
@@ -196,7 +317,20 @@ async function pullList(ctx: SiteContext, listKey: string, type: EntityType): Pr
       result.skipped += 1;
       continue;
     }
-    const { apply, conflicts } = reconcileInbound(row.data, row.dirty_fields, inboundPatches(type, item.fields));
+    const patches = inboundPatches(type, item.fields);
+    // Assigned To is two-way: resolve the inbound site-user lookup id back to an
+    // MC actor before reconciliation, so a SharePoint reassignment pulls in (and
+    // a both-sides edit raises a conflict, never an overwrite). Owner + Reporter
+    // are push-only and are never read back.
+    if (type === "task") {
+      const rawId = item.fields.AssignedToLookupId;
+      if (rawId !== undefined && rawId !== null && rawId !== "") {
+        const email = await resolveEmailByLookupId(ctx, Number(rawId));
+        const actorId = email ? actorIdByEmail(email) : null;
+        if (actorId) patches.assignee = actorId;
+      }
+    }
+    const { apply, conflicts } = reconcileInbound(row.data, row.dirty_fields, patches);
     for (const c of conflicts) {
       const display = displayFieldFor(type, c.field) ?? c.field;
       await repo.insertConflict({
@@ -246,6 +380,7 @@ export interface SweepResult {
 
 export async function runSweep(actor: string = SYNC_ACTOR): Promise<SweepResult> {
   await ensureSeeded();
+  await ensureReposSeeded();
   const ctx = await siteContext();
 
   // Inbound FIRST: SharePoint-side edits must be seen — and dirty-field
@@ -273,6 +408,8 @@ export async function runSweep(actor: string = SYNC_ACTOR): Promise<SweepResult>
       else pushErrors += 1;
     }
   }
+  // Push-only repo-registry mirror (Item 2) — counted with the outbound pushes.
+  pushed += await pushRepoRegistry(ctx);
 
   const lastSweep = repo.stamp();
   await repo.appendAudit(
@@ -288,6 +425,26 @@ export async function runSweep(actor: string = SYNC_ACTOR): Promise<SweepResult>
 
 // ─── Manual reconciliation (humans decide — SOUL non-negotiable) ─────────────
 
+// Targeted outbound push of a SINGLE MC field (conflict "keep MC" / error retry).
+// For a task PERSON column the `<Column>LookupId` must be resolved first —
+// otherwise the write is an empty no-op that would still let the caller mark the
+// row synced (a fabricated person sync — the exact class the audit flagged).
+// Returns `true` when the field was genuinely written; `false` when it is a
+// person column not yet resolvable to a site user, so the caller re-queues for
+// the next sweep (which resolves + audits) instead of claiming success.
+async function pushSingleField(ctx: SiteContext, type: EntityType, row: repo.EntityRow, mcField: string): Promise<boolean> {
+  if (!row.sp_item_id) return false;
+  const listKey = type === "task" ? "todos" : "risks";
+  let persons: ResolvedPersons["persons"] | undefined;
+  if (type === "task") {
+    persons = (await resolveTaskPersons(ctx, row.data as unknown as Task)).persons;
+    const isPerson = TASK_PERSON_FIELDS.some((f) => f.mc === mcField);
+    if (isPerson && persons[mcField as TaskPersonMc] === undefined) return false; // unresolved person — never fabricate
+  }
+  await patchListItemFields(ctx, listKey, row.sp_item_id, outboundFields(type, row.data, { only: [mcField], persons }));
+  return true;
+}
+
 export async function resolveConflict(conflictId: string, winner: "mc" | "sp", actor: string): Promise<boolean> {
   const conflict = await repo.getConflict(conflictId);
   if (!conflict) return false;
@@ -302,14 +459,21 @@ export async function resolveConflict(conflictId: string, winner: "mc" | "sp", a
       syncState: "synced",
     });
   } else if (row && winner === "mc") {
-    // Push MC's value to the loser. No item yet → it goes out with the next sweep.
-    if (row.sp_item_id) {
-      const ctx = await siteContext();
-      const listKey = type === "task" ? "todos" : "risks";
-      await patchListItemFields(ctx, listKey, row.sp_item_id, outboundFields(type, row.data, { only: [mcField] }));
+    // Push MC's value to the loser. No item yet (or an unresolved person column)
+    // → re-queue for the next sweep rather than claim a sync that didn't happen.
+    const ctx = row.sp_item_id ? await siteContext() : null;
+    const pushed = ctx ? await pushSingleField(ctx, type, row, mcField) : false;
+    if (pushed) {
       await repo.updateEntity(type, conflict.entityId, { syncState: "synced", dirtyFields: [] });
     } else {
       await repo.updateEntity(type, conflict.entityId, { syncState: "pending" });
+      if (row.sp_item_id) {
+        await repo.appendAudit(
+          actor,
+          `Kept Mission Control on ${conflict.entityId} · ${conflict.field}, but its person isn't resolvable to a site user yet — re-queued for the next sweep.`,
+          "pending"
+        );
+      }
     }
   }
 
@@ -334,10 +498,20 @@ export async function retryError(errorId: string, actor: string): Promise<boolea
   const mcField = mcFieldFor(type, error.field) ?? error.field;
   try {
     if (row.sp_item_id) {
-      // The mapping layer normalizes on the way out (§5.2) — the retry succeeds.
-      await patchListItemFields(ctx, listKey, row.sp_item_id, outboundFields(type, row.data, { only: [mcField] }));
+      const pushed = await pushSingleField(ctx, type, row, mcField);
+      if (!pushed) {
+        // Unresolved person column — don't claim the retry succeeded; re-queue.
+        await repo.updateEntity(type, row.id, { syncState: "pending" });
+        await repo.appendAudit(
+          actor,
+          `Retry deferred for ${error.entityId} · ${error.field} — its person isn't resolvable to a site user yet; re-queued for the next sweep.`,
+          "pending"
+        );
+        return false;
+      }
     } else {
-      const itemId = await createListItem(ctx, listKey, outboundFields(type, row.data, { creating: true }));
+      const persons = type === "task" ? (await resolveTaskPersons(ctx, row.data as unknown as Task)).persons : undefined;
+      const itemId = await createListItem(ctx, listKey, outboundFields(type, row.data, { creating: true, persons }));
       await repo.updateEntity(type, row.id, { spItemId: itemId });
     }
   } catch (err) {
@@ -351,7 +525,7 @@ export async function retryError(errorId: string, actor: string): Promise<boolea
   await repo.updateEntity(type, row.id, { syncState: "synced", dirtyFields: [] });
   await repo.appendAudit(
     actor,
-    `Retried push for ${error.entityId} · ${error.field} — value normalized ("${error.value}" → "${displayValue(outboundFields(type, row.data, { only: [mcField] })[error.field])}") and accepted.`,
+    `Retried push for ${error.entityId} · ${error.field} — re-pushed and accepted.`,
     "synced"
   );
   return true;

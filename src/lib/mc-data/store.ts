@@ -276,6 +276,9 @@ interface ServerSnapshot {
   audit: AuditRow[];
   counts: Record<string, { synced: number; pending: number; conflict: number; error: number }>;
   lastSweep: string;
+  // EN-002 / Item 2 — the persisted repo registry + request queue.
+  repos?: Repo[];
+  repoRequests?: RepoRequest[];
 }
 
 // Adopt the server's truth for everything the engine owns; notifications,
@@ -288,6 +291,10 @@ function applyServerState(snapshot: ServerSnapshot) {
   state.errors = snapshot.errors;
   state.audit = snapshot.audit;
   state.lastSweep = snapshot.lastSweep;
+  // EN-002 / Item 2 — adopt the persisted registry + request queue so approvals
+  // and requests survive a reload (the server is the source of truth on hydrate).
+  if (snapshot.repos) state.repos = Object.fromEntries(snapshot.repos.map((r) => [r.id, r]));
+  if (snapshot.repoRequests) state.repoRequests = snapshot.repoRequests;
   for (const list of state.lists) {
     const counts = snapshot.counts[list.key];
     if (counts) {
@@ -296,6 +303,14 @@ function applyServerState(snapshot: ServerSnapshot) {
     }
   }
   emit();
+}
+
+// Mirror a repo request to the server (persist). Fire-and-forget; a no-op under
+// SSR/tests, like every other serverCall — the optimistic state stands.
+function mirrorRepoRequest(request: RepoRequest) {
+  serverCall(async () => {
+    await api("/repos/requests", { method: "POST", body: JSON.stringify(request) });
+  });
 }
 
 async function refreshFromServer() {
@@ -530,6 +545,9 @@ export function requestRepo(input: NewRepoRequestInput, actorId: string = CURREN
   state.repoRequests = [request, ...state.repoRequests];
   pushAudit(actorId, `Requested repo ${name} — pending GitHub-org validation and approval.`, "pending");
   emit();
+  // Persist the pending request immediately so it survives a reload even if
+  // validation never settles; the verified update is mirrored on reconcile.
+  mirrorRepoRequest(request);
 
   const reconcile = (result: RepoValidationResult) => {
     const r = state.repoRequests.find((x) => x.id === id);
@@ -544,6 +562,7 @@ export function requestRepo(input: NewRepoRequestInput, actorId: string = CURREN
       r.note = result.note ?? "Could not be validated against the org.";
     }
     emit();
+    mirrorRepoRequest(r);
   };
   const onError = (err: unknown) => {
     const r = state.repoRequests.find((x) => x.id === id);
@@ -551,6 +570,7 @@ export function requestRepo(input: NewRepoRequestInput, actorId: string = CURREN
     r.verified = false;
     r.note = `Validation failed: ${err instanceof Error ? err.message : "unknown error"}.`;
     emit();
+    mirrorRepoRequest(r);
   };
 
   // SSR/tests with no injected validator: leave the request unverified (no
@@ -584,6 +604,12 @@ export function approveRepo(requestId: string, actorId: string = CURRENT_USER): 
   state.repos = { ...state.repos, [repo.id]: repo };
   pushAudit(actorId, `Approved repo ${req.name} — added to the registry allow-list.`, "pending");
   emit();
+  // Persist the decision + the new registry repo (the repo route re-checks the
+  // approver gate server-side) so the approval survives a reload.
+  mirrorRepoRequest(req);
+  serverCall(async () => {
+    await api("/repos", { method: "POST", body: JSON.stringify({ actor: actorId, repo }) });
+  });
   return true;
 }
 
@@ -600,6 +626,7 @@ export function rejectRepo(requestId: string, actorId: string = CURRENT_USER): b
   req.decidedTs = stamp();
   pushAudit(actorId, `Rejected repo request ${req.name}.`, "pending");
   emit();
+  mirrorRepoRequest(req); // persist the decision
   return true;
 }
 
@@ -800,14 +827,18 @@ export const setCoassignees = (taskId: string, ids: string[]) => {
 };
 
 // Set the human accountable owner (EN-003). Rejects an agent — accountability
-// is always human. DB-only: the Accountable Owner person column is part of the
-// deferred directory mirror, so no sync claim is made here.
+// is always human. The Accountable Owner person column now mirrors to SharePoint
+// on the next sync (Item 1, push-only), so the trail says so honestly.
 export const setAccountableOwner = (taskId: string, ownerId: string | null) => {
   if (isAgentId(ownerId)) {
     pushNotice("Accountability is always human — an agent can't be the accountable owner.");
     return;
   }
-  patchTaskFields(taskId, { accountableOwner: ownerId }, { activity: "set the accountable owner" });
+  patchTaskFields(
+    taskId,
+    { accountableOwner: ownerId },
+    { activity: "set the accountable owner — Accountable Owner mirrors to SharePoint on the next sync" }
+  );
 };
 
 // Toggle the per-task human-only policy. Turning it on while an agent is the
@@ -1019,9 +1050,10 @@ export function deleteBucketComment(bucketId: string, commentId: string, actor: 
 }
 
 // Reassign a task (null = unassign). Thin wrapper over the shared mutation
-// spine. The Assigned To person column is NOT mirrored yet (M365 directory
-// increment) — the activity + audit copy reflect that deferral honestly, the
-// server (state.ts) likewise does not re-queue the entity for push.
+// spine. The Assigned To person column now mirrors to SharePoint on the next
+// sync (Item 1) — the server (state.ts) re-queues the entity for push and the
+// engine resolves the actor to a site-user id. A Teams/email notification on
+// assignment is still deferred, so the trail never claims that delivery.
 export function reassignTask(taskId: string, actorId: string | null) {
   const t = taskById(taskId);
   if (!t) return;
@@ -1036,13 +1068,13 @@ export function reassignTask(taskId: string, actorId: string | null) {
     if (t.assignee === null) return;
     pushAudit(
       CURRENT_USER,
-      `Unassigned ${taskId} — Assigned To mirror deferred to the directory increment.`,
+      `Unassigned ${taskId} — clearing Assigned To on the next SharePoint sync.`,
       "pending"
     );
     patchTaskFields(
       taskId,
       { assignee: null },
-      { activity: "unassigned — Assigned To mirror deferred to the directory increment" }
+      { activity: "unassigned — Assigned To clears on the next SharePoint sync" }
     );
     return;
   }
@@ -1052,13 +1084,13 @@ export function reassignTask(taskId: string, actorId: string | null) {
   // the server audit (state.ts) omits it — a documented divergence, not parity.
   pushAudit(
     CURRENT_USER,
-    `Reassigned ${taskId} to ${who.name} — Assigned To mirror deferred to the directory increment.`,
+    `Reassigned ${taskId} to ${who.name} — Assigned To mirrors to SharePoint on the next sync.`,
     "pending"
   );
   patchTaskFields(
     taskId,
     { assignee: actorId },
-    { activity: `reassigned to ${who.name} — Assigned To mirror deferred to the directory increment` }
+    { activity: `reassigned to ${who.name} — Assigned To mirrors to SharePoint on the next sync` }
   );
 }
 

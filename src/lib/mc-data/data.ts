@@ -363,6 +363,7 @@ export const SP_LISTS: SpListDef[] = [
       { name: "Repos", type: "Multi line of text", mc: "repos", dir: "push" },
       { name: "Evidence Complete", type: "Yes/No", mc: "evidence", dir: "push" },
       { name: "Description", type: "Multi line of text", mc: "description", dir: "two-way" },
+      { name: "Sub-tasks", type: "Multi line of text", mc: "subtasks", dir: "push", note: "Item 3 — serialized push-only mirror" },
     ],
   },
   {
@@ -417,6 +418,22 @@ export const SP_LISTS: SpListDef[] = [
       { name: "Document Type", type: "Choice", mc: "docType", dir: "two-way", note: "PRD/Evidence/Deed/Report/Spec/Export" },
       { name: "Modified", type: "Date and time", mc: "modified", dir: "two-way" },
       { name: "Modified By", type: "Person", mc: "modifiedBy", dir: "pull" },
+    ],
+  },
+  {
+    // EN-002 / Item 2 — push-only mirror of the repo registry/allow-list. MC is
+    // authoritative; persistence + approvals live in the plx_mc DB.
+    key: "reporegistry", title: "Repo Registry", kind: "list", entity: "Repo", icon: "⎇",
+    maps: "Repo registry / allow-list", itemCount: 3, direction: "push",
+    lastSync: "—", counts: { synced: 0, pending: 3, conflict: 0, error: 0 },
+    columns: [
+      { name: "Repo ID", type: "Single line of text", mc: "id", dir: "push", required: true, note: "indexed · unique key" },
+      { name: "Title", type: "Single line of text", mc: "name", dir: "push", required: true },
+      { name: "Owner", type: "Single line of text", mc: "owner", dir: "push" },
+      { name: "Visibility", type: "Choice", mc: "visibility", dir: "push", note: "Public/Private" },
+      { name: "Default Branch", type: "Single line of text", mc: "def", dir: "push" },
+      { name: "Language", type: "Single line of text", mc: "lang", dir: "push" },
+      { name: "Scope", type: "Multi line of text", mc: "scope", dir: "push" },
     ],
   },
 ];
