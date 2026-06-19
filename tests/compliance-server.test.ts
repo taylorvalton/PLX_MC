@@ -11,6 +11,7 @@ const db = vi.hoisted(() => ({
   events: [] as { kind: string; actor: string; repo?: string | null; taskId?: string | null; pr?: string | null; payload?: Record<string, unknown> }[],
   checks: [] as { id: string; verdict: string; reasons: string[]; actorKind: string; taskId: string | null }[],
   tasks: new Map<string, Task>(),
+  dedupKeys: new Set<string>(),
 }));
 
 vi.mock("@/lib/compliance/repo", () => ({
@@ -20,11 +21,17 @@ vi.mock("@/lib/compliance/repo", () => ({
   async getDispatch(id: string) {
     return db.dispatches.get(id) ?? null;
   },
-  async appendEvent(e: { kind: string; actor: string; repo?: string | null; taskId?: string | null; pr?: string | null; payload?: Record<string, unknown> }) {
+  async appendEvent(e: { kind: string; actor: string; repo?: string | null; taskId?: string | null; pr?: string | null; payload?: Record<string, unknown>; dedupKey?: string | null }) {
+    if (e.dedupKey) {
+      if (db.dedupKeys.has(e.dedupKey)) return;
+      db.dedupKeys.add(e.dedupKey);
+    }
     db.events.push(e);
   },
   async recordCheck(c: { id: string; verdict: string; reasons: string[]; actorKind: string; taskId: string | null }) {
-    db.checks.push(c);
+    const i = db.checks.findIndex((x) => x.id === c.id);
+    if (i >= 0) db.checks[i] = c;
+    else db.checks.push(c);
   },
   async eventsAfter() {
     return db.events.map((e, i) => ({ seq: String(i + 1), ts: "t", pr: null, repo: null, taskId: null, payload: {}, ...e }));
@@ -69,6 +76,7 @@ beforeEach(() => {
   db.events.length = 0;
   db.checks.length = 0;
   db.tasks.clear();
+  db.dedupKeys.clear();
 });
 
 describe("checkout", () => {
@@ -107,14 +115,24 @@ describe("verifyPr — resolves actor/task from the checkout, not git", () => {
     expect(db.events.some((e) => e.kind === "gate.passed")).toBe(true);
   });
 
-  it("classifies a migration change as high-risk and blocks an agent PR without a bucket PRD", async () => {
+  it("classifies a migration change as high-risk; PRD is advisory (no bucket store) so a full bundle passes (S1)", async () => {
     db.tasks.set("TASK-900", taskish({ accountableOwner: "greg", evidence: { summary: "ok", items: [{ key: "a", label: "a", done: true }], rollback: "revert", shots: [{ label: "ui", cap: "x" }] } }));
     const { checkoutId } = await checkout({ taskId: "TASK-900", runtime: "cursor-cloud", accountableHuman: "vince", repo: "PLX_MC" });
 
     const r = await verifyPr({ repo: "PLX_MC", prNumber: 9, headSha: "ghi", changedPaths: ["db/migrations/006_x.sql"], checkoutId });
     expect(r.tier).toBe("high");
-    expect(r.verdict).toBe("block");
-    expect(r.reasons.some((x) => /bucket PRD/.test(x))).toBe(true);
+    expect(r.verdict).toBe("pass");
+    expect(r.reasons.some((x) => /advisory/.test(x))).toBe(true);
+  });
+
+  it("is idempotent on replay — same (repo, pr, sha) yields one check + one gate event (S3)", async () => {
+    db.tasks.set("TASK-900", taskish({ accountableOwner: "greg", evidence: { summary: "ok", items: [{ key: "a", label: "a", done: true }], rollback: "revert the PR" } }));
+    const { checkoutId } = await checkout({ taskId: "TASK-900", runtime: "cursor-cloud", accountableHuman: "vince", repo: "PLX_MC" });
+    const args = { repo: "PLX_MC", prNumber: 20, headSha: "sha20", changedPaths: ["src/x.ts"], checkoutId };
+    await verifyPr(args);
+    await verifyPr(args); // reconciliation replay of the same work
+    expect(db.checks.filter((c) => c.id.includes("_20_")).length).toBe(1);
+    expect(db.events.filter((e) => e.kind === "gate.passed").length).toBe(1);
   });
 
   it("treats a PR with no checkout as operator work and passes it", async () => {
@@ -158,5 +176,16 @@ describe("complete", () => {
     const ev = db.events.find((e) => e.kind === "task.completed");
     expect(ev).toBeTruthy();
     expect(ev!.payload).toMatchObject({ summary: "shipped", commitSha: "deadbeef" });
+  });
+
+  it("rejects completion for an unknown or expired checkout (S4)", async () => {
+    await expect(complete({ checkoutId: "dsp_bogus", summary: "x" })).rejects.toMatchObject({ code: "invalid_checkout" });
+    db.dispatches.set("dsp_exp", {
+      id: "dsp_exp", actorKind: "agent", runtime: "cursor", taskId: "TASK-900",
+      accountableHuman: "vince", repo: "PLX_MC", revoked: false,
+      expiresAt: new Date(Date.now() - 1000).toISOString(),
+    });
+    await expect(complete({ checkoutId: "dsp_exp", summary: "x" })).rejects.toMatchObject({ code: "invalid_checkout" });
+    expect(db.events.some((e) => e.kind === "task.completed")).toBe(false);
   });
 });

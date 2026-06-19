@@ -5,14 +5,17 @@
 // the caller, not here. Reuses the EN-003 evidence + accountability model.
 
 import type { Evidence } from "@/lib/mc-data";
-import { evidenceComplete, hasHumanAccountableOwner } from "@/lib/mc-data";
+import { hasHumanAccountableOwner } from "@/lib/mc-data";
 import { bundleRequirementsFor } from "./risk";
 import type { RiskTier, VerifyInput, VerifyResult } from "./types";
 
 // Is the evidence object complete enough for this tier?
 //   minimal → a non-empty summary
-//   note    → a complete evidence checklist + a rollback note
+//   note    → a non-empty summary + a non-empty, fully-done checklist + rollback
 //   full    → note + change-appropriate proof (screenshots or a test run)
+// A non-empty summary is required at EVERY tier, and an EMPTY checklist is never
+// "complete" (review S2 — the prior code let note/full pass with no summary and
+// treated `items: []` as vacuously done, which was weaker than the low tier).
 export function evidenceCompleteForTier(
   ev: Evidence | undefined,
   tier: RiskTier
@@ -20,12 +23,11 @@ export function evidenceCompleteForTier(
   const req = bundleRequirementsFor(tier);
   const missing: string[] = [];
 
-  if (req.evidence === "minimal") {
-    if (!ev || !ev.summary.trim()) missing.push("an evidence summary");
-    return { ok: missing.length === 0, missing };
-  }
+  if (!ev || !ev.summary.trim()) missing.push("an evidence summary");
+  if (req.evidence === "minimal") return { ok: missing.length === 0, missing };
 
-  if (!evidenceComplete(ev)) missing.push("a complete evidence checklist");
+  const checklistComplete = !!ev && ev.items.length > 0 && ev.items.every((i) => i.done);
+  if (!checklistComplete) missing.push("a complete evidence checklist");
   if (req.rollback && !ev?.rollback?.trim()) missing.push("a rollback plan");
   if (req.evidence === "full" && !(ev?.shots?.length || ev?.qa)) {
     missing.push("change-appropriate proof (screenshots or a test run)");
@@ -34,7 +36,7 @@ export function evidenceCompleteForTier(
 }
 
 export function verifyCompliance(input: VerifyInput): VerifyResult {
-  const { task, actor, tier, bucketHasPrd } = input;
+  const { task, actor, tier, bucketPrd } = input;
 
   // No task resolved from the checkout/link.
   if (!task) {
@@ -55,17 +57,25 @@ export function verifyCompliance(input: VerifyInput): VerifyResult {
   }
 
   // Agent work: enforce the tier-appropriate bundle + a human accountable owner.
+  // Blocking reasons flip the verdict; advisory notes are surfaced but do not.
   const reasons: string[] = [];
+  const notes: string[] = [];
   if (!hasHumanAccountableOwner(task)) {
     reasons.push("needs a human accountable owner (defaults to the dispatching operator)");
   }
   const ev = evidenceCompleteForTier(task.evidence, tier);
   reasons.push(...ev.missing.map((m) => `missing ${m}`));
-  if (bundleRequirementsFor(tier).prd && !bucketHasPrd) {
-    reasons.push("high-risk change requires an approved bucket PRD");
+  if (bundleRequirementsFor(tier).prd) {
+    if (bucketPrd === "absent") {
+      reasons.push("high-risk change requires an approved bucket PRD");
+    } else if (bucketPrd === "unknown") {
+      // No server bucket store yet (EN-005/006): the PRD requirement can't be
+      // evaluated, so it is advisory — never a hard block (review S1).
+      notes.push("bucket-PRD requirement not enforced yet (no bucket store) — advisory");
+    }
   }
 
   return reasons.length === 0
-    ? { verdict: "pass", reasons: [`agent bundle complete for ${tier}-risk change`] }
-    : { verdict: "block", reasons };
+    ? { verdict: "pass", reasons: [`agent bundle complete for ${tier}-risk change`, ...notes] }
+    : { verdict: "block", reasons: [...reasons, ...notes] };
 }

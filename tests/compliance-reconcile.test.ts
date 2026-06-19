@@ -69,7 +69,7 @@ beforeEach(() => {
 describe("fail-closed verify", () => {
   it("holds (pending) and enqueues when MC is degraded — never passes", async () => {
     db.fail.on = true;
-    const r = await verifyPrOrQueue({ repo: "PLX_MC", prNumber: 1, headSha: "a", changedPaths: ["src/x.ts"], taskId: "TASK-1" });
+    const r = await verifyPrOrQueue({ repo: "PLX_MC", prNumber: 1, headSha: "a", changedPaths: ["src/x.ts"] });
     expect(r.verdict).toBe("pending");
     expect("queued" in r && r.queued).toBe(true);
     expect(pending()).toHaveLength(1);
@@ -88,7 +88,7 @@ describe("fail-closed verify", () => {
 describe("reconcileSweep — replay on recovery", () => {
   it("resolves queued work once MC is back", async () => {
     db.fail.on = true;
-    await verifyPrOrQueue({ repo: "PLX_MC", prNumber: 1, headSha: "a", changedPaths: ["src/x.ts"], taskId: "TASK-1" });
+    await verifyPrOrQueue({ repo: "PLX_MC", prNumber: 1, headSha: "a", changedPaths: ["src/x.ts"] });
     expect(pending()).toHaveLength(1);
 
     db.fail.on = false; // MC recovers
@@ -99,7 +99,7 @@ describe("reconcileSweep — replay on recovery", () => {
 
   it("keeps the row + bumps attempts when replay still fails", async () => {
     db.fail.on = true;
-    await verifyPrOrQueue({ repo: "PLX_MC", prNumber: 2, headSha: "b", changedPaths: ["src/y.ts"], taskId: "TASK-2" });
+    await verifyPrOrQueue({ repo: "PLX_MC", prNumber: 2, headSha: "b", changedPaths: ["src/y.ts"] });
 
     const res = await reconcileSweep(); // still degraded
     expect(res).toMatchObject({ processed: 1, resolved: 0, failed: 1 });

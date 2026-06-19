@@ -7,6 +7,8 @@ import { z } from "zod";
 import { parseBody, route } from "@/lib/api/route";
 import { verifyPrOrQueue } from "@/lib/compliance/service";
 
+// No taskId — attribution comes from the checkout credential, not the client
+// (review S7); the status-check workflow never sends one.
 const verifySchema = z.object({
   repo: z.string().min(1),
   prNumber: z.number().int().nonnegative(),
@@ -14,7 +16,6 @@ const verifySchema = z.object({
   changedPaths: z.array(z.string()).default([]),
   labels: z.array(z.string()).optional(),
   checkoutId: z.string().optional(),
-  taskId: z.string().optional(),
 });
 
 export const POST = route(async (req) => verifyPrOrQueue(await parseBody(req, verifySchema)));

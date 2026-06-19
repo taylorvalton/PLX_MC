@@ -97,4 +97,25 @@ describe("ingestPullRequest", () => {
     await ingestPullRequest(evt);
     expect(db.events.map((e) => e.kind)).toEqual(expect.arrayContaining(["pr.merged", "task.promotion.requested"]));
   });
+
+  it("records a closed-without-merge PR as pr.closed, never pr.opened (B1)", async () => {
+    const evt = parsePullRequestEvent(prPayload({ action: "closed" }, { merged: false }))!;
+    const r = await ingestPullRequest(evt);
+    expect(r.recorded).toBe(true);
+    expect(db.events.some((e) => e.kind === "pr.closed")).toBe(true);
+    expect(db.events.some((e) => e.kind === "pr.opened")).toBe(false);
+  });
+
+  it("ignores unhandled actions (e.g. labeled) — no spurious event (B1)", async () => {
+    const evt = parsePullRequestEvent(prPayload({ action: "labeled" }))!;
+    const r = await ingestPullRequest(evt);
+    expect(r.recorded).toBe(false);
+    expect(db.events.length).toBe(0);
+  });
+
+  it("records a synchronize as pr.synchronized (T5)", async () => {
+    const evt = parsePullRequestEvent(prPayload({ action: "synchronize" }))!;
+    await ingestPullRequest(evt);
+    expect(db.events.some((e) => e.kind === "pr.synchronized")).toBe(true);
+  });
 });
