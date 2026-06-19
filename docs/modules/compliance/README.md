@@ -70,6 +70,7 @@ GitHub status-check workflow.
 - `scripts/compliance-ci-check.sh` — workflow/hook validator (P3 acceptance)
 - `db/migrations/005_compliance.sql` — `mc_events`, `mc_dispatch`, `mc_compliance_check`
 - `db/migrations/006_compliance_reconcile.sql` — `mc_reconcile_queue` (fail-closed replay)
+- `db/migrations/007_compliance_event_dedup.sql` — event idempotency (`dedup_key`) + the `(kind, seq)` export index
 - `src/app/api/compliance/reconcile/route.ts` — reconciliation sweep entrypoint
 - `docs/runbooks/compliance-gate-rollout.md` — operator activation + External Integrations declaration
 - `tests/compliance.test.ts` — risk truth table + verifier verdicts (pure)

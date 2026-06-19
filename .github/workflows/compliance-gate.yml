@@ -47,8 +47,8 @@ jobs:
             exit 0
           fi
           git fetch --no-tags --depth=1 origin "$PR_BASE_REF" || true
-          changed=$(git diff --name-only "origin/${PR_BASE_REF}...HEAD" \
-            | jq -R -s 'split("\n") | map(select(length>0))')
+          changed=$(git diff --name-only "origin/${PR_BASE_REF}...HEAD" 2>/dev/null \
+            | jq -R -s 'split("\n") | map(select(length>0))' || echo '[]')
           checkout=$(printf '%s' "$PR_BODY" | grep -oE 'MC-Checkout: dsp_[A-Za-z0-9]+' | head -n1 | sed 's/.* //' || true)
           body=$(jq -n \
             --arg repo "$REPO_NAME" \
@@ -59,9 +59,14 @@ jobs:
             --arg checkoutId "${checkout:-}" \
             '{repo:$repo, prNumber:$prNumber, headSha:$headSha, changedPaths:$changedPaths, labels:$labels}
              + (if $checkoutId != "" then {checkoutId:$checkoutId} else {} end)')
-          resp=$(curl -sS -X POST "${MC_BASE_URL%/}/api/compliance/verify" \
-            -H 'content-type: application/json' -d "$body")
+          resp=$(curl -sS --max-time 20 -X POST "${MC_BASE_URL%/}/api/compliance/verify" \
+            -H 'content-type: application/json' -d "$body" || true)
           echo "verify response: $resp"
+          if [ -z "$resp" ]; then
+            echo "Compliance gate: MC unreachable (network/timeout)."
+            if [ "$MODE" = "hard" ]; then exit 1; fi
+            echo "soft mode — not failing the check"; exit 0
+          fi
           verdict=$(printf '%s' "$resp" | jq -r '.data.verdict // "block"')
           reasons=$(printf '%s' "$resp" | jq -r '(.data.reasons // []) | join("; ")')
           echo "verdict=$verdict mode=$MODE"

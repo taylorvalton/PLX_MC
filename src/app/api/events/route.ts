@@ -10,5 +10,8 @@ export const GET = route(async (req) => {
   const q = parseEventsQuery(new URL(req.url).searchParams);
   const events = await listEvents(q);
   const nextCursor = events.length > 0 ? events[events.length - 1].seq : null;
-  return { events, nextCursor };
+  // hasMore lets a consumer stop without an extra round-trip (review N9): a
+  // partial page (< limit) is the last page even though nextCursor is non-null.
+  const hasMore = events.length === q.limit;
+  return { events, nextCursor, hasMore };
 });

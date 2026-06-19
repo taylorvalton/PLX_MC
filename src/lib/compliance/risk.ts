@@ -8,12 +8,15 @@ import type { BundleRequirement, RiskTier } from "./types";
 const HIGH_PATH: RegExp[] = [
   /(^|\/)db\/migrations\//i,
   /(^|\/)auth(\/|\.)/i,
-  /permission/i,
+  // Anchored so docs like `permissions-guide.md` are NOT high-risk (review N4) —
+  // only a permissions dir or a permissions code file.
+  /(^|\/)permissions?(\/|\.[jt]sx?$)/i,
   /(^|\/)infra\//i,
   /(^|\/)\.github\/workflows\//i,
   /(^|\/)terraform\//i,
   /(^|\/)Dockerfile$/i,
-  /(^|\/)deploy/i,
+  // `deploy/` dir or a deploy script — not `deployment-notes.md` (review N4).
+  /(^|\/)deploy(\/|\.(sh|ya?ml|[jt]s|mjs))/i,
 ];
 
 const LOW_PATH: RegExp[] = [
@@ -45,5 +48,11 @@ export function bundleRequirementsFor(tier: RiskTier): BundleRequirement {
       return { evidence: "note", rollback: true, prd: false };
     case "low":
       return { evidence: "minimal", rollback: false, prd: false };
+    default: {
+      // Exhaustiveness guard (review N5): a future RiskTier fails loudly here
+      // rather than silently returning undefined.
+      const _exhaustive: never = tier;
+      throw new Error(`unhandled risk tier: ${String(_exhaustive)}`);
+    }
   }
 }

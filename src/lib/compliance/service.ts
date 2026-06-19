@@ -2,10 +2,10 @@
 // the pure verifier (verify.ts), and the event log (repo.ts); the
 // /api/compliance/* routes are thin wrappers over these. DB access is via ./repo
 // (mocked in tests/compliance-server.test.ts). Buckets have no server-side store
-// yet, so the per-bucket PRD check reads the BUCKETS fixture — TODO: switch to a
-// server bucket store when one lands (EN-005/EN-006).
+// yet, so the per-bucket PRD requirement is reported "unknown" (advisory) until
+// one lands (EN-005/006) — see verifyPr.
 
-import { BUCKETS } from "@/lib/mc-data";
+import { ApiError } from "@/lib/api/route";
 import type { Task } from "@/lib/mc-data";
 import { getEntity } from "@/lib/sync/repo";
 import { classifyRiskTier } from "./risk";
@@ -22,15 +22,20 @@ function genId(prefix: string): string {
   return `${prefix}_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`;
 }
 
-// Resolve the task a checkout credential is bound to — strictly. The credential
-// must be unrevoked, unexpired, AND bound to this repo; otherwise it yields null
-// (so the gate blocks the agent PR — an expired/forged/mismatched credential is
-// never silently downgraded to an operator pass). Hardening for the security
-// review (CRITICAL #1 / #5 / #6): a present checkoutId always means an agent run.
-async function resolveTaskFromCheckout(checkoutId: string, repoName: string): Promise<string | null> {
+// Deterministic check id so recordCheck's upsert actually dedups across
+// reconciliation replays (review S3) — one row per (repo, pr, headSha).
+function checkId(repoName: string, prNumber: number, headSha: string): string {
+  return `chk_${repoName}_${prNumber}_${headSha}`.replace(/[^A-Za-z0-9_.-]/g, "_");
+}
+
+// Resolve a checkout credential strictly — unrevoked, unexpired, AND repo-bound —
+// returning the dispatch it points at, or null. A present checkoutId always means
+// an agent run; an invalid one yields null so the gate blocks the agent PR (never
+// a silent downgrade to operator). Hardening: security review CRITICAL #1/#5/#6.
+async function resolveDispatch(checkoutId: string, repoName: string): Promise<repo.DispatchRow | null> {
   const d = await repo.getDispatch(checkoutId);
   const valid = !!d && !d.revoked && new Date(d.expiresAt).getTime() > Date.now() && d.repo === repoName;
-  return valid ? d!.taskId : null;
+  return valid ? d : null;
 }
 
 // ─── Checkout (the handshake, decision 3) ────────────────────────────────────
@@ -77,13 +82,19 @@ export interface CompleteInput {
 }
 
 export async function complete(input: CompleteInput): Promise<{ ok: true }> {
+  // Validate the credential strictly — a bogus/expired/revoked id must not append
+  // an orphan task.completed to the canonical log (review S4).
   const d = await repo.getDispatch(input.checkoutId);
+  if (!d || d.revoked || new Date(d.expiresAt).getTime() <= Date.now()) {
+    throw new ApiError("invalid_checkout", "Unknown, revoked, or expired checkout.", 409);
+  }
   await repo.appendEvent({
     kind: "task.completed",
-    actor: d?.runtime ?? "unknown",
-    repo: d?.repo ?? null,
-    taskId: d?.taskId ?? null,
+    actor: d.runtime,
+    repo: d.repo,
+    taskId: d.taskId,
     payload: {
+      actorKind: "agent",
       checkoutId: input.checkoutId,
       summary: input.summary,
       commitSha: input.commitSha ?? null,
@@ -102,7 +113,6 @@ export interface VerifyPrInput {
   changedPaths: string[];
   labels?: string[];
   checkoutId?: string | null;
-  taskId?: string | null;
 }
 
 export interface VerifyPrResult extends VerifyResult {
@@ -121,22 +131,26 @@ export async function verifyPr(input: VerifyPrInput): Promise<VerifyPrResult> {
   const tier = classifyRiskTier(input.changedPaths, input.labels ?? []);
 
   // Actor + task come from the checkout credential, never git metadata
-  // (decision 9). A present checkoutId means an agent run; a missing/invalid one
-  // is resolved strictly (expiry + repo binding) so a bad credential blocks
-  // rather than downgrades to an operator pass. No checkoutId ⇒ operator path.
+  // (decision 9). A present checkoutId means an agent run; an invalid/expired/
+  // repo-mismatched one yields no task so the agent PR blocks. The client cannot
+  // supply a taskId for attribution (review S7).
   let actorKind: ActorKind = "operator";
-  let taskId = input.taskId ?? null;
+  let taskId: string | null = null;
+  let actorIdentity = "operator";
   if (input.checkoutId) {
     actorKind = "agent";
-    taskId = await resolveTaskFromCheckout(input.checkoutId, input.repo);
+    const d = await resolveDispatch(input.checkoutId, input.repo);
+    taskId = d?.taskId ?? null;
+    actorIdentity = d?.runtime ?? "agent";
   }
 
   const task = await loadTask(taskId);
-  const bucketHasPrd = !!(task && BUCKETS.find((b) => b.id === task.bucket)?.prd);
-  const result = verifyCompliance({ task, actor: actorKind, tier, bucketHasPrd });
+  // No server bucket store yet (EN-005/006) → PRD presence is "unknown", so the
+  // high-risk PRD requirement is advisory, not a hard block (review S1).
+  const result = verifyCompliance({ task, actor: actorKind, tier, bucketPrd: "unknown" });
 
   await repo.recordCheck({
-    id: genId("chk"),
+    id: checkId(input.repo, input.prNumber, input.headSha),
     repo: input.repo,
     prNumber: input.prNumber,
     headSha: input.headSha,
@@ -147,11 +161,14 @@ export async function verifyPr(input: VerifyPrInput): Promise<VerifyPrResult> {
   });
   await repo.appendEvent({
     kind: result.verdict === "pass" ? "gate.passed" : "gate.blocked",
-    actor: actorKind,
+    actor: actorIdentity,
     repo: input.repo,
     taskId,
     pr: String(input.prNumber),
-    payload: { tier, headSha: input.headSha, reasons: result.reasons },
+    payload: { actorKind, tier, headSha: input.headSha, reasons: result.reasons },
+    // Idempotent per (repo, pr, sha, verdict): a replay dedups; a genuine
+    // re-verify that flips the verdict still records a new event (review S3).
+    dedupKey: `gate:${input.repo}:${input.prNumber}:${input.headSha}:${result.verdict}`,
   });
 
   return { ...result, tier, actorKind, taskId };
@@ -172,45 +189,63 @@ export interface IngestResult {
 // emitted here as a `task.promotion.requested` seam (kept out of scope so this
 // phase never writes src/lib/sync/**). The verdict gate is the verify route, not
 // this path. Actor + task come from the checkout credential, never git metadata.
+const HANDLED_ACTIONS = new Set(["opened", "reopened", "synchronize", "closed"]);
+
 export async function ingestPullRequest(evt: PrEvent): Promise<IngestResult> {
   let actorKind: ActorKind = "operator";
   let taskId: string | null = null;
+  let actorIdentity = evt.author || "operator";
   if (evt.checkoutId) {
     actorKind = "agent";
-    taskId = await resolveTaskFromCheckout(evt.checkoutId, evt.repo);
+    const d = await resolveDispatch(evt.checkoutId, evt.repo);
+    taskId = d?.taskId ?? null;
+    actorIdentity = d?.runtime ?? "agent";
   }
 
-  if (evt.action === "closed" && evt.merged) {
-    await repo.appendEvent({
-      kind: "pr.merged",
-      actor: actorKind,
-      repo: evt.repo,
-      taskId,
-      pr: String(evt.prNumber),
-      payload: { sha: evt.headSha, branch: evt.branch, title: evt.title },
-    });
-    await repo.appendEvent({
-      kind: "task.promotion.requested",
-      actor: actorKind,
-      repo: evt.repo,
-      taskId,
-      pr: String(evt.prNumber),
-      payload: { sha: evt.headSha },
-    });
+  // Only record the lifecycle actions we model; ignore the rest (edited, labeled,
+  // assigned, ready_for_review, …) so we never append a spurious pr.opened to the
+  // record (review B1). dedupKey keys every append on its logical identity so a
+  // reconciliation replay is a no-op (review S3).
+  if (!HANDLED_ACTIONS.has(evt.action)) {
+    return { action: evt.action, actorKind, taskId, recorded: false };
+  }
+  const idBase = `${evt.repo}:${evt.prNumber}:${evt.headSha}:${evt.action}`;
+
+  if (evt.action === "closed") {
+    if (evt.merged) {
+      await repo.appendEvent({
+        kind: "pr.merged", actor: actorIdentity, repo: evt.repo, taskId, pr: String(evt.prNumber),
+        payload: { actorKind, sha: evt.headSha, branch: evt.branch, title: evt.title },
+        dedupKey: `pr.merged:${evt.repo}:${evt.prNumber}:${evt.headSha}`,
+      });
+      await repo.appendEvent({
+        kind: "task.promotion.requested", actor: actorIdentity, repo: evt.repo, taskId, pr: String(evt.prNumber),
+        payload: { actorKind, sha: evt.headSha },
+        dedupKey: `task.promotion.requested:${evt.repo}:${evt.prNumber}:${evt.headSha}`,
+      });
+    } else {
+      // Closed WITHOUT merging is its own kind — NOT pr.opened (review B1).
+      await repo.appendEvent({
+        kind: "pr.closed", actor: actorIdentity, repo: evt.repo, taskId, pr: String(evt.prNumber),
+        payload: { actorKind, sha: evt.headSha, branch: evt.branch, title: evt.title },
+        dedupKey: `pr.closed:${idBase}`,
+      });
+    }
     return { action: evt.action, actorKind, taskId, recorded: true };
   }
 
   // opened / reopened / synchronize → record the PR. An operator PR with no
-  // checkout is still recorded (decision 5), attributed to its author and
-  // flagged sparse (ungated, no task yet).
+  // checkout is still recorded (decision 5), attributed to its author, sparse.
+  const kind = evt.action === "synchronize" ? "pr.synchronized" : "pr.opened";
   const sparse = actorKind === "operator" && !taskId;
   await repo.appendEvent({
-    kind: evt.action === "synchronize" ? "pr.synchronized" : "pr.opened",
-    actor: actorKind === "operator" ? evt.author || "operator" : actorKind,
+    kind,
+    actor: actorIdentity,
     repo: evt.repo,
     taskId,
     pr: String(evt.prNumber),
-    payload: { branch: evt.branch, title: evt.title, author: evt.author, headSha: evt.headSha, actorKind, sparse },
+    payload: { actorKind, branch: evt.branch, title: evt.title, author: evt.author, headSha: evt.headSha, sparse },
+    dedupKey: `${kind}:${idBase}`,
   });
   return { action: evt.action, actorKind, taskId, recorded: true };
 }
@@ -229,11 +264,13 @@ export interface QueuedOutcome {
 export async function verifyPrOrQueue(input: VerifyPrInput): Promise<VerifyPrResult | QueuedOutcome> {
   try {
     return await verifyPr(input);
-  } catch {
+  } catch (err) {
+    console.error("[compliance] verify failed — holding + queueing for reconciliation:", err);
     try {
       await repo.enqueueReconcile("verify", input as unknown as Record<string, unknown>);
-    } catch {
+    } catch (qerr) {
       // best-effort: even if the queue write fails we still hold (never pass).
+      console.error("[compliance] reconcile enqueue failed:", qerr);
     }
     return { verdict: "pending", reasons: ["MC unavailable — held for reconciliation (fail-closed)"], queued: true };
   }
@@ -242,11 +279,12 @@ export async function verifyPrOrQueue(input: VerifyPrInput): Promise<VerifyPrRes
 export async function ingestOrQueue(evt: PrEvent): Promise<IngestResult | { ingested: false; queued: true }> {
   try {
     return await ingestPullRequest(evt);
-  } catch {
+  } catch (err) {
+    console.error("[compliance] ingest failed — queueing for reconciliation:", err);
     try {
       await repo.enqueueReconcile("ingest", evt as unknown as Record<string, unknown>);
-    } catch {
-      // best-effort
+    } catch (qerr) {
+      console.error("[compliance] reconcile enqueue failed:", qerr);
     }
     return { ingested: false, queued: true };
   }
@@ -260,6 +298,9 @@ export interface ReconcileSweepResult {
 
 // Replay queued work when MC recovers (driven by POST /api/compliance/reconcile
 // or the sync scheduler cadence). Resolved rows drop out of the pending set.
+// Note (review N7): if a checkout's TTL lapses while a verify sits queued, the
+// replay re-resolves the now-expired credential and blocks — intended fail-closed
+// behavior (a stale credential must not pass), not a regression.
 export async function reconcileSweep(): Promise<ReconcileSweepResult> {
   const pending = await repo.pendingReconcile();
   let resolved = 0;

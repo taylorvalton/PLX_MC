@@ -102,18 +102,26 @@ describe("evidenceCompleteForTier", () => {
     });
     expect(evidenceCompleteForTier(withQa, "high").ok).toBe(true);
   });
+
+  it("requires a summary at every tier and rejects an empty checklist for note/full (S2)", () => {
+    const noSummary = evidence({ summary: "  ", rollback: "x" });
+    expect(evidenceCompleteForTier(noSummary, "standard").missing).toContain("an evidence summary");
+    expect(evidenceCompleteForTier(evidence({ summary: "" }), "low").ok).toBe(false);
+    const emptyItems = evidence({ items: [], rollback: "x" });
+    expect(evidenceCompleteForTier(emptyItems, "standard").missing).toContain("a complete evidence checklist");
+  });
 });
 
 describe("verifyCompliance (decisions 2, 5, 9)", () => {
   it("operator PRs always pass (recorded, ungated) — with or without a task", () => {
-    expect(verifyCompliance({ task: null, actor: "operator", tier: "high", bucketHasPrd: false }).verdict).toBe("pass");
+    expect(verifyCompliance({ task: null, actor: "operator", tier: "high", bucketPrd: "unknown" }).verdict).toBe("pass");
     expect(
-      verifyCompliance({ task: taskish({}), actor: "operator", tier: "high", bucketHasPrd: false }).verdict
+      verifyCompliance({ task: taskish({}), actor: "operator", tier: "high", bucketPrd: "unknown" }).verdict
     ).toBe("pass");
   });
 
   it("an agent PR with no checked-out task is blocked", () => {
-    const r = verifyCompliance({ task: null, actor: "agent", tier: "low", bucketHasPrd: false });
+    const r = verifyCompliance({ task: null, actor: "agent", tier: "low", bucketPrd: "unknown" });
     expect(r.verdict).toBe("block");
     expect(r.reasons[0]).toMatch(/no checked-out MC task/);
   });
@@ -123,7 +131,7 @@ describe("verifyCompliance (decisions 2, 5, 9)", () => {
       task: taskish({ accountableOwner: null, evidence: evidence({ rollback: "x" }) }),
       actor: "agent",
       tier: "standard",
-      bucketHasPrd: false,
+      bucketPrd: "unknown",
     });
     expect(r.verdict).toBe("block");
     expect(r.reasons.some((x) => /human accountable owner/.test(x))).toBe(true);
@@ -134,7 +142,7 @@ describe("verifyCompliance (decisions 2, 5, 9)", () => {
       task: taskish({ accountableOwner: "greg", evidence: evidence({ rollback: "revert the PR" }) }),
       actor: "agent",
       tier: "standard",
-      bucketHasPrd: false,
+      bucketPrd: "unknown",
     });
     expect(r.verdict).toBe("pass");
   });
@@ -145,7 +153,7 @@ describe("verifyCompliance (decisions 2, 5, 9)", () => {
       task: taskish({ accountableOwner: "greg", evidence: full }),
       actor: "agent",
       tier: "high",
-      bucketHasPrd: false,
+      bucketPrd: "absent",
     });
     expect(r.verdict).toBe("block");
     expect(r.reasons.some((x) => /bucket PRD/.test(x))).toBe(true);
@@ -157,8 +165,20 @@ describe("verifyCompliance (decisions 2, 5, 9)", () => {
       task: taskish({ accountableOwner: "greg", evidence: full }),
       actor: "agent",
       tier: "high",
-      bucketHasPrd: true,
+      bucketPrd: "present",
     });
     expect(r.verdict).toBe("pass");
+  });
+
+  it("passes a high-risk agent PR when bucket-PRD is unknown (advisory, not a hard block — S1)", () => {
+    const full = evidence({ rollback: "revert", shots: [{ label: "ui", cap: "after" }] });
+    const r = verifyCompliance({
+      task: taskish({ accountableOwner: "greg", evidence: full }),
+      actor: "agent",
+      tier: "high",
+      bucketPrd: "unknown",
+    });
+    expect(r.verdict).toBe("pass");
+    expect(r.reasons.some((x) => /advisory/.test(x))).toBe(true);
   });
 });

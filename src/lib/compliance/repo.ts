@@ -19,13 +19,17 @@ export interface AppendEventInput {
   taskId?: string | null;
   pr?: string | null;
   payload?: Record<string, unknown>;
+  // Optional idempotency key (review S3). When set, a replay of the same logical
+  // event is a no-op; NULL keys are unconstrained (see migration 007).
+  dedupKey?: string | null;
 }
 
 export async function appendEvent(e: AppendEventInput): Promise<void> {
   await query(
-    `INSERT INTO mc_events (kind, actor, repo, task_id, pr, payload)
-     VALUES ($1, $2, $3, $4, $5, $6)`,
-    [e.kind, e.actor, e.repo ?? null, e.taskId ?? null, e.pr ?? null, JSON.stringify(e.payload ?? {})]
+    `INSERT INTO mc_events (kind, actor, repo, task_id, pr, payload, dedup_key)
+     VALUES ($1, $2, $3, $4, $5, $6, $7)
+     ON CONFLICT (dedup_key) WHERE dedup_key IS NOT NULL DO NOTHING`,
+    [e.kind, e.actor, e.repo ?? null, e.taskId ?? null, e.pr ?? null, JSON.stringify(e.payload ?? {}), e.dedupKey ?? null]
   );
 }
 
