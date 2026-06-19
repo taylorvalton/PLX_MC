@@ -25,10 +25,15 @@ const store = vi.hoisted(() => {
 
 vi.mock("@/lib/sync/engine", () => ({
   ensureSeeded: vi.fn(async () => true),
+  ensureReposSeeded: vi.fn(async () => true),
 }));
 
 vi.mock("@/lib/sync/repo", () => ({
   stamp: () => "2026.06.16 · 00:00",
+  // EN-005: patchTask validates a repos edit against the persisted registry.
+  async getRepos() {
+    return [{ id: "portal-web", name: "plx-customer-portal", lang: "TypeScript", def: "master", owner: "taylorvalton", visibility: "private", scope: "" }];
+  },
   async getEntity(type: string, id: string) {
     return store.rows.get(`${type}:${id}`) ?? null;
   },
@@ -240,6 +245,26 @@ describe("patchTask — accountability enforcement (EN-003 gates)", () => {
     seedTask({ humanOnly: true });
     const updated = await patchTask("TASK-900", { assignee: "greg" }, "vince");
     expect(updated!.assignee).toBe("greg");
+  });
+});
+
+describe("patchTask — repos edit allow-list enforcement (EN-005, DB-only)", () => {
+  it("persists an allow-listed repos edit into the jsonb blob without re-queuing a push", async () => {
+    seedTask({ repos: [] });
+    const updated = await patchTask("TASK-900", { repos: ["portal-web"] }, "vince");
+    expect(updated!.repos).toEqual(["portal-web"]);
+    const row = store.rows.get("task:TASK-900")!;
+    expect(row.data.repos).toEqual(["portal-web"]);
+    expect(row.sync_state).toBe("synced"); // DB-only — repos not in PUSHED_FIELDS
+    expect(row.dirty_fields).toEqual([]);
+  });
+
+  it("rejects an off-registry repo and leaves the task untouched", async () => {
+    seedTask({ repos: ["portal-web"] });
+    await expect(patchTask("TASK-900", { repos: ["ghost"] }, "vince")).rejects.toMatchObject({
+      code: "repo_not_allowed",
+    });
+    expect(store.rows.get("task:TASK-900")!.data.repos).toEqual(["portal-web"]);
   });
 });
 
