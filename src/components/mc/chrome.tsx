@@ -5,9 +5,9 @@
 import type { ReactNode } from "react";
 import Image from "next/image";
 
-import { ACTORS, AGENTS, CURRENT_USER } from "@/lib/mc-data";
+import { ACTORS, CURRENT_USER, liveAgentCount } from "@/lib/mc-data";
 import { useMcNotices, useMcVersion } from "@/lib/mc-data/hooks";
-import { allBuckets, dismissNotice, storeSyncCounts, unreadCount } from "@/lib/mc-data/store";
+import { allBuckets, allTasks, dismissNotice, storeSyncCounts, unreadCount } from "@/lib/mc-data/store";
 import { meetingIntakeEnabled } from "@/lib/meeting-intake";
 
 import { Avatar, PMark } from "./atoms";
@@ -96,7 +96,9 @@ export function Sidebar({
 }) {
   useMcVersion();
   const unread = unreadCount();
-  const live = Object.values(AGENTS).filter((a) => a.online).length;
+  // Honest live-agent count: agents currently executing in-flight work (EN-005),
+  // not a fabricated online flag.
+  const live = liveAgentCount(allTasks());
   const sc = storeSyncCounts();
   const conflicts = sc.conflict + sc.error;
 

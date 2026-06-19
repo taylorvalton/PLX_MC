@@ -714,6 +714,8 @@ export type TaskFieldPatch = Partial<
     | "assignee"
     | "accountableOwner"
     | "humanOnly"
+    | "repos"
+    | "agentRunApproved"
   >
 >;
 
@@ -836,6 +838,31 @@ export const setTaskBucket = (taskId: string, bucket: string) =>
 
 export const setTaskLabels = (taskId: string, labels: string[]) =>
   patchTaskFields(taskId, { labels }, { activity: "updated labels" }); // DB-only — no sync claim
+
+// Edit a task's repos post-creation (EN-005). Constrained to the registry
+// allow-list (humans + agents alike) — anything off-list is dropped at the
+// boundary with a non-silent notice; the server (state.ts) re-validates against
+// the same persisted registry.
+export const setTaskRepos = (taskId: string, repos: string[]) => {
+  const t = taskById(taskId);
+  if (!t) return;
+  const allowed = Array.from(new Set(allowedReposOnly(repos, state.repos)));
+  const dropped = disallowedRepos(repos, state.repos);
+  if (dropped.length > 0) {
+    pushNotice(`Skipped repos not in the registry: ${dropped.join(", ")}. Request them first.`, "info");
+  }
+  patchTaskFields(taskId, { repos: allowed }, { activity: "updated repos" });
+};
+
+// Operator approval of an approve-mode agent's run (EN-005). Unblocks a stage
+// advance into the doing band for a task whose executor is a needs-approval
+// agent (see policy.stageAdvanceViolation). DB-only — no SharePoint column.
+export const setAgentRunApproved = (taskId: string, approved: boolean) =>
+  patchTaskFields(
+    taskId,
+    { agentRunApproved: approved },
+    { activity: approved ? "approved the agent run" : "revoked agent-run approval" }
+  );
 
 export const setCoassignees = (taskId: string, ids: string[]) => {
   const t = taskById(taskId);

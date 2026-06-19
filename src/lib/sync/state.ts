@@ -280,6 +280,8 @@ export interface PatchTaskInput {
   comments?: Task["comments"]; // EN-001 / WS-3 — DB-only, app-only (never pushed)
   accountableOwner?: string | null; // Item 1 — pushed to the Accountable Owner person column (push-only)
   humanOnly?: boolean; // EN-003 — DB-only assignment policy
+  repos?: string[]; // EN-005 — DB-only, allow-list enforced; re-push deferred to a later sync increment
+  agentRunApproved?: boolean; // EN-005 — DB-only operator approval of an approve-mode agent run
 }
 
 // Persistence tiers:
@@ -314,6 +316,21 @@ export async function patchTask(id: string, patch: PatchTaskInput, actor: string
   if ("stage" in patch && patch.stage) {
     const violation = stageAdvanceViolation(effective, patch.stage);
     if (violation) throw new ApiError("stage_blocked", violation, 409);
+  }
+  // Allow-list enforcement on edit (EN-005): a task's repos may only be set to
+  // registry members — the SAME persisted allow-list createTask validates against.
+  if (patch.repos) {
+    await ensureReposSeeded();
+    const registry = await repo.getRepos();
+    const registryMap = Object.fromEntries(registry.map((r) => [r.id, r]));
+    const offlist = disallowedRepos(patch.repos, registryMap);
+    if (offlist.length > 0) {
+      throw new ApiError(
+        "repo_not_allowed",
+        `These repos are not in the registry: ${offlist.join(", ")}. Request and get them approved first.`,
+        422
+      );
+    }
   }
 
   const pushedDirty = entries.map(([k]) => k).filter((k) => PUSHED_FIELDS.includes(k));
