@@ -50,6 +50,10 @@
   background: linear-gradient(90deg, var(--p-paper-2), transparent 60%);
 }
 
+.mc .feed .frow.approval-needed {
+  background: linear-gradient(90deg, var(--p-paper-2), transparent 66%);
+}
+
 .mc .feed .frow .ftime {
   font-family: var(--mono);
   font-size: 9px;
@@ -159,6 +163,19 @@
   border-radius: 50%;
   background: var(--p-ok);
   animation: pfPulse 1.6s infinite;
+}
+
+@media (max-width: 760px) {
+  .mc .feed .frow {
+    grid-template-columns: 1fr;
+  }
+
+  .mc .feed .frow .factions {
+    flex-direction: row;
+    align-items: center;
+    justify-content: flex-start;
+    flex-wrap: wrap;
+  }
 }
 
 /* Bucket detail */

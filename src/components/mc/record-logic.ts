@@ -1,4 +1,4 @@
-import { isAgentId } from "@/lib/mc-data";
+import { AGENTS, MODE, agentIsActive, agentRunApprovalNeeded, isAgentId } from "@/lib/mc-data";
 import type { FeedEvent, FileEntry, Repo, Task } from "@/lib/mc-data";
 
 export function directionGlyph(direction: "two-way" | "push" | "pull"): string {
@@ -85,6 +85,19 @@ const FEED_CHIP: Record<FeedEvent["kind"], string> = {
 export function deriveAgentFeed(tasks: Task[]): FeedEvent[] {
   const out: FeedEvent[] = [];
   for (const task of tasks) {
+    const agent = task.assignee ? AGENTS[task.assignee] : undefined;
+    if (agent && agentRunApprovalNeeded(task)) {
+      out.push({
+        age: "approval",
+        actor: agent.id,
+        task: task.id,
+        kind: "approve",
+        text: `needs operator approval to run in ${MODE[agent.mode].label} mode`,
+        chip: "Approval needed",
+        live: agentIsActive(agent.id, tasks),
+        warn: true,
+      });
+    }
     for (const entry of task.activity) {
       if (!isAgentId(entry.who)) continue;
       const kind = FEED_KIND_FOR_ACTIVITY[entry.kind] ?? "run";

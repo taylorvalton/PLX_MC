@@ -56,24 +56,17 @@ export function CommandPalette({
   const [query, setQuery] = useState("");
   const [selected, setSelected] = useState(0);
   const inputRef = useRef<HTMLInputElement | null>(null);
-  const tasks = allTasks();
 
   // `version` is load-bearing: bucket/task commands read the live store, so a
   // store mutation while the palette is open must recompute the groups.
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   const groups = useMemo<PaletteGroup<PaletteCommand>[]>(() => {
+    void version;
+    const tasks = allTasks();
     const firstBucket = allBuckets()[0]?.id;
     const firstTask = tasks[0]?.id;
     const create: PaletteCommand[] = [
       { key: "create:new-task", icon: "+", label: "New task", hint: "create", run: onOpenNewTask },
       { key: "create:new-bucket", icon: "+", label: "New initiative", hint: "create", run: onOpenNewInitiative },
-      {
-        key: "create:draft-prd",
-        icon: "✎",
-        label: "Draft PRD with Scribe",
-        hint: "agent",
-        run: () => {},
-      },
     ];
 
     const navigate: PaletteCommand[] = [
@@ -181,7 +174,7 @@ export function CommandPalette({
       { title: "Tasks", items: taskCommands },
       { title: "Assign agents", items: assignAgents },
     ];
-  }, [nav, onOpenNewTask, onOpenNewInitiative, tasks, version]);
+  }, [nav, onOpenNewTask, onOpenNewInitiative, version]);
 
   const filtered = useMemo(() => filterPaletteGroups(groups, query), [groups, query]);
   const flat = useMemo(() => filtered.flatMap((group) => group.items), [filtered]);

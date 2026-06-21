@@ -142,7 +142,8 @@ export function MissionControlShell() {
   // flush, so its presence guarantees the shell is interactive, not merely
   // server-painted. Lets E2E wait for true interactivity (see e2e/helpers.ts).
   useEffect(() => {
-    setReady(true);
+    const timer = window.setTimeout(() => setReady(true), 0);
+    return () => window.clearTimeout(timer);
   }, []);
 
   const ScreenComponent = SCREENS[route.screen];
