@@ -96,6 +96,36 @@ describe("derived presence (EN-005 — no fabricated heartbeat)", () => {
 });
 
 describe("agent feed derivation (EN-005)", () => {
+  it("includes approval-needed rows for approve-mode agent assignments", () => {
+    const tasks = [
+      baseTask({
+        id: "TASK-APPROVE",
+        assignee: "atlas",
+        agentRunApproved: false,
+      }),
+    ];
+    const feed = deriveAgentFeed(tasks);
+    expect(feed).toHaveLength(1);
+    expect(feed[0]).toMatchObject({
+      actor: "atlas",
+      task: "TASK-APPROVE",
+      kind: "approve",
+      chip: "Approval needed",
+      warn: true,
+    });
+  });
+
+  it("does not add approval-needed rows for auto-mode agents", () => {
+    const tasks = [
+      baseTask({
+        id: "TASK-AUTO",
+        assignee: "vibes",
+        agentRunApproved: false,
+      }),
+    ];
+    expect(deriveAgentFeed(tasks)).toEqual([]);
+  });
+
   it("includes agent-authored activity and excludes human-authored", () => {
     const tasks = [
       baseTask({
@@ -128,6 +158,7 @@ describe("store — approve-mode agent run gate (EN-005)", () => {
     expect(activeNotices().some((n) => /needs-approval/.test(n.body))).toBe(true);
 
     setAgentRunApproved("TASK-221", true);
+    expect(taskById("TASK-221")?.agentRunApproved).toBe(true);
     setTaskStage("TASK-221", "progress");
     expect(taskById("TASK-221")?.stage).toBe("progress"); // now advances
   });

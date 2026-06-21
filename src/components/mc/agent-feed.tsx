@@ -1,6 +1,6 @@
-import { ACTORS, AGENTS, MODE, agentIsActive } from "@/lib/mc-data";
+import { ACTORS, AGENTS, MODE, agentIsActive, agentRunApprovalNeeded } from "@/lib/mc-data";
 import { useMcVersion } from "@/lib/mc-data/hooks";
-import { allTasks, taskById } from "@/lib/mc-data/store";
+import { allTasks, setAgentRunApproved, taskById } from "@/lib/mc-data/store";
 
 import { Avatar } from "./atoms";
 import { deriveAgentFeed } from "./record-logic";
@@ -53,9 +53,12 @@ export function AgentFeed({ nav }: ScreenProps) {
         )}
         {feed.map((event, idx) => {
           const actor = ACTORS[event.actor];
+          const agent = AGENTS[event.actor];
           const task = taskById(event.task);
+          const needsApproval = !!task && event.kind === "approve" && agentRunApprovalNeeded(task);
+          const chipTone = event.warn ? "warn" : event.live ? "live" : "acc";
           return (
-            <div className="frow" key={`${event.task}-${idx}`}>
+            <div className={`frow${needsApproval ? " approval-needed" : ""}`} key={`${event.task}-${idx}`}>
               <span className="ftime">{event.age}</span>
               <div className="fbody">
                 <div className="fline">
@@ -73,10 +76,21 @@ export function AgentFeed({ nav }: ScreenProps) {
                   {task && <span className="task-title"> · {task.title}</span>}
                 </div>
                 <div className="fmeta">
-                  <span className="fchip acc">{event.chip}</span>
+                  <span className={`fchip ${chipTone}`}>{event.chip}</span>
+                  {agent && <span className="fchip">{MODE[agent.mode].label}</span>}
+                  {task && <span className="fchip">Status · {task.stage}</span>}
                 </div>
               </div>
               <div className="factions">
+                {needsApproval && (
+                  <button
+                    type="button"
+                    className="btn acc sm"
+                    onClick={() => setAgentRunApproved(event.task, true)}
+                  >
+                    Approve run
+                  </button>
+                )}
                 <button
                   type="button"
                   className="btn ghost sm"
