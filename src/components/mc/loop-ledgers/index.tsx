@@ -10,8 +10,6 @@ import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import type { LoaderDetailResult, LoaderSummaryRow } from "@/lib/loop-ledgers";
 
-import type { ScreenProps } from "@/components/mc/route";
-
 import { LLStats, deriveIndexStats, encodeRef } from "./helpers";
 import { DegradedGallery, DetailView, IndexView } from "./views";
 
@@ -21,7 +19,10 @@ type LLTab = "index" | "detail" | "gallery";
 
 // ─── Main screen component ────────────────────────────────────────────────────
 
-export function LoopLedgersView({ route: _route, nav: _nav }: ScreenProps) {
+// This screen manages its own tab/selection state and consumes neither `route`
+// nor `nav`; the registry types it as ComponentType<ScreenProps>, which accepts
+// a zero-arg component.
+export function LoopLedgersView() {
   const [rows, setRows] = useState<LoaderSummaryRow[]>([]);
   const [stats, setStats] = useState<LLStats>({
     repos: 0,
