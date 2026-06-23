@@ -506,6 +506,81 @@ describe("sortByScariest — ordering", () => {
   });
 });
 
+// ─── N5 regression — tallyCheck union reconciliation ─────────────────────────
+// tallyCheck must flag keys present in artifacts but ABSENT from the summary bucket.
+
+describe("validateLedgerRaw — N5 regression: omitted-key bucket mismatch", () => {
+  it("flags count_mismatch when by_severity omits 'critical' but an artifact has severity=critical", () => {
+    // BEFORE fix: tallyCheck only iterated Object.keys(bucket) = ['high'], so 'critical' was never checked.
+    // AFTER fix: union of bucket keys + tally keys catches the discrepancy.
+    const result = validateLedgerRaw({
+      schema_version: "vmc-quality-ledger/v1",
+      module: "x",
+      generated_at: "2026-06-23",
+      summary: {
+        total_artifacts: 2,
+        by_type: { defect: 2 },
+        by_status: { broken: 2 },
+        by_severity: { high: 2 }, // omits critical — but one artifact IS critical
+        by_safety_class: { green: 2 },
+      },
+      artifacts: [
+        { artifact_id: "X-001", module: "x", artifact_type: "defect", title: "a", status: "broken", severity: "high", safety_class: "green", confidence: 0.5 },
+        { artifact_id: "X-002", module: "x", artifact_type: "defect", title: "b", status: "broken", severity: "critical", safety_class: "green", confidence: 0.8 },
+      ],
+    });
+    expect(result.valid).toBe(false);
+    const mismatch = result.errors.find(
+      (e) => e.code === "count_mismatch" && e.message.includes("by_severity.critical")
+    );
+    expect(mismatch).toBeDefined();
+  });
+
+  it("flags count_mismatch when by_safety_class omits 'red' but an artifact has safety_class=red", () => {
+    const result = validateLedgerRaw({
+      schema_version: "vmc-quality-ledger/v1",
+      module: "x",
+      generated_at: "2026-06-23",
+      summary: {
+        total_artifacts: 1,
+        by_type: { risk: 1 },
+        by_status: { unknown: 1 },
+        by_severity: { high: 1 },
+        by_safety_class: { green: 1 }, // omits red — but artifact IS red
+      },
+      artifacts: [
+        { artifact_id: "X-001", module: "x", artifact_type: "risk", title: "t", status: "unknown", severity: "high", safety_class: "red", confidence: 0.5 },
+      ],
+    });
+    expect(result.valid).toBe(false);
+    const mismatch = result.errors.find(
+      (e) => e.code === "count_mismatch" && e.message.includes("by_safety_class.red")
+    );
+    expect(mismatch).toBeDefined();
+  });
+});
+
+// ─── N7 regression — riskRank dead-code removal ────────────────────────────────
+// The cleaned riskRank must still correctly rank the real validator codes.
+
+describe("riskRank — N7 regression: real codes rank correctly after dead-code removal", () => {
+  it("returns 0 for invalid_json", () => {
+    expect(riskRank({ valid: false, healthCode: "invalid_json", ledger: null, errors: [{ code: "invalid_json", message: "" }], freshnessInfo: { level: "unknown", ageDays: null, reason: "" } })).toBe(0);
+  });
+
+  it("returns 0 for schema_mismatch", () => {
+    expect(riskRank({ valid: false, healthCode: "schema_mismatch", ledger: null, errors: [{ code: "schema_mismatch", message: "" }], freshnessInfo: { level: "unknown", ageDays: null, reason: "" } })).toBe(0);
+  });
+
+  it("returns 1 for partial", () => {
+    expect(riskRank({ valid: false, healthCode: "partial", ledger: null, errors: [{ code: "count_mismatch", message: "" }], freshnessInfo: { level: "fresh", ageDays: 1, reason: "" } })).toBe(1);
+  });
+
+  it("returns 6 for valid fresh ledger with no critical/red artifacts", () => {
+    expect(riskRank(validateLedgerRaw(VALID_LEDGER, new Date("2026-06-24")))).toBe(6);
+  });
+});
+
 // ─── Registry config ──────────────────────────────────────────────────────────
 
 describe("parseRegistryConfig", () => {

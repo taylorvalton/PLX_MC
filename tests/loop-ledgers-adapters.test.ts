@@ -604,6 +604,211 @@ describe("LocalFsSource", () => {
 });
 
 // ═════════════════════════════════════════════════════════════════════════════
+// N1 regression — getLedgerDetail registry allowlist enforcement
+// Off-registry / wrong-branch / out-of-glob refs must be rejected WITHOUT fetching.
+// ═════════════════════════════════════════════════════════════════════════════
+
+describe("getLedgerDetail — N1 regression: registry allowlist", () => {
+  afterEach(() => setToken(undefined));
+
+  it("returns degraded not_found for a repo not in the registry (no fetch)", async () => {
+    setToken("test-token");
+    const fetchSpy = vi.fn();
+    vi.stubGlobal("fetch", fetchSpy);
+
+    const registry = makeRegistry(); // only taylorvalton/agentic-swarm
+    const result = await getLedgerDetail(
+      { repo: "attacker/evil-repo", branch: "main", path: "docs/vmc/quality-ledger/chat.artifacts.json" },
+      registry,
+      new GithubApiSource()
+    );
+
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.reason).toBe("not_found");
+    expect(result.note).toMatch(/not in the registry/i);
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  it("returns degraded not_found for a ref with wrong branch (no fetch)", async () => {
+    setToken("test-token");
+    const fetchSpy = vi.fn();
+    vi.stubGlobal("fetch", fetchSpy);
+
+    const registry = makeRegistry(); // default_branch: main
+    const result = await getLedgerDetail(
+      { repo: "taylorvalton/agentic-swarm", branch: "evil-branch", path: "docs/vmc/quality-ledger/chat.artifacts.json" },
+      registry,
+      new GithubApiSource()
+    );
+
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.reason).toBe("not_found");
+    expect(result.note).toMatch(/evil-branch/);
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  it("returns degraded not_found for a path that does not match the registry glob (no fetch)", async () => {
+    setToken("test-token");
+    const fetchSpy = vi.fn();
+    vi.stubGlobal("fetch", fetchSpy);
+
+    const registry = makeRegistry(); // glob: docs/vmc/quality-ledger/*.artifacts.json
+    const result = await getLedgerDetail(
+      { repo: "taylorvalton/agentic-swarm", branch: "main", path: "../../etc/passwd" },
+      registry,
+      new GithubApiSource()
+    );
+
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.reason).toBe("not_found");
+    expect(result.note).toMatch(/glob/i);
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+});
+
+// ═════════════════════════════════════════════════════════════════════════════
+// N2 regression — fetchTree JSON parse failure does NOT poison the batch
+// One repo returning 200 + non-JSON body must only affect that repo.
+// ═════════════════════════════════════════════════════════════════════════════
+
+describe("loader — N2 regression: tree JSON parse failure is per-repo, not batch-wide", () => {
+  const LEDGER_VALID = loadFixtureSync("ledger-valid.json");
+
+  afterEach(() => setToken(undefined));
+
+  it("healthy repo still yields rows when another repo returns 200+invalid-JSON for tree", async () => {
+    setToken("test-token");
+
+    const goodTree = {
+      sha: "abc123",
+      tree: [{ path: "docs/vmc/quality-ledger/chat.artifacts.json", type: "blob", sha: "s1" }],
+      truncated: false,
+    };
+
+    const registry = makeRegistry([
+      { repo: "taylorvalton/agentic-swarm", display_name: "Good Repo", default_branch: "main", ledger_glob: "docs/vmc/quality-ledger/*.artifacts.json" },
+      { repo: "taylorvalton/bad-repo", display_name: "Bad Repo", default_branch: "main", ledger_glob: "docs/vmc/quality-ledger/*.artifacts.json" },
+    ]);
+
+    vi.stubGlobal("fetch", vi.fn((url: string) => {
+      if (url.includes("agentic-swarm")) {
+        if (url.includes("/git/trees/")) return Promise.resolve(mockResponse(200, JSON.stringify(goodTree)));
+        return Promise.resolve(mockResponse(200, LEDGER_VALID));
+      }
+      // bad-repo returns 200 with non-JSON body for tree
+      return Promise.resolve(mockResponse(200, "this is not json {{{{"));
+    }));
+
+    const rows = await listLedgerSummaries(registry, new GithubApiSource());
+
+    const goodRows = rows.filter((r) => r.repo === "taylorvalton/agentic-swarm");
+    const badRows = rows.filter((r) => r.repo === "taylorvalton/bad-repo");
+
+    // Good repo must survive
+    expect(goodRows.length).toBeGreaterThanOrEqual(1);
+    expect(goodRows.some((r) => r.kind === "ledger")).toBe(true);
+
+    // Bad repo must yield exactly one degraded row — not pollute good rows
+    expect(badRows).toHaveLength(1);
+    expect(badRows[0].kind).toBe("degraded-source");
+    if (badRows[0].kind === "degraded-source") {
+      expect(badRows[0].reason).toBe("network_error");
+    }
+  });
+});
+
+// ═════════════════════════════════════════════════════════════════════════════
+// N3 regression — truncated tree flag surfaces as loud degraded reason
+// ═════════════════════════════════════════════════════════════════════════════
+
+describe("GithubApiSource — N3 regression: truncated tree returns degraded reason", () => {
+  afterEach(() => setToken(undefined));
+
+  it("returns ok=false with reason=truncated when trees API returns truncated=true", async () => {
+    setToken("test-token");
+
+    const truncatedTree = {
+      sha: "abc123",
+      tree: [{ path: "docs/vmc/quality-ledger/chat.artifacts.json", type: "blob", sha: "s1" }],
+      truncated: true,
+    };
+
+    setupFetchFn((url) => {
+      if (url.includes("/git/trees/")) return mockResponse(200, JSON.stringify(truncatedTree));
+      return mockResponse(200, "should-not-reach");
+    });
+
+    const results = await new GithubApiSource().listLedgers(makeRegistry());
+    expect(results).toHaveLength(1);
+    expect(results[0].ok).toBe(false);
+    if (results[0].ok) return;
+    expect(results[0].reason).toBe("truncated");
+    expect(results[0].note).toMatch(/truncated/i);
+  });
+});
+
+// ═════════════════════════════════════════════════════════════════════════════
+// N4 regression — all raw content fetches fail → visible degraded row
+// ═════════════════════════════════════════════════════════════════════════════
+
+describe("GithubApiSource — N4 regression: all content fetches fail → degraded row visible", () => {
+  afterEach(() => setToken(undefined));
+
+  it("returns ok=false with reason=network_error when all content fetches fail for matched paths", async () => {
+    setToken("test-token");
+
+    const twoPathTree = {
+      sha: "abc123",
+      tree: [
+        { path: "docs/vmc/quality-ledger/chat.artifacts.json", type: "blob", sha: "s1" },
+        { path: "docs/vmc/quality-ledger/swarm.artifacts.json", type: "blob", sha: "s2" },
+      ],
+      truncated: false,
+    };
+
+    setupFetchFn((url) => {
+      if (url.includes("/git/trees/")) return mockResponse(200, JSON.stringify(twoPathTree));
+      // All content fetches fail with 500
+      return mockResponse(500, JSON.stringify({ message: "Internal Server Error" }));
+    });
+
+    const results = await new GithubApiSource().listLedgers(makeRegistry());
+    expect(results).toHaveLength(1);
+    expect(results[0].ok).toBe(false);
+    if (results[0].ok) return;
+    expect(results[0].reason).toBe("network_error");
+    expect(results[0].note).toMatch(/2 path/i);
+  });
+
+  it("visible degraded row appears in listLedgerSummaries output (repo not dropped)", async () => {
+    setToken("test-token");
+
+    const twoPathTree = {
+      sha: "abc123",
+      tree: [
+        { path: "docs/vmc/quality-ledger/chat.artifacts.json", type: "blob", sha: "s1" },
+        { path: "docs/vmc/quality-ledger/swarm.artifacts.json", type: "blob", sha: "s2" },
+      ],
+      truncated: false,
+    };
+
+    setupFetchFn((url) => {
+      if (url.includes("/git/trees/")) return mockResponse(200, JSON.stringify(twoPathTree));
+      return mockResponse(404, JSON.stringify({ message: "Not Found" }));
+    });
+
+    const rows = await listLedgerSummaries(makeRegistry(), new GithubApiSource());
+    const repoRows = rows.filter((r) => r.repo === "taylorvalton/agentic-swarm");
+    // Repo must appear in the list — not silently dropped
+    expect(repoRows).toHaveLength(1);
+    expect(repoRows[0].kind).toBe("degraded-source");
+  });
+});
+
+// ═════════════════════════════════════════════════════════════════════════════
 // Loader — scariest-first sort
 // ═════════════════════════════════════════════════════════════════════════════
 
@@ -621,6 +826,110 @@ describe("loader — scariest-first sort", () => {
     expect(rows[0].kind).toBe("degraded-source");
     if (rows[0].kind === "degraded-source") {
       expect(rows[0].reason).toBe("token_missing");
+    }
+  });
+
+  it("N8 regression: among equal-rank rows, lower avg confidence sorts first", async () => {
+    setToken("test-token");
+
+    // Two repos, both return valid ledgers (rank 6) but different confidence averages.
+    // low-confidence ledger (avg 0.3) must sort before high-confidence (avg 0.9).
+    const lowConfTree = {
+      sha: "sha-low",
+      tree: [{ path: "docs/vmc/quality-ledger/low.artifacts.json", type: "blob", sha: "s1" }],
+      truncated: false,
+    };
+    const highConfTree = {
+      sha: "sha-high",
+      tree: [{ path: "docs/vmc/quality-ledger/high.artifacts.json", type: "blob", sha: "s2" }],
+      truncated: false,
+    };
+
+    const makeLedger = (confidence: number, generatedAt: string) => JSON.stringify({
+      schema_version: "vmc-quality-ledger/v1",
+      module: "m",
+      generated_at: generatedAt,
+      branch: "main",
+      summary: { total_artifacts: 1, by_type: { defect: 1 }, by_status: { broken: 1 }, by_severity: { low: 1 }, by_safety_class: { green: 1 } },
+      artifacts: [{ artifact_id: "X-001", module: "m", artifact_type: "defect", title: "t", status: "broken", severity: "low", safety_class: "green", confidence }],
+    });
+
+    const registry = makeRegistry([
+      { repo: "taylorvalton/high-conf", display_name: "High Conf", default_branch: "main", ledger_glob: "docs/vmc/quality-ledger/*.artifacts.json" },
+      { repo: "taylorvalton/low-conf", display_name: "Low Conf", default_branch: "main", ledger_glob: "docs/vmc/quality-ledger/*.artifacts.json" },
+    ]);
+
+    vi.stubGlobal("fetch", vi.fn((url: string) => {
+      if (url.includes("high-conf")) {
+        if (url.includes("/git/trees/")) return Promise.resolve(mockResponse(200, JSON.stringify(highConfTree)));
+        return Promise.resolve(mockResponse(200, makeLedger(0.9, "2026-06-01")));
+      }
+      if (url.includes("low-conf")) {
+        if (url.includes("/git/trees/")) return Promise.resolve(mockResponse(200, JSON.stringify(lowConfTree)));
+        return Promise.resolve(mockResponse(200, makeLedger(0.3, "2026-06-01")));
+      }
+      return Promise.resolve(mockResponse(404, "{}"));
+    }));
+
+    const rows = await listLedgerSummaries(registry, new GithubApiSource());
+    const ledgerRows = rows.filter((r) => r.kind === "ledger");
+    expect(ledgerRows).toHaveLength(2);
+    // lower avg confidence (0.3) must come before higher (0.9)
+    if (ledgerRows[0].kind === "ledger" && ledgerRows[1].kind === "ledger") {
+      const conf0 = ledgerRows[0].validationResult.valid ? ledgerRows[0].validationResult.ledger.artifacts[0].confidence : 1;
+      const conf1 = ledgerRows[1].validationResult.valid ? ledgerRows[1].validationResult.ledger.artifacts[0].confidence : 0;
+      expect(conf0).toBeLessThan(conf1);
+    }
+  });
+
+  it("N8 regression: among equal-rank equal-confidence rows, newer generated_at sorts first", async () => {
+    setToken("test-token");
+
+    // Use dates that are both fresh (within 7 days of now) so both rows stay at rank 6.
+    // "older" = 5 days ago, "newer" = 2 days ago — both fresh, same rank, same confidence.
+    const olderDate = new Date(Date.now() - 5 * 86_400_000).toISOString().slice(0, 10);
+    const newerDate = new Date(Date.now() - 2 * 86_400_000).toISOString().slice(0, 10);
+
+    const makeTree = (sha: string, path: string) => ({
+      sha,
+      tree: [{ path, type: "blob", sha: "s1" }],
+      truncated: false,
+    });
+
+    const makeLedger = (generatedAt: string) => JSON.stringify({
+      schema_version: "vmc-quality-ledger/v1",
+      module: "m",
+      generated_at: generatedAt,
+      branch: "main",
+      summary: { total_artifacts: 1, by_type: { defect: 1 }, by_status: { broken: 1 }, by_severity: { low: 1 }, by_safety_class: { green: 1 } },
+      artifacts: [{ artifact_id: "X-001", module: "m", artifact_type: "defect", title: "t", status: "broken", severity: "low", safety_class: "green", confidence: 0.5 }],
+    });
+
+    const registry = makeRegistry([
+      { repo: "taylorvalton/older-repo", display_name: "Older Repo", default_branch: "main", ledger_glob: "docs/vmc/quality-ledger/*.artifacts.json" },
+      { repo: "taylorvalton/newer-repo", display_name: "Newer Repo", default_branch: "main", ledger_glob: "docs/vmc/quality-ledger/*.artifacts.json" },
+    ]);
+
+    vi.stubGlobal("fetch", vi.fn((url: string) => {
+      if (url.includes("older-repo")) {
+        if (url.includes("/git/trees/")) return Promise.resolve(mockResponse(200, JSON.stringify(makeTree("sha1", "docs/vmc/quality-ledger/older.artifacts.json"))));
+        return Promise.resolve(mockResponse(200, makeLedger(olderDate)));
+      }
+      if (url.includes("newer-repo")) {
+        if (url.includes("/git/trees/")) return Promise.resolve(mockResponse(200, JSON.stringify(makeTree("sha2", "docs/vmc/quality-ledger/newer.artifacts.json"))));
+        return Promise.resolve(mockResponse(200, makeLedger(newerDate)));
+      }
+      return Promise.resolve(mockResponse(404, "{}"));
+    }));
+
+    const rows = await listLedgerSummaries(registry, new GithubApiSource());
+    const ledgerRows = rows.filter((r) => r.kind === "ledger");
+    expect(ledgerRows).toHaveLength(2);
+    // newer generated_at must come before older (both have same rank + confidence)
+    if (ledgerRows[0].kind === "ledger" && ledgerRows[1].kind === "ledger") {
+      const ga0 = ledgerRows[0].validationResult.valid ? ledgerRows[0].validationResult.ledger.generated_at : "";
+      const ga1 = ledgerRows[1].validationResult.valid ? ledgerRows[1].validationResult.ledger.generated_at : "";
+      expect(ga0 > ga1).toBe(true);
     }
   });
 

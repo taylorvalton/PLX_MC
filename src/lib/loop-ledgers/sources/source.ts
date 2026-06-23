@@ -20,6 +20,7 @@ import type { LedgerRef, RegistryConfig } from "@/lib/loop-ledgers/types";
  * - schema_mismatch   File parseable but schema_version !== 'vmc-quality-ledger/v1'
  * - network_error     fetch() threw — DNS failure, timeout, or host unreachable
  * - disabled          Adapter is explicitly disabled (local-fs in production)
+ * - truncated         GitHub Trees API returned truncated=true — tree is partial, glob results unreliable
  */
 export type SourceDegradedReason =
   | "not_found"
@@ -30,7 +31,8 @@ export type SourceDegradedReason =
   | "invalid_json"
   | "schema_mismatch"
   | "network_error"
-  | "disabled";
+  | "disabled"
+  | "truncated";
 
 // ─── Per-file discovery record ────────────────────────────────────────────────
 

@@ -121,7 +121,25 @@ async function fetchTree(
     };
   }
 
-  const data = (await res.json()) as GitTreeResponse;
+  let data: GitTreeResponse;
+  try {
+    data = (await res.json()) as GitTreeResponse;
+  } catch {
+    return {
+      ok: false,
+      reason: "network_error",
+      note: `${owner}/${name} tree response body was not valid JSON (HTTP ${res.status})`,
+    };
+  }
+
+  if (data.truncated) {
+    return {
+      ok: false,
+      reason: "truncated",
+      note: `${owner}/${name}: GitHub Trees API returned truncated=true — repo tree is too large to enumerate fully; glob results would be unreliable`,
+    };
+  }
+
   return { ok: true, tree: data.tree ?? [], treeSha: data.sha };
 }
 
@@ -206,7 +224,9 @@ async function discoverRepo(
     };
   }
 
-  // Fetch each matching file independently — one file failing does not fail the repo
+  // Fetch each matching file independently — one file failing does not fail the repo.
+  // BUT if ALL fetches fail, we must surface a loud degraded row instead of silently
+  // returning ok=true with zero ledgers (which causes the repo to disappear).
   const ledgers: DiscoveredLedger[] = [];
   for (const p of matchingPaths) {
     const rawResult = await fetchRawContent(owner, name, branch, p, token);
@@ -217,9 +237,15 @@ async function discoverRepo(
         commitSha: treeResult.treeSha,
       });
     }
-    // A single-file fetch failure is silently skipped here; if ALL files fail
-    // the ledgers array stays empty — which is acceptable (caller sees ok=true
-    // with zero ledgers). A repo-level failure (tree fetch) returns ok=false.
+  }
+
+  if (matchingPaths.length > 0 && ledgers.length === 0) {
+    return {
+      ok: false,
+      repo: entry.repo,
+      reason: "network_error",
+      note: `${owner}/${name}: ${matchingPaths.length} path(s) matched the glob but all content fetches failed`,
+    };
   }
 
   return { ok: true, repo: entry.repo, ledgers };

@@ -8,6 +8,7 @@ import type { DegradedSourceRow, LedgerRow, LoaderSummaryRow } from "@/lib/loop-
 
 import {
   applyFilters,
+  buildGalleryObservedSet,
   deriveAttentionCounts,
   deriveIndexStats,
   encodeRef,
@@ -523,6 +524,87 @@ describe("freshnessTone", () => {
     expect(freshnessTone("warn")).toBe("warn");
     expect(freshnessTone("stale")).toBe("hot");
     expect(freshnessTone("unknown")).toBe("muted");
+  });
+});
+
+// ─── N6 regression — buildGalleryObservedSet ──────────────────────────────────
+// Gallery must highlight cards for individual error codes (e.g. count_mismatch),
+// not only for the collapsed healthCode="partial".
+
+describe("buildGalleryObservedSet — N6 regression: error codes propagated into observed set", () => {
+  it("includes the healthCode for a degraded-source row", () => {
+    const observed = buildGalleryObservedSet([makeDegradedRow("permission_denied")]);
+    expect(observed.has("permission_denied")).toBe(true);
+  });
+
+  it("includes healthCode='partial' for an invalid ledger row", () => {
+    const row = makeLedgerRow({
+      validationResult: {
+        valid: false,
+        healthCode: "partial",
+        ledger: null,
+        errors: [{ code: "count_mismatch", message: "mismatch" }],
+        freshnessInfo: { level: "fresh", ageDays: 1, reason: "" },
+      },
+    });
+    const observed = buildGalleryObservedSet([row]);
+    expect(observed.has("partial")).toBe(true);
+  });
+
+  it("also includes individual error codes from partial ledger (BEFORE fix: only 'partial' was included)", () => {
+    // BEFORE fix: observed = new Set(rows.map(r => r.validationResult.healthCode)) → only "partial"
+    // AFTER fix: folds errors[].code → "count_mismatch" appears too
+    const row = makeLedgerRow({
+      validationResult: {
+        valid: false,
+        healthCode: "partial",
+        ledger: null,
+        errors: [
+          { code: "count_mismatch", message: "mismatch" },
+          { code: "enum_violation", message: "bad enum" },
+        ],
+        freshnessInfo: { level: "fresh", ageDays: 1, reason: "" },
+      },
+    });
+    const observed = buildGalleryObservedSet([row]);
+    expect(observed.has("count_mismatch")).toBe(true);
+    expect(observed.has("enum_violation")).toBe(true);
+  });
+
+  it("includes 'verified_no_evidence' error code from a partial ledger", () => {
+    const row = makeLedgerRow({
+      validationResult: {
+        valid: false,
+        healthCode: "partial",
+        ledger: null,
+        errors: [{ code: "verified_no_evidence", message: "no evidence" }],
+        freshnessInfo: { level: "fresh", ageDays: 1, reason: "" },
+      },
+    });
+    const observed = buildGalleryObservedSet([row]);
+    expect(observed.has("verified_no_evidence")).toBe(true);
+  });
+
+  it("a valid ledger row with no errors adds only the healthCode", () => {
+    const observed = buildGalleryObservedSet([makeLedgerRow()]);
+    expect(observed.has("valid")).toBe(true);
+    expect(observed.size).toBe(1);
+  });
+
+  it("mixed rows: degraded-source + partial-with-errors accumulates all codes", () => {
+    const partialRow = makeLedgerRow({
+      validationResult: {
+        valid: false,
+        healthCode: "partial",
+        ledger: null,
+        errors: [{ code: "duplicate_id", message: "dup" }],
+        freshnessInfo: { level: "fresh", ageDays: 1, reason: "" },
+      },
+    });
+    const observed = buildGalleryObservedSet([makeDegradedRow("no_ledgers"), partialRow]);
+    expect(observed.has("no_ledgers")).toBe(true);
+    expect(observed.has("partial")).toBe(true);
+    expect(observed.has("duplicate_id")).toBe(true);
   });
 });
 

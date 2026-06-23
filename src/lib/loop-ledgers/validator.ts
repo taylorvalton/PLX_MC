@@ -166,7 +166,8 @@ export function validateLedgerRaw(
         const k = pick(a as Record<string, unknown>);
         if (k !== undefined) tally[k] = (tally[k] ?? 0) + 1;
       }
-      for (const k of Object.keys(bucket)) {
+      const allKeys = new Set([...Object.keys(bucket), ...Object.keys(tally)]);
+      for (const k of allKeys) {
         const declared = bucket[k] ?? 0;
         const actual = tally[k] ?? 0;
         if (declared !== actual) {
@@ -290,11 +291,9 @@ export function validateLedgerJson(
 export function riskRank(result: LedgerValidationResult): number {
   const hc = result.healthCode as HealthCode | string;
 
-  if (
-    ["invalid_json", "schema_mismatch", "unreachable", "permission_denied", "token_missing"].includes(hc)
-  ) return 0;
+  if (hc === "invalid_json" || hc === "schema_mismatch") return 0;
 
-  if (["count_mismatch", "partial", "rate_limited"].includes(hc)) return 1;
+  if (hc === "partial") return 1;
 
   if (result.freshnessInfo.level === "stale") return 2;
 

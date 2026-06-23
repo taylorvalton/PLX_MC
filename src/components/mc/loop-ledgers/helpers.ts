@@ -210,6 +210,8 @@ function sourceReasonRankLocal(reason: SourceDegradedReason): number {
       return 1;
     case "not_found":
       return 2;
+    case "truncated":
+      return 1;
     case "no_ledgers":
     case "disabled":
       return 4;
@@ -222,8 +224,8 @@ function sourceReasonRankLocal(reason: SourceDegradedReason): number {
 // Not imported to avoid pulling the server-only local-fs adapter into the client bundle.
 function validationResultRisk(result: LedgerValidationResult): number {
   const hc: string = result.healthCode;
-  if (["invalid_json", "schema_mismatch", "unreachable", "permission_denied", "token_missing"].includes(hc)) return 0;
-  if (["count_mismatch", "partial", "rate_limited"].includes(hc)) return 1;
+  if (hc === "invalid_json" || hc === "schema_mismatch") return 0;
+  if (hc === "partial") return 1;
   if (result.freshnessInfo.level === "stale") return 2;
   if (result.valid) {
     const sum = result.ledger.summary;
@@ -264,6 +266,7 @@ export function healthLabel(code: string): string {
     no_ledgers: "No ledgers",
     network_error: "Network error",
     disabled: "Disabled",
+    truncated: "Tree truncated",
   };
   return labels[code] ?? code;
 }
@@ -292,6 +295,31 @@ export function freshnessTone(level: string): "valid" | "warn" | "hot" | "muted"
   if (level === "warn") return "warn";
   if (level === "stale") return "hot";
   return "muted";
+}
+
+// ─── Gallery observed-set builder ────────────────────────────────────────────
+
+/**
+ * Build the set of health/error codes that are "live" in the current data,
+ * used by DegradedGallery to highlight active failure modes.
+ *
+ * For degraded-source rows: the source reason code.
+ * For ledger rows: the top-level healthCode PLUS each individual error.code
+ * (since the validator collapses multiple error codes into healthCode="partial").
+ */
+export function buildGalleryObservedSet(rows: LoaderSummaryRow[]): Set<string> {
+  const observed = new Set<string>();
+  for (const r of rows) {
+    if (r.kind === "degraded-source") {
+      observed.add(r.reason);
+    } else {
+      observed.add(r.validationResult.healthCode);
+      for (const e of r.validationResult.errors) {
+        observed.add(e.code);
+      }
+    }
+  }
+  return observed;
 }
 
 // ─── Ref encoding (browser-safe base64url) ────────────────────────────────────

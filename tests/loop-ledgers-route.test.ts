@@ -248,6 +248,36 @@ describe("GET /api/loop-ledgers/[ref] — detail", () => {
 });
 
 // ═════════════════════════════════════════════════════════════════════════════
+// N1 regression — off-registry refs produce degraded { data } response (not 4xx)
+// The allowlist enforcement is in the loader; the route must surface the result.
+// ═════════════════════════════════════════════════════════════════════════════
+
+describe("GET /api/loop-ledgers/[ref] — N1 regression: off-registry ref", () => {
+  it("returns 200 with degraded not_found payload for a ref whose repo is not in the registry", async () => {
+    const offRegistryRef = { repo: "attacker/evil-repo", branch: "main", path: "docs/evil.json" };
+    m.getLedgerDetail.mockResolvedValue({
+      ok: false,
+      ref: offRegistryRef,
+      repo: offRegistryRef.repo,
+      repoDisplayName: offRegistryRef.repo,
+      reason: "not_found",
+      note: 'repo "attacker/evil-repo" is not in the registry',
+    });
+
+    const resp = await detailRouteModule.GET(
+      getReq(`http://test/api/loop-ledgers/${encodeRef(offRegistryRef)}`),
+      detailCtx(offRegistryRef)
+    );
+
+    expect(resp.status).toBe(200);
+    const body = await resp.json();
+    expect(body).toHaveProperty("data");
+    expect(body.data.ok).toBe(false);
+    expect(body.data.reason).toBe("not_found");
+  });
+});
+
+// ═════════════════════════════════════════════════════════════════════════════
 // Read-only contract — only GET exported from each route module
 // ═════════════════════════════════════════════════════════════════════════════
 

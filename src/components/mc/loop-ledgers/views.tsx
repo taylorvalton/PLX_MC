@@ -16,6 +16,7 @@ import {
   LLStats,
   applyFilters,
   AttentionCounts,
+  buildGalleryObservedSet,
   deriveAttentionCounts,
   deriveFilterOptions,
   freshnessLabel,
@@ -612,8 +613,10 @@ const GALLERY_CARDS: GalleryCard[] = [
 ];
 
 export function DegradedGallery({ rows }: { rows: LoaderSummaryRow[] }) {
-  // Which codes are actually observed in the current data (for emphasis)
-  const observed = new Set<string>(rows.map((r) => (r.kind === "degraded-source" ? r.reason : r.validationResult.healthCode)));
+  // Which codes are actually observed in the current data (for emphasis).
+  // Folds error.code entries from validator errors (which collapse to healthCode="partial")
+  // so individual codes like count_mismatch/enum_violation highlight correctly.
+  const observed = buildGalleryObservedSet(rows);
 
   return (
     <div data-testid="ll-gallery">
