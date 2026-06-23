@@ -5,7 +5,7 @@
 import { NextRequest } from "next/server";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { basicGate, isAllowedUser, isPublicAsset } from "@/lib/auth/gate";
-import middleware from "@/middleware";
+import middleware, { config } from "@/middleware";
 
 const req = (auth?: string) =>
   new NextRequest("http://test/", { headers: auth ? { authorization: auth } : {} });
@@ -86,5 +86,24 @@ describe("public asset + sign-in bypass", () => {
     ).toBe(200);
     // A normal route still challenges — the bypass is scoped, not a hole.
     expect((await run(req())).status).toBe(401);
+  });
+});
+
+describe("middleware matcher — unauthenticated bypass list", () => {
+  // The matcher decides which paths the session gate runs for at all. The cron
+  // sweep endpoint MUST be excluded (it carries its own CRON_SECRET bearer, and
+  // Vercel calls it with no user session) — re-gating it would 302 the cron to
+  // Microsoft sign-in and the scheduled sweep would silently never run.
+  const matches = (pathname: string) => new RegExp(`^${config.matcher[0]}$`).test(pathname);
+
+  it("excludes the Vercel Cron sweep endpoint and the auth endpoints", () => {
+    expect(matches("/api/cron/sweep")).toBe(false);
+    expect(matches("/api/auth/callback/microsoft-entra-id")).toBe(false);
+  });
+
+  it("still gates the app shell and its data API", () => {
+    expect(matches("/")).toBe(true);
+    expect(matches("/tasks")).toBe(true);
+    expect(matches("/api/state")).toBe(true);
   });
 });

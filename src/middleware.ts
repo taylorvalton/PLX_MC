@@ -10,8 +10,10 @@ import { auth } from "@/lib/auth";
 export default auth;
 
 export const config = {
-  // Never gate the auth endpoints, framework static assets, the branded
-  // sign-in page, or the brand/font assets it renders (those load pre-auth;
-  // the `authorized` callback also allow-lists them via isPublicAsset).
-  matcher: ["/((?!api/auth|_next/static|_next/image|favicon.ico|signin|brand|fonts).*)"],
+  // Never gate the auth endpoints, the Vercel Cron sweep endpoint (it carries
+  // its own CRON_SECRET bearer auth — src/app/api/cron/sweep — and is called by
+  // Vercel with no user session), framework static assets, the branded sign-in
+  // page, or the brand/font assets it renders (those load pre-auth; the
+  // `authorized` callback also allow-lists them via isPublicAsset).
+  matcher: ["/((?!api/auth|api/cron|_next/static|_next/image|favicon.ico|signin|brand|fonts).*)"],
 };
