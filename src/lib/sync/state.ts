@@ -42,7 +42,7 @@ export interface StateSnapshot {
 export async function snapshot(): Promise<StateSnapshot> {
   await ensureSeeded();
   await registry.ensureRegistrySeeded();
-  const [tasks, risks, files, conflicts, errors, audit, counts, repos, repoRequests] = await Promise.all([
+  const [tasks, risks, files, conflicts, errors, audit, counts, repos, repoRequests, lastSweptAt] = await Promise.all([
     repo.getEntities("task"),
     repo.getEntities("risk"),
     repo.getEntities("file"),
@@ -52,6 +52,7 @@ export async function snapshot(): Promise<StateSnapshot> {
     repo.countsByList(),
     registry.getRegistry(),
     registry.getRequests(),
+    repo.lastSweepAt(),
   ]);
   return {
     tasks: tasks.map((r) => r.data as unknown as Task),
@@ -63,7 +64,10 @@ export async function snapshot(): Promise<StateSnapshot> {
     counts,
     // Lists not yet mirrored (roadmap, milestones) keep their fixture counts;
     // mirrored lists report live counts. The store merges via SP_LISTS keys.
-    lastSweep: audit.find((a) => a.body.startsWith("Sweep completed"))?.ts ?? SP_LISTS[0].lastSync,
+    // Heartbeat from delta_links (advances every sweep, incl. no-op ones),
+    // falling back to the legacy audit-derived value then the fixture stamp so
+    // a brand-new mirror with no sweep yet still renders a value.
+    lastSweep: lastSweptAt ?? audit.find((a) => a.body.startsWith("Sweep completed"))?.ts ?? SP_LISTS[0].lastSync,
     repos,
     repoRequests,
   };

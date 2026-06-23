@@ -98,3 +98,18 @@ export function complianceWebhookConfigured(): boolean {
 export function complianceWebhookSecret(): string {
   return requireSecret("COMPLIANCE_WEBHOOK_SECRET");
 }
+
+// Vercel Cron auth for the scheduled sweep on the deployed app. The in-app
+// setInterval scheduler stays OFF on Vercel (serverless timers are unreliable —
+// TOOLS.md); a Vercel Cron job (vercel.json, every 5 min) calls
+// GET /api/cron/sweep instead. Vercel injects `Authorization: Bearer
+// $CRON_SECRET` on each cron invocation; the route rejects anything that does
+// not match. Absent by default → the cron route returns 503 (the scheduled
+// sweep ships default-off until CRON_SECRET is configured).
+export function cronConfigured(): boolean {
+  return !!process.env.CRON_SECRET;
+}
+
+export function cronSecret(): string {
+  return requireSecret("CRON_SECRET");
+}
