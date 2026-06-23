@@ -52,8 +52,12 @@ jobs:
             | jq -R -s 'split("\n") | map(select(length>0))' || echo '[]')
           # Read EVERY MC-Checkout stamp (one per task) — a PR may complete N
           # related tasks; verify checks all of them and blocks if any is incomplete.
-          checkoutIds=$(printf '%s' "$PR_BODY" | grep -oE 'MC-Checkout: dsp_[A-Za-z0-9]+' | sed 's/.* //' \
-            | sort -u | jq -R -s 'split("\n") | map(select(length>0))' || echo '[]')
+          # `grep || true` swallows the no-match exit (operator PR) under pipefail;
+          # jq then emits a valid empty array for the no-stamp case.
+          checkoutIds=$(printf '%s' "$PR_BODY" \
+            | { grep -oE 'MC-Checkout: dsp_[A-Za-z0-9]+' || true; } \
+            | sed 's/.* //' | sort -u \
+            | jq -R -s 'split("\n") | map(select(length>0))')
           body=$(jq -n \
             --arg repo "$REPO_NAME" \
             --argjson prNumber "$PR_NUMBER" \
