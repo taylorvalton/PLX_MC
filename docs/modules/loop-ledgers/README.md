@@ -9,7 +9,7 @@ degraded-state gallery. It is **not** a writer or mutator — no sync, repair,
 rerun, or source-ledger edit affordances exist anywhere in the stack.
 
 The registry seeds three repos: `taylorvalton/agentic-swarm` (main,
-`docs/vmc/quality-ledger/*.artifacts.json`), `taylorvalton/plx-mc` (main,
+`docs/vmc/quality-ledger/*.artifacts.json`), `taylorvalton/PLX_MC` (main,
 `docs/plx-mc/quality-ledger/*.artifacts.json`), and `taylorvalton/plx-customer-portal`
 (master, `docs/portal/quality-ledger/*.artifacts.json`). Missing, stale, invalid,
 or unreachable sources render as loud degraded rows — they are never hidden or
