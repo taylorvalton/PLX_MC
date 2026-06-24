@@ -138,7 +138,7 @@ export const BUCKETS: Bucket[] = [
   { id: "BKT-QMS", name: "QMS", owner: "vince", health: "track", target: "Jul 20", started: "2026.06.11", desc: "Quality management system — forms + DocuSign.", repos: ["portal-web"], sync: { state: "pending", ts: "—", sp: "Roadmap · unprovisioned" }, prd: null },
   { id: "BKT-SHOP", name: "Shopify → Business Central", owner: "vince", health: "track", target: "Aug 31", started: "2026.06.11", desc: "Shopify to Business Central migration — owned by Greg and Stephen (directory entries pending).", repos: ["portal-web"], sync: { state: "pending", ts: "—", sp: "Roadmap · unprovisioned" }, prd: null },
   { id: "BKT-INFRA", name: "Backend Infra", owner: "vince", health: "track", target: "Oct 01", started: "2026.06.11", desc: "Cross-cutting platform/infra work supporting go-live.", repos: ["portal-web"], sync: { state: "pending", ts: "—", sp: "Roadmap · unprovisioned" }, prd: null },
-  { id: "BKT-UAT", name: "UAT", owner: "vince", health: "track", target: "Oct 01", started: "2026.06.11", desc: "Owns parallel testing and the go-live milestones.", repos: ["portal-web"], sync: { state: "pending", ts: "—", sp: "Roadmap · unprovisioned" }, prd: null },
+  { id: "BKT-UAT", name: "UAT", owner: "vince", health: "track", target: "Oct 01", started: "2026.06.11", desc: "Owns parallel testing and the go-live milestones. UAT posture is the portal-published uat quality-ledger surfaced via Loop Ledgers; see docs/modules/uat.", repos: ["portal-web"], sync: { state: "pending", ts: "—", sp: "Roadmap · unprovisioned" }, prd: null },
 ];
 
 export const BUCKET_IDX: Record<string, Bucket> = Object.fromEntries(

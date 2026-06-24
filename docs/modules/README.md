@@ -25,3 +25,4 @@ key files change, update its contract in the same PR.
 | compliance | Vince | Critical | `docs/modules/compliance/README.md` |
 | mcp | Vince | Critical | `docs/modules/mcp/README.md` |
 | loop-ledgers | Vince | Medium | `docs/modules/loop-ledgers/README.md` |
+| uat | Vince | Medium | `docs/modules/uat/README.md` |
