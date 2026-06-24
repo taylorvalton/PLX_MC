@@ -1,0 +1,109 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "./ui-loop.schema.json",
+  "title": "UI Loop Manifest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "appDir",
+    "tokenCheck",
+    "componentMap",
+    "routesGlob",
+    "renderGuard",
+    "a11yAllowlist",
+    "viewports",
+    "baseUrlEnv",
+    "authBypassEnv",
+    "previewCommand"
+  ],
+  "properties": {
+    "appDir": {
+      "type": "string",
+      "minLength": 1
+    },
+    "tokenCheck": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "command",
+        "args",
+        "fileGlobs"
+      ],
+      "properties": {
+        "command": {
+          "type": "string",
+          "minLength": 1
+        },
+        "args": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "fileGlobs": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "componentMap": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "routesGlob": {
+      "type": "string",
+      "minLength": 1
+    },
+    "renderGuard": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "authHeading",
+        "errorHeading"
+      ],
+      "properties": {
+        "authHeading": {
+          "type": "string",
+          "minLength": 1
+        },
+        "errorHeading": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "a11yAllowlist": {
+      "type": "string",
+      "minLength": 1
+    },
+    "viewports": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "baseUrlEnv": {
+      "type": "string",
+      "minLength": 1
+    },
+    "authBypassEnv": {
+      "type": "string",
+      "minLength": 1
+    },
+    "previewCommand": {
+      "type": "string",
+      "minLength": 1
+    }
+  }
+}

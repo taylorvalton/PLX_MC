@@ -1,0 +1,32 @@
+{
+  "appDir": ".",
+  "tokenCheck": {
+    "command": ".venv/Scripts/python.exe",
+    "args": ["scripts/check-plx-ui-tokens.py"],
+    "fileGlobs": [
+      "src/styles/mc-*.css",
+      "src/styles/*.css",
+      "src/components/mc/**/*.tsx"
+    ]
+  },
+  "componentMap": [
+    "PMark",
+    "Avatar",
+    "Assignee",
+    "Confidence"
+  ],
+  "routesGlob": "e2e/helpers/ui-loop/*.routes.ts",
+  "renderGuard": {
+    "authHeading": "Sign in",
+    "errorHeading": "Something went wrong"
+  },
+  "a11yAllowlist": "e2e/ui-a11y-allowlist.json",
+  "viewports": [
+    "chromium",
+    "tablet",
+    "mobile-chrome"
+  ],
+  "baseUrlEnv": "PLX_E2E_BASE_URL",
+  "authBypassEnv": "PLX_LOCAL_AUTH_BYPASS",
+  "previewCommand": "npm run dev"
+}

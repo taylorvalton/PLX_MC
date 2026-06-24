@@ -41,6 +41,8 @@ APPROVED_ROOT_FILES = {
     "next-env.d.ts",
     "eslint.config.mjs",
     "vitest.config.ts",
+    "ui-loop.config.json",
+    "ui-loop.schema.json",
     ".gitignore",
     ".pre-commit-config.yaml",
 }
