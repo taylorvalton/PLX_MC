@@ -3,20 +3,21 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import {
-  BUCKETS,
   CURRENT_USER,
   PRDS,
   PRIORITY,
-  REPOS,
   STAGES,
   STAGE_IDX,
+  TARGET_ENV,
   type PriorityKey,
   type StageKey,
+  type TargetEnv,
 } from "@/lib/mc-data";
 import { useMcVersion } from "@/lib/mc-data/hooks";
-import { actorById, addTask, nextTaskId } from "@/lib/mc-data/store";
+import { actorById, addTask, allBuckets, allRepos, bucketById, nextTaskId } from "@/lib/mc-data/store";
 
 import { Avatar } from "./atoms";
+import { LabelEditor } from "./label-editor";
 import { NotifyTrail, PeoplePicker } from "./people-picker";
 import type { Nav } from "./route";
 
@@ -68,19 +69,23 @@ export function NewTaskModal({
   nav: Nav;
 }) {
   useMcVersion();
-  const startingBucketId = ctx?.bucketId ?? BUCKETS[0]?.id ?? "";
+  const startingBucketId = ctx?.bucketId ?? allBuckets()[0]?.id ?? "";
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [bucketId, setBucketId] = useState(startingBucketId);
   const [ownerId, setOwnerId] = useState<string | null>(null);
+  // EN-003: a human is always accountable; default to the operator authoring it.
+  const [accountableId, setAccountableId] = useState<string | null>(CURRENT_USER);
+  const [humanOnly, setHumanOnly] = useState(false);
+  const [accountablePickerOpen, setAccountablePickerOpen] = useState(false);
   const [priority, setPriority] = useState<PriorityKey>("medium");
   const [stage, setStage] = useState<StageKey>("backlog");
+  const [targetEnv, setTargetEnv] = useState<TargetEnv>("staging");
   const [estimate, setEstimate] = useState<"S" | "M" | "L">("M");
   const [dueISO, setDueISO] = useState("");
   const [requirements, setRequirements] = useState<string[]>([]);
   const [repos, setRepos] = useState<string[]>([]);
   const [labels, setLabels] = useState<string[]>([]);
-  const [labelDraft, setLabelDraft] = useState("");
   const [ownerPickerOpen, setOwnerPickerOpen] = useState(false);
   const titleRef = useRef<HTMLInputElement | null>(null);
 
@@ -89,21 +94,32 @@ export function NewTaskModal({
     return () => window.clearTimeout(timer);
   }, []);
 
-  const bucket = useMemo(() => BUCKETS.find((b) => b.id === bucketId) ?? null, [bucketId]);
+  // Repo chooser is sourced from the registry (= allow-list, EN-002): only
+  // registry repos can be attached. Approved self-service repos appear here too.
+  const registry = allRepos();
+  const bucket = useMemo(() => bucketById(bucketId) ?? null, [bucketId]);
   const prd = useMemo(() => (bucket?.prd ? PRDS[bucket.prd] : undefined), [bucket]);
   const owner = ownerId ? actorById(ownerId) : undefined;
+  const accountable = accountableId ? actorById(accountableId) : undefined;
+
+  // Turning on human-only drops an already-chosen agent executor so the policy
+  // invariant holds before submit (the executor picker also hides agents).
+  const toggleHumanOnly = (next: boolean) => {
+    setHumanOnly(next);
+    if (next && owner?.kind === "agent") setOwnerId(null);
+  };
   const repoOptions = useMemo(() => {
     if (bucket?.repos && bucket.repos.length > 0) return bucket.repos;
-    return Object.keys(REPOS);
-  }, [bucket]);
+    return Object.keys(registry);
+  }, [bucket, registry]);
 
   const canCreate = title.trim().length > 0 && !!bucketId;
   const handleBucketChange = (nextBucketId: string) => {
     setBucketId(nextBucketId);
-    const nextBucket = BUCKETS.find((bucketOption) => bucketOption.id === nextBucketId) ?? null;
+    const nextBucket = bucketById(nextBucketId) ?? null;
     const nextPrd = nextBucket?.prd ? PRDS[nextBucket.prd] : undefined;
     const nextRepoOptions =
-      nextBucket?.repos && nextBucket.repos.length > 0 ? nextBucket.repos : Object.keys(REPOS);
+      nextBucket?.repos && nextBucket.repos.length > 0 ? nextBucket.repos : Object.keys(registry);
     setRequirements((prev) =>
       prev.filter((id) => nextPrd?.reqs.some((requirement) => requirement.id === id) ?? false)
     );
@@ -117,14 +133,6 @@ export function NewTaskModal({
     set(values.includes(value) ? values.filter((v) => v !== value) : [...values, value]);
   };
 
-  const addLabel = () => {
-    const normalized = labelDraft.trim().toLowerCase();
-    if (normalized && !labels.includes(normalized)) {
-      setLabels((prev) => [...prev, normalized]);
-    }
-    setLabelDraft("");
-  };
-
   const submit = useCallback(() => {
     if (!canCreate || !bucketId) return;
     const created = addTask({
@@ -132,23 +140,28 @@ export function NewTaskModal({
       description,
       bucket: bucketId,
       assignee: ownerId,
+      accountableOwner: accountableId,
+      humanOnly,
       priority,
       stage,
       due: formatDueDate(dueISO),
       estimate,
       reqs: requirements,
       repos,
+      targetEnv,
       labels,
       reporter: CURRENT_USER,
     });
     onClose();
     nav("board", { bucketId: created.bucket });
   }, [
+    accountableId,
     bucketId,
     canCreate,
     description,
     dueISO,
     estimate,
+    humanOnly,
     labels,
     nav,
     onClose,
@@ -157,6 +170,7 @@ export function NewTaskModal({
     repos,
     requirements,
     stage,
+    targetEnv,
     title,
   ]);
 
@@ -212,7 +226,7 @@ export function NewTaskModal({
               <span className="k">Initiative</span>
               <div className="ntm-select-wrap">
                 <select value={bucketId} onChange={(event) => handleBucketChange(event.target.value)}>
-                  {BUCKETS.map((bucketOption) => (
+                  {allBuckets().map((bucketOption) => (
                     <option key={bucketOption.id} value={bucketOption.id}>
                       {bucketOption.name}
                     </option>
@@ -223,7 +237,38 @@ export function NewTaskModal({
             </label>
 
             <div className="ntm-fact">
-              <span className="k">Owner</span>
+              <span className="k">Accountable owner</span>
+              <div style={{ position: "relative" }}>
+                <button
+                  type="button"
+                  className="ntm-field-btn"
+                  onClick={() => setAccountablePickerOpen((prev) => !prev)}
+                >
+                  {accountable ? (
+                    <span className="who" style={{ display: "flex", alignItems: "center", gap: 7 }}>
+                      <Avatar id={accountable.id} size="sm" />
+                      <span className="nm">{accountable.name}</span>
+                    </span>
+                  ) : (
+                    <span className="unassigned">+ Assign accountable owner</span>
+                  )}
+                  <span className="caret">▾</span>
+                </button>
+                {accountablePickerOpen ? (
+                  <PeoplePicker
+                    // Accountability is always human (EN-003) — no agents.
+                    allowAgents={false}
+                    current={accountableId}
+                    onPick={setAccountableId}
+                    onClose={() => setAccountablePickerOpen(false)}
+                    style={{ top: "100%", left: 0, marginTop: 5, minWidth: "100%" }}
+                  />
+                ) : null}
+              </div>
+            </div>
+
+            <div className="ntm-fact">
+              <span className="k">Executor</span>
               <div style={{ position: "relative" }}>
                 <button
                   type="button"
@@ -237,12 +282,14 @@ export function NewTaskModal({
                       {owner.kind === "agent" ? <span className="tag model">{owner.model}</span> : null}
                     </span>
                   ) : (
-                    <span className="unassigned">+ Assign owner</span>
+                    <span className="unassigned">+ Assign executor</span>
                   )}
                   <span className="caret">▾</span>
                 </button>
                 {ownerPickerOpen ? (
                   <PeoplePicker
+                    // Human-only tasks hide agents (EN-003 policy via allowAgents).
+                    allowAgents={!humanOnly}
                     current={ownerId}
                     onPick={setOwnerId}
                     onClose={() => setOwnerPickerOpen(false)}
@@ -250,6 +297,14 @@ export function NewTaskModal({
                   />
                 ) : null}
               </div>
+              <label className="ntm-humanonly">
+                <input
+                  type="checkbox"
+                  checked={humanOnly}
+                  onChange={(event) => toggleHumanOnly(event.target.checked)}
+                />
+                <span>Human-only — agents can&apos;t execute</span>
+              </label>
               <NotifyTrail id={ownerId} />
             </div>
 
@@ -274,6 +329,25 @@ export function NewTaskModal({
                       {stageOption.n} · {stageOption.name}
                     </option>
                   ))}
+                </select>
+                <span className="caret">▾</span>
+              </div>
+            </label>
+
+            <label className="ntm-fact">
+              <span className="k">Environment</span>
+              <div className="ntm-select-wrap">
+                <select
+                  value={targetEnv}
+                  onChange={(event) => setTargetEnv(event.target.value as TargetEnv)}
+                >
+                  {(Object.entries(TARGET_ENV) as [TargetEnv, (typeof TARGET_ENV)[TargetEnv]][]).map(
+                    ([key, cfg]) => (
+                      <option key={key} value={key}>
+                        {cfg.label}
+                      </option>
+                    )
+                  )}
                 </select>
                 <span className="caret">▾</span>
               </div>
@@ -331,7 +405,7 @@ export function NewTaskModal({
                   className={`ntm-chip repo${repos.includes(repoId) ? " on" : ""}`}
                   onClick={() => toggle(repos, repoId, setRepos)}
                 >
-                  {REPOS[repoId].name}
+                  {registry[repoId]?.name ?? repoId}
                 </button>
               ))}
             </div>
@@ -339,31 +413,7 @@ export function NewTaskModal({
 
           <div className="ntm-chips">
             <span className="k">Labels</span>
-            <div className="row">
-              {labels.map((label) => (
-                <button
-                  type="button"
-                  key={label}
-                  className="ntm-chip label on"
-                  onClick={() => toggle(labels, label, setLabels)}
-                >
-                  {label} <span className="rm">✕</span>
-                </button>
-              ))}
-              <input
-                className="ntm-label-input"
-                value={labelDraft}
-                onChange={(event) => setLabelDraft(event.target.value)}
-                onKeyDown={(event) => {
-                  if (event.key === "Enter") {
-                    event.preventDefault();
-                    addLabel();
-                  }
-                }}
-                onBlur={addLabel}
-                placeholder="+ label"
-              />
-            </div>
+            <LabelEditor labels={labels} onChange={setLabels} />
           </div>
         </div>
 

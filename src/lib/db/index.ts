@@ -37,3 +37,30 @@ export async function query<R extends object = Record<string, unknown>>(
   const result = await pool().query(text, params);
   return result.rows as R[];
 }
+
+// Parameterized query bound to a single transaction's client.
+export type TxQuery = <R extends object = Record<string, unknown>>(
+  text: string,
+  params?: unknown[]
+) => Promise<R[]>;
+
+// Run a set of statements on ONE pooled connection inside a transaction:
+// BEGIN, run `fn`, COMMIT — or ROLLBACK on any throw (the connection is always
+// released). The plain `query()` above checks out a fresh connection per call,
+// so it CANNOT span a multi-statement transaction; use this when several writes
+// must be atomic (e.g. the bucket-comment replace-thread).
+export async function withTransaction<T>(fn: (q: TxQuery) => Promise<T>): Promise<T> {
+  const client = await pool().connect();
+  try {
+    await client.query("BEGIN");
+    const q: TxQuery = async (text, params = []) => (await client.query(text, params)).rows as never;
+    const result = await fn(q);
+    await client.query("COMMIT");
+    return result;
+  } catch (err) {
+    await client.query("ROLLBACK");
+    throw err;
+  } finally {
+    client.release();
+  }
+}

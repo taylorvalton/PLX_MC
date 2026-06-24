@@ -5,6 +5,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   BUCKETS,
+  CURRENT_USER,
   STAGES,
   TASKS,
   bandOf,
@@ -15,7 +16,7 @@ import {
   syncCounts,
   tasksForUser,
 } from "@/lib/mc-data";
-import type { Evidence } from "@/lib/mc-data";
+import type { Evidence, Task } from "@/lib/mc-data";
 
 describe("bandOf", () => {
   it("maps every stage to its declared band", () => {
@@ -62,7 +63,9 @@ describe("evidenceComplete", () => {
 
 describe("syncCounts", () => {
   it("aggregates the unprovisioned go-live plan as all-pending, nothing to resolve", () => {
-    expect(syncCounts()).toEqual({ pending: 28, conflict: 0, error: 0 });
+    // 28 go-live items (todos 15 + roadmap 8 + milestones 2 + risks 3) + the 3
+    // Repo Registry repos (EN-002 / Item 2), all pending their first push = 31.
+    expect(syncCounts()).toEqual({ pending: 31, conflict: 0, error: 0 });
   });
 
   it("treats conflicts + errors as the 'to resolve' count", () => {
@@ -84,7 +87,45 @@ describe("tasksForUser", () => {
   });
 
   it("returns nothing for someone with no involvement", () => {
-    expect(tasksForUser("lena")).toHaveLength(0);
+    expect(tasksForUser("ross")).toHaveLength(0);
+  });
+
+  // PR-D1 (My Tasks) membership: the view seeds from tasksForUser, so it must
+  // include tasks where the user is the assignee OR a co-assignee (and the
+  // reporter), and exclude tasks they have no part in. Synthetic fixture so the
+  // three cases are isolated from the shared mock data.
+  it("includes assignee, co-assignee, and reporter tasks; excludes the rest", () => {
+    const base = TASKS[0];
+    const fixture: Task[] = [
+      { ...base, id: "MINE-ASG", assignee: "vince", coassignees: [], reporter: "greg" },
+      { ...base, id: "MINE-CO", assignee: "greg", coassignees: ["vince"], reporter: "greg" },
+      { ...base, id: "MINE-REP", assignee: "greg", coassignees: [], reporter: "vince" },
+      { ...base, id: "NOT-MINE", assignee: "greg", coassignees: ["ross"], reporter: "greg" },
+    ];
+    const mine = tasksForUser("vince", fixture).map((t) => t.id);
+    expect(mine).toEqual(["MINE-ASG", "MINE-CO", "MINE-REP"]);
+    expect(mine).not.toContain("NOT-MINE");
+  });
+
+  // My Tasks is cross-bucket BY DEFINITION (SPEC §5 D1): the seed must span
+  // every initiative the user is involved in, never one bucket. This pins the
+  // composition-precedence rule — the mine-seed replaces the bucket base, so a
+  // single-bucket filter on top would wrongly drop the user's other tasks.
+  it("seeds My Tasks across multiple buckets (cross-bucket, not one initiative)", () => {
+    const mineBuckets = new Set(
+      tasksForUser(CURRENT_USER, TASKS).map((t) => t.bucket)
+    );
+    expect(mineBuckets.size).toBeGreaterThan(1);
+  });
+
+  it("ignores bucket scoping — every involved task is returned regardless of bucket", () => {
+    const base = TASKS[0];
+    const fixture: Task[] = [
+      { ...base, id: "B1", assignee: "vince", bucket: "BKT-WMS" },
+      { ...base, id: "B2", assignee: "vince", bucket: "BKT-DAPI" },
+    ];
+    const ids = tasksForUser("vince", fixture).map((t) => t.id);
+    expect(ids).toEqual(["B1", "B2"]); // both buckets present, none filtered out
   });
 });
 
@@ -116,8 +157,8 @@ describe("confidenceOf", () => {
 
 describe("Petra domain rule", () => {
   it("accepts both Petra domains, case-insensitively", () => {
-    expect(isPetraEmail("maya.aldosari@petralabx.com")).toBe(true);
-    expect(isPetraEmail("Dana.Okafor@PETRASOAP.COM")).toBe(true);
+    expect(isPetraEmail("team@petralabx.com")).toBe(true);
+    expect(isPetraEmail("Ross.Pennino@PETRASOAP.COM")).toBe(true);
   });
 
   it("rejects external domains and malformed input", () => {
@@ -128,6 +169,6 @@ describe("Petra domain rule", () => {
   });
 
   it("extracts a lowercased domain", () => {
-    expect(domainOf("Sam.Whitfield@PetraSoap.com")).toBe("petrasoap.com");
+    expect(domainOf("Ross.Pennino@PetraSoap.com")).toBe("petrasoap.com");
   });
 });

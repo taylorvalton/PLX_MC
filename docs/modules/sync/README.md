@@ -39,21 +39,64 @@ tenant against the committed schema with exit codes.
   numbered migrations in `db/migrations/` (`npm run migrate`,
   `scripts/migrate.mjs`); numbering serialization enforced by
   `scripts/check-migrations.py` in every preflight mode. Tables: `delta_links`,
-  `sync_conflicts`, `sync_push_errors`, `sync_audit_log`, `entities`.
+  `sync_conflicts`, `sync_push_errors`, `sync_audit_log`, `entities`,
+  (Item 2) `repos` / `repo_requests`, (Item 4) `bucket_comments`, and
+  (EN-005) `buckets`.
 - Engine v1 (landed 2026-06-11, `src/lib/sync/`): outbound push + inbound
   Graph delta poll for ToDos and Risk Register against the staging site.
   Inbound runs BEFORE outbound in every sweep so dirty-field edits raise
   conflicts (§5.1) instead of last-write-wins. Mapping layer (`mapping.ts`)
   enforces §3 directions and the §5.2 `Medium` → `Med` Likelihood
-  normalization. Runs inside the Next.js process: `src/instrumentation.ts`
-  starts the 5-min scheduler when `PLX_MC_SYNC_ENABLED=1` (default OFF);
+  normalization.   Runs inside the Next.js process: `src/instrumentation.ts`
+  starts the 5-min scheduler when `PLX_MC_SYNC_ENABLED=1` (default OFF, intended
+  for a long-lived host — e.g. the dev box). On Vercel, where serverless timers
+  are unreliable, the in-app scheduler stays OFF and the 5-min cadence runs via
+  Vercel Cron (`vercel.json` → `GET /api/cron/sweep`, authed by `CRON_SECRET`);
   `POST /api/sync/sweep` runs one on demand. API surface per spec §6 under
   `src/app/api/` (shared wrapper + zod). Evidence:
   `artifacts/sync/2026-06-11-sync-engine/`.
-- Deferred to the public-deploy increment: Graph change webhooks, the
-  directory module (person columns: Assigned To / Reporter / Owner),
-  notifications, lookup columns (Initiative), and Project Documents
-  (driveItem) sync — file entities are display fixtures until then.
+- Person columns (landed 2026-06-18, Item 1): ToDos `Assigned To` (↔),
+  `Accountable Owner` (→) and `Reporter` (→) mirror via `<Column>LookupId`. The
+  pure mapping layer emits a pre-resolved id (`outboundFields` `opts.persons`);
+  `graph.ts` resolves an `@petrasoap.com` email → site User Information List id
+  with a cached read (both directions). App-only client-credentials CANNOT
+  `_api/web/ensureUser`, so a user not in the UIL (or an agent with no email)
+  resolves to null → the column is skipped + audited (fail visible, never faked).
+  `assignee` pulls inbound; owner/reporter are push-only.
+- Repo Registry (landed 2026-06-18, Item 2): the allow-list + self-service
+  request queue persist in the `repos` / `repo_requests` tables (migration
+  `005`); `snapshot()` seeds the canonical repos idempotently and returns them so
+  approvals survive a reload. A push-only "Repo Registry" list mirrors the
+  registry (MC authoritative; resolved optionally so a missing list never blocks
+  the sweep). Routes `POST /api/repos` (approver-gated) + `/api/repos/requests`.
+- Sub-tasks (landed 2026-06-18, Item 3): a push-only `Subtasks` ToDos column —
+  `serializeSubtasks` renders one human-readable line per sub-task; MC owns the
+  structured array, so it is never read back.
+- Bucket comments (landed 2026-06-18, Item 4): bucket discussion threads now
+  persist in a dedicated `bucket_comments` table (migration `006`) via
+  `PATCH /api/buckets/{id}/comments` (atomic replace-thread on `db.withTransaction`)
+  and hydrate from the snapshot, so they survive a reload. The store mirrors each
+  add/edit/delete optimistically (reconcile-on-success / rollback+notice-on-failure,
+  the same spine as `patchTaskFields`). App-only — bucket comments are NEVER
+  pushed to SharePoint (the EN-001 decision).
+- Flexible buckets (landed 2026-06-18, EN-005): initiatives are no longer a
+  static fixture — they persist in a dedicated `buckets` table (migration `007`,
+  full Bucket shape in `data` jsonb, seeded idempotently from the BUCKETS fixture
+  via `ensureBucketsSeeded`). `createBucket` / `patchBucket` (state) back
+  `POST /api/buckets` + `PATCH /api/buckets/{id}` (shared wrapper + zod);
+  attached repos are clamped to the persisted registry. The store exposes
+  `allBuckets()` / `bucketById()` as the single source of truth (every consumer
+  migrated off the fixture) plus optimistic create/edit
+  (reconcile-on-success / rollback+notice-on-failure). The buckets ↔ Roadmap
+  SharePoint mirror is DEFERRED (the engine does not mirror the Roadmap list
+  yet) — buckets are app-persistent for now, exactly as the repo registry
+  shipped DB-first; `sync_state` / `sp_item_id` columns are carried for that
+  future increment.
+- Still deferred to the public-deploy increment: Graph change webhooks,
+  notification DELIVERY (Teams/email — assignment/mention still in-app + audit
+  only), lookup columns (Initiative), the buckets ↔ Roadmap list two-way mirror,
+  and Project Documents (driveItem) sync — file entities are display fixtures
+  until then.
 
 ## Dependencies
 

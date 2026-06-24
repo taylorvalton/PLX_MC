@@ -1,10 +1,11 @@
+"use client";
+
 import {
   ACTORS,
   BUCKETS,
-  BUCKET_IDX,
+  CURRENT_USER,
   MILESTONES,
   PRDS,
-  REPOS,
   STAGES,
   STAGE_IDX,
   TRACE,
@@ -14,12 +15,25 @@ import {
   type Trace,
 } from "@/lib/mc-data";
 import { useMcVersion } from "@/lib/mc-data/hooks";
-import { allRisks, allTasks } from "@/lib/mc-data/store";
+import {
+  addBucketComment,
+  allRepos,
+  allRisks,
+  allTasks,
+  bucketById,
+  commentsForBucket,
+  deleteBucketComment,
+  editBucketComment,
+  mentionables,
+} from "@/lib/mc-data/store";
 
 import { Avatar, AvatarStack, HealthPill, PMark, ReqChip, SyncTick } from "./atoms";
 import type { ScreenProps } from "./route";
+import { Timeline } from "./timeline";
 
-const FALLBACK_BUCKET_ID = BUCKETS[0].id;
+// A static fallback (first fixture initiative) so the detail view always
+// resolves to a real bucket; live resolution goes through bucketById (EN-005).
+const FALLBACK_BUCKET = BUCKETS[0];
 
 interface BucketRollups {
   tasks: Task[];
@@ -56,7 +70,7 @@ export function summarizeTrace(trace: Trace | null): TraceSummary {
 export function BucketDetail({ route, nav }: ScreenProps) {
   useMcVersion();
 
-  const bucket = BUCKET_IDX[route.bucketId ?? FALLBACK_BUCKET_ID] ?? BUCKET_IDX[FALLBACK_BUCKET_ID];
+  const bucket = bucketById(route.bucketId ?? FALLBACK_BUCKET.id) ?? FALLBACK_BUCKET;
   const rollups = rollupsForBucket(bucket.id, allTasks(), MILESTONES, allRisks());
   const prd = bucket.prd ? PRDS[bucket.prd] : null;
   const trace = TRACE.bucket === bucket.id ? TRACE : null;
@@ -139,7 +153,7 @@ export function BucketDetail({ route, nav }: ScreenProps) {
             </span>
           </div>
           <div className="f">
-            <span className="k">Owner</span>
+            <span className="k">Accountable owner</span>
             <span className="v sm fact-owner">
               <Avatar id={bucket.owner} size="sm" />
               {ACTORS[bucket.owner].name}
@@ -276,6 +290,21 @@ export function BucketDetail({ route, nav }: ScreenProps) {
                 </div>
               </div>
             </div>
+
+            <div className="blk">
+              <div className="bh">
+                <span className="kk">/ Discussion</span>
+                <span className="kk">app-only thread</span>
+              </div>
+              <Timeline
+                comments={commentsForBucket(bucket.id)}
+                people={mentionables()}
+                currentUser={CURRENT_USER}
+                onAdd={(body) => addBucketComment(bucket.id, body)}
+                onEdit={(commentId, body) => editBucketComment(bucket.id, commentId, body)}
+                onDelete={(commentId) => deleteBucketComment(bucket.id, commentId)}
+              />
+            </div>
           </div>
 
           <div className="c">
@@ -323,7 +352,7 @@ export function BucketDetail({ route, nav }: ScreenProps) {
                 {bucket.repos.map((repoId) => (
                   <button type="button" className="dl" key={repoId} onClick={() => nav("repos")}>
                     <span className="ic">{"</>"}</span>
-                    <span className="t">{REPOS[repoId].name}</span>
+                    <span className="t">{allRepos()[repoId]?.name ?? repoId}</span>
                     <span className="ms">GitHub</span>
                     <span className="ext">↗</span>
                   </button>

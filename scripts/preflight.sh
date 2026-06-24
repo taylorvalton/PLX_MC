@@ -71,6 +71,8 @@ run_quick() {
   if [[ -f package.json ]]; then
     step "TypeScript typecheck"
     npm run typecheck
+    step "ESLint"
+    npm run lint
   else
     echo "[preflight] SKIP node quick checks (no package.json)"
   fi
@@ -90,6 +92,10 @@ run_full() {
     npm run test
     step "Production build"
     npm run build
+    step "Playwright browser runtime"
+    npx playwright install chromium
+    step "Playwright E2E (Cycle-1 Planner)"
+    npx playwright test
   fi
 }
 

@@ -37,6 +37,7 @@
         { "name": "TaskID", "displayName": "Task ID", "type": "text", "required": true, "indexed": true, "unique": true },
         { "name": "Status", "displayName": "Status", "type": "choice", "choices": ["Backlog", "Specced", "Approved", "Planned", "In Progress", "In QA", "In Review", "Merged", "Verified"] },
         { "name": "AssignedTo", "displayName": "Assigned To", "type": "person" },
+        { "name": "AccountableOwner", "displayName": "Accountable Owner", "type": "person", "$comment": "EN-003 — human accountable owner, distinct from the executor (Assigned To). Person-column two-way sync is part of the deferred directory increment (see src/lib/sync/mapping.ts)." },
         { "name": "Reporter", "displayName": "Reporter", "type": "person" },
         { "name": "Priority", "displayName": "Priority", "type": "choice", "choices": ["Urgent", "High", "Medium", "Low"] },
         { "name": "DueDate", "displayName": "Due Date", "type": "dateTime" },
@@ -44,8 +45,10 @@
         { "name": "PRDRequirements", "displayName": "PRD Requirements", "type": "multiline" },
         { "name": "Estimate", "displayName": "Estimate", "type": "choice", "choices": ["S", "M", "L"] },
         { "name": "Repos", "displayName": "Repos", "type": "multiline" },
+        { "name": "TargetEnvironment", "displayName": "Target Environment", "type": "choice", "choices": ["Staging", "Production"] },
         { "name": "EvidenceComplete", "displayName": "Evidence Complete", "type": "boolean" },
-        { "name": "Description", "displayName": "Description", "type": "multiline" }
+        { "name": "Description", "displayName": "Description", "type": "multiline" },
+        { "name": "Subtasks", "displayName": "Sub-tasks", "type": "multiline", "$comment": "Item 3 — push-only human-readable mirror of the DB-only Subtask[] (one line per sub-task). MC is authoritative; never read back." }
       ]
     },
     {
@@ -82,6 +85,20 @@
       "columns": [
         { "name": "Initiative", "displayName": "Initiative", "type": "lookup", "lookupList": "roadmap" },
         { "name": "DocumentType", "displayName": "Document Type", "type": "choice", "choices": ["PRD", "Evidence", "Deed", "Report", "Spec", "Export"] }
+      ]
+    },
+    {
+      "key": "reporegistry",
+      "displayName": "Repo Registry",
+      "template": "genericList",
+      "description": "Repo registry / allow-list (EN-002). Push-only mirror — Mission Control is authoritative; SharePoint is never read back. Persistence + approvals live in the plx_mc DB (repos / repo_requests).",
+      "columns": [
+        { "name": "RepoID", "displayName": "Repo ID", "type": "text", "required": true, "indexed": true, "unique": true },
+        { "name": "Owner", "displayName": "Owner", "type": "text", "$comment": "GitHub org/owner (text — not a SharePoint person)." },
+        { "name": "Visibility", "displayName": "Visibility", "type": "choice", "choices": ["Public", "Private"] },
+        { "name": "DefaultBranch", "displayName": "Default Branch", "type": "text" },
+        { "name": "Language", "displayName": "Language", "type": "text" },
+        { "name": "Scope", "displayName": "Scope", "type": "multiline" }
       ]
     }
   ],

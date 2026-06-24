@@ -18,7 +18,10 @@
   flex-direction: column;
 }
 
-.mc .board.full .bcol {
+/* Compact 244px columns for every multi-column axis (stage/bucket/priority/
+   assignee). Only the 3-column `band` axis keeps the 300px default above —
+   the className is gated on the axis (work-views.tsx), not a literal. */
+.mc .board.compact .bcol {
   flex: 0 0 244px;
   min-width: 244px;
 }
@@ -102,7 +105,7 @@
 .mc .tcard {
   background: var(--p-paper);
   border: 1px solid var(--p-grid);
-  border-radius: 4px;
+  border-radius: var(--p-radius);
   padding: 11px 12px;
   display: flex;
   flex-direction: column;
@@ -138,6 +141,10 @@
   line-height: 1.16;
   letter-spacing: -0.01em;
   color: var(--p-ink);
+  /* Long unbroken titles (pasted URLs, long initiative names) must wrap rather
+     than blow out the compact 244px column. */
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .mc .tcard .ct-meta {
@@ -145,6 +152,9 @@
   align-items: center;
   gap: 6px;
   flex-wrap: wrap;
+  min-width: 0;
+  /* A long single label must wrap inside its chip, not widen the card. */
+  overflow-wrap: anywhere;
 }
 
 .mc .tcard .ct-foot {
@@ -163,6 +173,38 @@
 
 .mc .tcard.blocked {
   border-left: 2px solid var(--p-hot);
+}
+
+/* ════════ DRAG-TO-MUTATE (Module B, native HTML5 DnD) ════════
+   Drag is enabled only on axes where a column-drop maps to a real field
+   mutation; on those, cards get a grab cursor and a lift while dragging, and
+   the target column body shows an inset accent ring. Tokens only — no raw hex. */
+.mc .tcard[draggable="true"] {
+  cursor: grab;
+}
+
+.mc .tcard.dragging {
+  opacity: 0.55;
+  transform: scale(1.02);
+  cursor: grabbing;
+}
+
+/* The lift itself (opacity/scale above) stays for the drop affordance under
+   any motion preference; only the animated transition into it is gated, so
+   reduced-motion users get the final state with no tween (mirrors ntmIn). */
+@media (prefers-reduced-motion: no-preference) {
+  .mc .tcard.dragging {
+    transition:
+      opacity var(--p-dur) var(--p-ease),
+      transform var(--p-dur) var(--p-ease);
+  }
+}
+
+/* The drop target is the column body (.bbody); the active ring is drawn inset
+   so it reads as "drop here" without shifting layout. */
+.mc .board .bbody.drop-active {
+  box-shadow: inset 0 0 0 1px var(--p-accent);
+  background: var(--p-accent-soft);
 }
 
 /* ════════ LIST ════════ */
@@ -480,4 +522,326 @@
   border-left: 1px solid var(--p-grid);
   background: transparent;
   opacity: 1;
+}
+
+/* ════════ FILTER BAR ════════
+   A low-chrome pill row beneath the .tb toolbar; mirrors .tb/.seg/.pill skins.
+   Presentational only (filter-bar.tsx). Tokens only — no raw hex. */
+.mc .filterbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding: 8px 26px;
+  border-bottom: 1px solid var(--p-grid);
+  background: var(--p-paper);
+}
+
+.mc .filterbar .fb-search {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  border: 1px solid var(--p-grid);
+  background: var(--p-canvas);
+  padding: 0 9px;
+  min-width: 200px;
+}
+
+.mc .filterbar .fb-mag {
+  font-size: 11px;
+  color: var(--p-muted);
+}
+
+.mc .filterbar .fb-input {
+  border: 0;
+  background: transparent;
+  outline: none;
+  padding: 6px 0;
+  font-family: inherit;
+  font-size: 12px;
+  color: var(--p-ink);
+  width: 180px;
+}
+
+.mc .filterbar .fb-input::placeholder {
+  color: var(--p-muted);
+}
+
+/* Keyboard focus ring — the input clears its UA outline above, so restore a
+   visible focus-visible ring for keyboard users (WCAG 2.4.7). Drawn on the
+   .fb-search wrapper via :focus-within so the ring frames the whole field
+   (magnifier + input) rather than just the borderless text box. */
+.mc .filterbar .fb-search:focus-within {
+  outline: 2px solid var(--p-accent);
+  outline-offset: 1px;
+}
+
+.mc .filterbar .fb-facets {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  flex-wrap: wrap;
+}
+
+.mc .filterbar .fb-facet {
+  position: relative;
+}
+
+.mc .filterbar .fb-pill {
+  color: var(--p-muted);
+  border-color: var(--p-grid);
+  cursor: pointer;
+  background: transparent;
+  transition: all var(--p-dur-fast) var(--p-ease);
+}
+
+.mc .filterbar .fb-pill:hover {
+  color: var(--p-ink-2);
+  border-color: var(--p-ink-2);
+}
+
+.mc .filterbar .fb-pill.on {
+  color: var(--p-ink);
+  border-color: var(--p-ink);
+  background: var(--p-paper-2);
+}
+
+/* Facet popover — mirrors the .mc .picker skin. */
+.mc .filterbar .fb-pop {
+  position: absolute;
+  z-index: 50;
+  top: 100%;
+  left: 0;
+  margin-top: 5px;
+  min-width: 200px;
+  max-height: 280px;
+  overflow-y: auto;
+  background: var(--p-paper);
+  border: 1px solid var(--p-grid);
+  box-shadow: 0 8px 28px color-mix(in srgb, var(--p-ink) 12%, transparent);
+  padding: 5px;
+}
+
+.mc .filterbar .fb-pop-hd {
+  font-family: var(--mono);
+  font-size: 8px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--p-muted);
+  padding: 6px 8px 5px;
+}
+
+.mc .filterbar .fb-pop-empty {
+  padding: 8px;
+  font-size: 11px;
+  color: var(--p-muted);
+}
+
+.mc .filterbar .fb-opt {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  text-align: left;
+  background: none;
+  border: 0;
+  cursor: pointer;
+  padding: 6px 8px;
+  font-size: 12px;
+  color: var(--p-ink-2);
+  transition: background var(--p-dur-fast) var(--p-ease);
+}
+
+.mc .filterbar .fb-opt:hover,
+.mc .filterbar .fb-opt.on {
+  background: var(--p-paper-2);
+  color: var(--p-ink);
+}
+
+.mc .filterbar .fb-opt .fb-check {
+  display: inline-flex;
+  justify-content: center;
+  width: 11px;
+  color: var(--p-accent);
+  font-size: 10px;
+}
+
+.mc .filterbar .fb-chips {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.mc .filterbar .fb-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-family: var(--mono);
+  font-size: 9px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--p-ink);
+  background: var(--p-paper-2);
+  border: 1px solid var(--p-ink-2);
+  padding: 4px 8px;
+  cursor: pointer;
+  transition: border-color var(--p-dur-fast) var(--p-ease);
+}
+
+.mc .filterbar .fb-chip:hover {
+  border-color: var(--p-hot);
+}
+
+.mc .filterbar .fb-chip .rm {
+  color: var(--p-muted);
+  font-size: 8px;
+}
+
+.mc .filterbar .fb-count {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--p-muted);
+  margin-left: auto;
+}
+
+.mc .filterbar .fb-count b {
+  color: var(--p-ink);
+  font-weight: 500;
+}
+
+.mc .filterbar .fb-count .fb-hint {
+  letter-spacing: 0.1em;
+  text-transform: none;
+}
+
+.mc .filterbar .fb-clear {
+  padding: 5px 9px;
+  font-size: 8.5px;
+}
+
+/* Saved-views switcher (Module F, SPEC §3.A.6). Reuses the .fb-pill / .fb-pop /
+   .fb-opt skins; tokens only — no raw hex. The trigger sits on the right edge so
+   its popover anchors right (the facet popovers anchor left). */
+.mc .filterbar .fb-views {
+  position: relative;
+}
+
+.mc .filterbar .fb-viewstrigger {
+  font-family: var(--mono);
+  font-size: 9px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.mc .filterbar .fb-dirty {
+  color: var(--p-hot);
+  font-weight: 700;
+}
+
+.mc .filterbar .fb-views-pop {
+  left: auto;
+  right: 0;
+  min-width: 220px;
+}
+
+.mc .filterbar .fb-viewrow {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.mc .filterbar .fb-viewrow.on .fb-viewapply {
+  color: var(--p-ink);
+}
+
+.mc .filterbar .fb-viewapply {
+  flex: 1;
+  min-width: 0;
+  /* A long saved-view name truncates cleanly instead of wrapping or shoving the
+     per-row delete button (the popover is min-width:220px). */
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.mc .filterbar .fb-viewdel {
+  flex: none;
+  border: 0;
+  background: none;
+  cursor: pointer;
+  color: var(--p-muted);
+  font-size: 9px;
+  padding: 4px 6px;
+  transition: color var(--p-dur-fast) var(--p-ease);
+}
+
+.mc .filterbar .fb-viewdel:hover {
+  color: var(--p-hot);
+}
+
+.mc .filterbar .fb-viewsave {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  border-top: 1px solid var(--p-grid);
+  margin-top: 4px;
+  padding: 7px 6px 4px;
+}
+
+.mc .filterbar .fb-viewname {
+  flex: 1;
+  min-width: 0;
+  width: auto;
+  border: 1px solid var(--p-grid);
+  background: var(--p-canvas);
+  padding: 5px 8px;
+  font-size: 11px;
+}
+
+.mc .filterbar .fb-viewname:focus-visible {
+  outline: 2px solid var(--p-accent);
+  outline-offset: 1px;
+}
+
+.mc .filterbar .fb-viewsavebtn {
+  flex: none;
+  padding: 5px 10px;
+  font-size: 8.5px;
+}
+
+.mc .filterbar .fb-viewsavebtn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+/* Due-range preset facet (Module G, SPEC §3.G.1). Reuses the .fb-pill / .fb-pop
+   / .fb-opt skins; tokens only — no raw hex. The pill picks up an accent tint
+   when a range is active so the "Due" facet reads as engaged without a chip
+   scan; the popover is a touch wider to fit the cycle labels. */
+.mc .filterbar .fb-due .fb-pill.has {
+  border-color: color-mix(in oklch, var(--p-accent) 55%, var(--p-grid));
+  color: var(--p-ink);
+}
+
+.mc .filterbar .fb-due-pop {
+  min-width: 188px;
+}
+
+.mc .filterbar .fb-due-pop .fb-due-clear {
+  border-top: 1px solid var(--p-grid);
+  margin-top: 4px;
+  color: var(--p-muted);
+}
+
+.mc .filterbar .fb-due-pop .fb-due-clear:hover:not(:disabled) {
+  color: var(--p-hot);
+}
+
+/* Disabled = no range to clear (kept in the layout + tab order, never hidden). */
+.mc .filterbar .fb-due-pop .fb-due-clear:disabled {
+  opacity: 0.5;
+  cursor: default;
 }

@@ -1,11 +1,25 @@
-import { ACTORS, BANDS, BUCKETS, BUCKET_IDX, STAGES, bandOf } from "@/lib/mc-data";
-import type { Bucket, Task } from "@/lib/mc-data";
+import { ACTORS, BANDS, BUCKETS, PRIORITY, STAGES, bandOf } from "@/lib/mc-data";
+import type { Band, Bucket, PriorityKey, StageKey, Task } from "@/lib/mc-data";
 
-export type BoardGrouping = "band" | "full";
+// Buckets are INJECTED (default = fixture) so these stay pure, deterministic
+// functions of their inputs — no store reads. The view passes the live
+// allBuckets() set (EN-005) so user-created initiatives appear as columns / drop
+// targets / timeline rows once they hold tasks.
+
+// One unified column axis drives BOTH the board and the list (resolves OQ i;
+// replaces the former ad-hoc `BoardGrouping` + `ListGroupBy`). Single-cell:
+// a task lands in exactly one column per axis, preserving the disjoint+complete
+// partition invariant the tests assert (true multi-membership is Cycle 2, R4).
+export type GroupBy = "band" | "stage" | "bucket" | "priority" | "assignee";
 export type BoardSwimlanes = "off" | "agents";
-export type ListGroupBy = "bucket" | "status" | "assignee";
 
 type BoardColumn = { key: string; name: string };
+
+// The "Unassigned" column key for assignee-axis grouping/filtering.
+export const UNASSIGNED_KEY = "unassigned";
+
+// Priority columns follow the PRIORITY config order (urgent → low).
+const PRIORITY_ORDER = Object.keys(PRIORITY) as PriorityKey[];
 
 export const TIMELINE_MONTH_DAYS = 30;
 export const TIMELINE_DEFAULT_END_DAY = 24;
@@ -15,21 +29,164 @@ export function filterTasksByBucket(tasks: Task[], bucketId?: string): Task[] {
   return tasks.filter((task) => task.bucket === bucketId);
 }
 
-export function boardColumns(grouping: BoardGrouping): BoardColumn[] {
-  return grouping === "full" ? STAGES : BANDS;
+// Swimlanes (the Agents/Humans/Unassigned sub-lanes) are only meaningful on the
+// lifecycle axes. Under bucket/priority/assignee they would render a meaningless
+// sub-split, so the caller must force swimlanes off — keyed off this predicate.
+export function swimlanesAllowed(groupBy: GroupBy): boolean {
+  return groupBy === "band" || groupBy === "stage";
 }
 
-export function columnKeyForTask(task: Task, grouping: BoardGrouping): string {
-  return grouping === "full" ? task.stage : bandOf(task.stage);
+// Ordered columns for an axis — the single grouping source for board + list.
+// The band/stage/bucket/priority axes have a fixed column model; the assignee
+// axis is data-derived (the distinct assignees present, in directory order,
+// then an "Unassigned" column last) so it never renders a column per directory
+// member. Pass `tasks` for the assignee axis; the static axes ignore it.
+export function columnsFor(groupBy: GroupBy, tasks: Task[] = [], buckets: Bucket[] = BUCKETS): BoardColumn[] {
+  switch (groupBy) {
+    case "stage":
+      return STAGES.map((stage) => ({ key: stage.key, name: stage.name }));
+    case "bucket":
+      return buckets.map((bucket) => ({ key: bucket.id, name: bucket.name }));
+    case "priority":
+      return PRIORITY_ORDER.map((key) => ({ key, name: PRIORITY[key].label }));
+    case "assignee": {
+      const columns = assigneeUniverse(tasks).map((id) => ({
+        key: id,
+        name: ACTORS[id]?.name ?? id,
+      }));
+      // The "Unassigned" column is present only when some task lacks an
+      // assignee — keeping the partition disjoint+complete with no empty column.
+      if (tasks.some((task) => !task.assignee)) {
+        columns.push({ key: UNASSIGNED_KEY, name: "Unassigned" });
+      }
+      return columns;
+    }
+    case "band":
+    default:
+      return BANDS.map((band) => ({ key: band.key, name: band.name }));
+  }
+}
+
+export function boardColumns(groupBy: GroupBy, tasks: Task[] = [], buckets: Bucket[] = BUCKETS): BoardColumn[] {
+  return columnsFor(groupBy, tasks, buckets);
+}
+
+export function columnKeyForTask(task: Task, groupBy: GroupBy): string {
+  switch (groupBy) {
+    case "stage":
+      return task.stage;
+    case "bucket":
+      return task.bucket;
+    case "priority":
+      return task.priority;
+    case "assignee":
+      return task.assignee ?? UNASSIGNED_KEY;
+    case "band":
+    default:
+      return bandOf(task.stage);
+  }
+}
+
+// ─── Drag-to-mutate axis → field resolution (Module B, pure + tested) ─────────
+
+// The band axis has no single "band" field on a Task; dropping into a band
+// column sets the band's ENTRY stage (the first stage of that band). Documented
+// map (SPEC §5 Module B): todo→backlog, doing→progress, done→merged. These keys
+// are the n=01 / n=05 / n=08 stages of each band in STAGES.
+export const BAND_ENTRY_STAGE: Record<Band, StageKey> = {
+  todo: "backlog",
+  doing: "progress",
+  done: "merged",
+};
+
+// Which Task field a drop on the given axis mutates. Used both to ENABLE drag
+// (only axes that map to a real field are drag-targets) and to route the drop
+// through the right PR-0 spine wrapper. Every Cycle-1 axis is persistable, so
+// this is non-null for all five — but the union is explicit so a future,
+// non-persistable axis (e.g. a derived/computed lane) is disabled, not a silent
+// no-op (SPEC §5 "Respect axis sensibility").
+export type DragField = "stage" | "priority" | "bucket" | "assignee";
+
+export function dragFieldForAxis(groupBy: GroupBy): DragField | null {
+  switch (groupBy) {
+    case "band":
+    case "stage":
+      return "stage";
+    case "priority":
+      return "priority";
+    case "bucket":
+      return "bucket";
+    case "assignee":
+      return "assignee";
+    default:
+      return null;
+  }
+}
+
+// True when dropping a card onto a column under this axis maps to a real,
+// persisted field mutation. Drives whether cards are `draggable` + columns are
+// drop targets (SPEC §5: disable drag on axes where a drop maps to no field,
+// rather than no-op silently). All five Cycle-1 axes qualify.
+export function dragEnabledForAxis(groupBy: GroupBy): boolean {
+  return dragFieldForAxis(groupBy) !== null;
+}
+
+// A resolved drop: the field to set and the value to set it to, for the column
+// the card was dropped on. `null` when the axis is not drag-mutable or the
+// column key is not a real value on that axis (defensive — an unknown drop
+// target is dropped, never written). The assignee "Unassigned" column resolves
+// to `assignee: null` (unassign). Pure: no store reads, no side effects.
+export interface ResolvedDrop {
+  field: DragField;
+  value: StageKey | PriorityKey | string | null;
+}
+
+export function resolveColumnDrop(groupBy: GroupBy, columnKey: string, buckets: Bucket[] = BUCKETS): ResolvedDrop | null {
+  switch (groupBy) {
+    case "stage":
+      // Only a real stage key is a valid target.
+      return STAGES.some((s) => s.key === columnKey)
+        ? { field: "stage", value: columnKey as StageKey }
+        : null;
+    case "band": {
+      const entry = BAND_ENTRY_STAGE[columnKey as Band];
+      return entry ? { field: "stage", value: entry } : null;
+    }
+    case "priority":
+      return columnKey in PRIORITY
+        ? { field: "priority", value: columnKey as PriorityKey }
+        : null;
+    case "bucket":
+      return buckets.some((b) => b.id === columnKey) ? { field: "bucket", value: columnKey } : null;
+    case "assignee":
+      // The "Unassigned" sentinel column unassigns; any other key is an actor id.
+      return columnKey === UNASSIGNED_KEY
+        ? { field: "assignee", value: null }
+        : { field: "assignee", value: columnKey };
+    default:
+      return null;
+  }
+}
+
+// True when the card already lives in the dropped column on this axis — the
+// no-op guard (SPEC §5): a same-column drop must not PATCH (avoids spurious
+// writes + the sweep race). Reuses the single read-side column resolver so the
+// no-op test is exactly the inverse of where the card renders.
+export function isNoopDrop(task: Task, groupBy: GroupBy, columnKey: string): boolean {
+  return columnKeyForTask(task, groupBy) === columnKey;
 }
 
 export function partitionTasksByColumn(
   tasks: Task[],
-  grouping: BoardGrouping
+  groupBy: GroupBy,
+  buckets: Bucket[] = BUCKETS
 ): Record<string, Task[]> {
-  const out = Object.fromEntries(boardColumns(grouping).map((c) => [c.key, [] as Task[]]));
+  const out = Object.fromEntries(boardColumns(groupBy, tasks, buckets).map((c) => [c.key, [] as Task[]]));
   for (const task of tasks) {
-    out[columnKeyForTask(task, grouping)].push(task);
+    const key = columnKeyForTask(task, groupBy);
+    // Every task lands in a column (the assignee column model is derived from
+    // these same tasks, so the partition stays disjoint + complete).
+    (out[key] ??= []).push(task);
   }
   return out;
 }
@@ -63,41 +220,107 @@ export interface TaskGroup {
   list: Task[];
 }
 
-export function groupTasksForList(tasks: Task[], groupBy: ListGroupBy): TaskGroup[] {
-  if (groupBy === "assignee") {
-    const map = new Map<string, Task[]>();
-    for (const task of tasks) {
-      const key = task.assignee ?? "unassigned";
-      const group = map.get(key);
-      if (group) group.push(task);
-      else map.set(key, [task]);
-    }
-    return Array.from(map.entries())
-      .map(([key, list]) => ({
-        key,
-        name: key === "unassigned" ? "Unassigned" : (ACTORS[key]?.name ?? key),
-        list,
-      }))
-      .filter((g) => g.list.length > 0);
-  }
-
-  if (groupBy === "status") {
-    return BANDS.map((band) => ({
-      key: band.key,
-      name: band.name,
-      list: tasks.filter((task) => bandOf(task.stage) === band.key),
-    })).filter((g) => g.list.length > 0);
-  }
-
-  return BUCKETS.map((bucket) => ({
-    key: bucket.id,
-    name: bucket.name,
-    list: tasks.filter((task) => task.bucket === bucket.id),
-  })).filter((g) => g.list.length > 0);
+// List grouping reads the SAME column model as the board (one grouping source
+// — kills the former board/list divergence). The list only renders non-empty
+// groups; the board renders the full column model. The former list "status"
+// option is the unified "band" axis.
+export function groupTasksForList(tasks: Task[], groupBy: GroupBy, buckets: Bucket[] = BUCKETS): TaskGroup[] {
+  const byColumn = partitionTasksByColumn(tasks, groupBy, buckets);
+  return columnsFor(groupBy, tasks, buckets)
+    .map((column) => ({ key: column.key, name: column.name, list: byColumn[column.key] ?? [] }))
+    .filter((group) => group.list.length > 0);
 }
 
-export function bucketsForTimeline(tasks: Task[]): Bucket[] {
-  return BUCKETS.filter((bucket) => tasks.some((task) => task.bucket === bucket.id));
+// ─── Filtering (pure, exported → unit-testable with zero persistence risk) ────
+
+// One filter shape shared by the board + list + timeline. Each facet is a
+// multi-select; an unset/empty facet does not constrain. Facets AND-combine;
+// within a facet the values OR. `assignee` may include UNASSIGNED_KEY to match
+// unassigned tasks. `dueStart`/`dueEnd` (Module G, SPEC §3.G.1) are a due-range
+// over the same June-grid `dueDay()` scale — both bounds INCLUSIVE; undefined =
+// open. They reuse the existing date model (no calendar widget); the timeline,
+// board, and list all read this one shape (one filter, three lenses).
+export interface FilterState {
+  text?: string;
+  priority?: PriorityKey[];
+  assignee?: string[];
+  label?: string[];
+  stage?: StageKey[];
+  dueStart?: number; // inclusive day offset (dueDay scale); undefined = open
+  dueEnd?: number; // inclusive; undefined = open
+}
+
+// A task's due date falls within an explicit [start, end] day-offset range (both
+// bounds inclusive, dueDay scale). With NO range set (both undefined) this is the
+// identity (every task passes). An undated task (dueDay → null) falls OUT of any
+// explicit range — documented (SPEC §3.G.1): a range is a positive selection, so
+// "no due date" is excluded once a bound is set. Pure; no store reads.
+export function isTaskDueInRange(task: Task, start?: number, end?: number): boolean {
+  if (start === undefined && end === undefined) return true;
+  const d = dueDay(task.due);
+  if (d === null) return false; // undated tasks fall OUT of an explicit range
+  if (start !== undefined && d < start) return false;
+  if (end !== undefined && d > end) return false;
+  return true;
+}
+
+export function hasActiveFilters(f: FilterState): boolean {
+  return (
+    !!f.text?.trim() ||
+    !!f.priority?.length ||
+    !!f.assignee?.length ||
+    !!f.label?.length ||
+    !!f.stage?.length ||
+    f.dueStart != null ||
+    f.dueEnd != null
+  );
+}
+
+// Pure predicate: text matches id/title/labels (case-insensitive); each facet
+// is a Set membership test; an empty filter is the identity. No store reads.
+export function applyFilters(tasks: Task[], f: FilterState): Task[] {
+  if (!hasActiveFilters(f)) return tasks;
+  const text = f.text?.trim().toLowerCase() ?? "";
+  const priority = f.priority?.length ? new Set(f.priority) : null;
+  const assignee = f.assignee?.length ? new Set(f.assignee) : null;
+  const labels = f.label?.length ? new Set(f.label) : null;
+  const stages = f.stage?.length ? new Set(f.stage) : null;
+
+  const hasDueRange = f.dueStart != null || f.dueEnd != null;
+
+  return tasks.filter((task) => {
+    if (text) {
+      const haystack = [task.id, task.title, ...task.labels].join(" ").toLowerCase();
+      if (!haystack.includes(text)) return false;
+    }
+    if (priority && !priority.has(task.priority)) return false;
+    if (assignee && !assignee.has(task.assignee ?? UNASSIGNED_KEY)) return false;
+    if (stages && !stages.has(task.stage)) return false;
+    if (labels && !task.labels.some((label) => labels.has(label))) return false;
+    if (hasDueRange && !isTaskDueInRange(task, f.dueStart, f.dueEnd)) return false;
+    return true;
+  });
+}
+
+// Distinct labels across the given tasks, deduped + sorted — filter options.
+export function labelUniverse(tasks: Task[]): string[] {
+  return Array.from(new Set(tasks.flatMap((task) => task.labels))).sort();
+}
+
+// Distinct assignee ids across the given tasks, deduped, in directory order
+// (the ACTORS insertion order), with any unknown ids appended sorted. Excludes
+// the unassigned sentinel (callers add an "Unassigned" column/option explicitly).
+export function assigneeUniverse(tasks: Task[]): string[] {
+  const present = new Set(
+    tasks.map((task) => task.assignee).filter((id): id is string => !!id)
+  );
+  const known = Object.keys(ACTORS).filter((id) => present.has(id));
+  const unknown = Array.from(present).filter((id) => !(id in ACTORS)).sort();
+  return [...known, ...unknown];
+}
+
+export function bucketsForTimeline(tasks: Task[], buckets: Bucket[] = BUCKETS): Bucket[] {
+  return buckets.filter((bucket) => tasks.some((task) => task.bucket === bucket.id));
 }
 
 // Day offsets from Jun 1 — the timeline is a June grid (CYCLES). Month-aware
@@ -155,10 +378,13 @@ export function timelineRangeForTask(
   return { startDay, endDay, leftPct, widthPct };
 }
 
-export function timelineSegmentClass(task: Task): "seg-track" | "seg-risk" | "seg-blocked" | "seg-done" {
+export function timelineSegmentClass(
+  task: Task,
+  buckets: Bucket[] = BUCKETS
+): "seg-track" | "seg-risk" | "seg-blocked" | "seg-done" {
   if (task.blocked) return "seg-blocked";
   if (task.stage === "verified" || task.stage === "merged") return "seg-done";
-  const bucket = BUCKET_IDX[task.bucket];
+  const bucket = buckets.find((b) => b.id === task.bucket);
   if (task.priority === "urgent" || bucket?.health === "risk") return "seg-risk";
   return "seg-track";
 }

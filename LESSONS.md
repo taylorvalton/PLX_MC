@@ -16,6 +16,128 @@
 
 ## Lessons
 
+### 2026-06-21 (ET) — ESLint was outside preflight, so lint regressions could sit undetected
+
+- **What happened:** A React Hooks lint issue surfaced only when `npm run lint`
+  was run directly; the canonical `scripts/preflight.sh --mode pre-commit` gate
+  had been green because it only ran TypeScript typecheck for Node quick checks.
+- **Root cause:** ESLint was defined in `package.json` but not included in
+  `run_quick`, so neither local pre-commit/pre-push nor CI mode treated lint as
+  part of the single definition of "passing."
+- **Rule going forward:** `scripts/preflight.sh` runs `npm run lint` in
+  `run_quick`, so lint executes in every preflight mode. Fix legitimate lint
+  failures in code; only suppress a rule with a narrow, documented reason.
+
+### 2026-06-19 (ET) — Called a long-lived integration branch "promotable" without diffing it against main
+
+- **What happened:** After merging EN-005 into `feat/enhancements-integration`,
+  I told the operator we were "done — just promote," and ran `npm run migrate`
+  from the integration tree against the **shared** staging `plx_mc` DB. A later
+  check showed integration had **diverged from main at EN-003** (ahead 20, behind
+  27): main had independently shipped EN-001/002/004 + an EN-006 sync increment +
+  a *different* "EN-005" (flexible buckets) + its **own** repo-registry
+  persistence (`repos`/`repo_requests`, `005_repo_registry.sql`), while
+  integration carried EN-006/007 compliance + EN-005 agent/repo (`mc_repos`,
+  `008_repo_registry.sql`). Promotion is blocked: duplicate migration prefixes
+  (`005`/`006`/`007` on both branches, different content) and two parallel
+  repo-registry implementations.
+- **Root cause:** Treated the integration branch as a clean fast-forward ahead of
+  main without `git fetch` + a compare. Ran a DB migration from a stale branch's
+  tree against a DB shared with main's deployed app, so the shared DB accumulated
+  both branches' prefix-colliding migrations.
+- **Rule going forward:** Before calling any branch promotable — or running its
+  migrations against a shared environment — `git fetch` and compare to the deploy
+  target: `gh api repos/<o>/<r>/compare/<base>...<head>` and require `behind_by==0`
+  for a clean promote, else plan a reconciliation. Never `npm run migrate` from a
+  feature/integration branch against a DB shared with another branch's deployed
+  app; migrations are globally serialized, so a stale tree introduces prefix
+  collisions. Confirm the migration set matches the deploy target's tree first.
+
+### 2026-06-19 (ET) — `gh pr merge --delete-branch` fails when the base is in a sibling worktree
+
+- **What happened:** `gh pr merge 44 --merge --delete-branch` merged the PR on
+  GitHub but exited 1 on the local post-merge step (`'feat/enhancements-integration'
+  is already used by worktree at ...`), leaving the remote head branch undeleted.
+- **Root cause:** `--delete-branch` tries to check out the base branch locally and
+  delete the head; the base was checked out in another git worktree, so the local
+  switch failed *after* the API merge had already succeeded.
+- **Rule going forward:** In multi-worktree setups, confirm the merge landed with
+  `gh pr view <n> --json state,mergeCommit` regardless of the command's exit code,
+  and delete the remote branch explicitly (`git push origin --delete <branch>`)
+  instead of relying on `--delete-branch`. (Second distinct `--delete-branch`
+  failure mode — see 2026-06-17; promote to a rule if it recurs once more.)
+
+### 2026-06-19 (ET) — A `/tmp` Node script can't resolve repo `node_modules`
+
+- **What happened:** `node /tmp/verify.cjs` failed with `Cannot find module 'pg'`
+  even when run from the repo directory.
+- **Root cause:** Node resolves `require()` relative to the **script's** location,
+  not the CWD; a script under `/tmp` has no `node_modules` on its resolution path.
+- **Rule going forward:** For one-off DB/verification scripts kept outside the
+  repo, set `NODE_PATH="$(pwd)/node_modules"` (or place the script inside the repo
+  and delete it after). Keep such scripts read-only (SELECT) and remove them when
+  done.
+
+### 2026-06-17 (ET) — `--delete-branch` mid-stack closed the next stacked PR
+
+- **What happened:** Merging the bottom of the Cycle-2 stack (#30) with
+  `gh pr merge --merge --delete-branch` deleted its head branch, which **closed**
+  the next PR in the stack (#27) instead of retargeting it to `main`. A closed PR
+  whose base branch no longer exists then deadlocks: "cannot change the base
+  branch of a closed pull request" *and* "state cannot be changed, the branch has
+  been deleted."
+- **Root cause:** GitHub's auto-retarget-on-base-deletion is unreliable for
+  stacked PRs; deleting a base branch that still has dependent open PRs can close
+  them rather than reparent them.
+- **Rule going forward:** When merging a stacked chain bottom-up, do **not** pass
+  `--delete-branch` mid-stack. Merge each PR with `--merge` only, retarget the next
+  child to `main` first (`gh api repos/<o>/<r>/pulls/<n> -X PATCH -f base=main`),
+  then merge it; delete all head branches at the very end. To recover a
+  wrongly-closed stacked PR, recreate its deleted base at the old SHA
+  (`git push origin <sha>:refs/heads/<branch>`), reopen via REST
+  (`gh api .../pulls/<n> -X PATCH -f state=open`), then retarget to `main`.
+
+### 2026-06-17 (ET) — ⌘K command-palette E2E flakes on hydration timing
+
+- **What happened:** An intermediate `push: main` CI run failed on
+  `e2e/my-tasks.spec.ts:33` ("reachable via the ⌘K command palette"):
+  `.mc-cmdk` not visible within 10s after `keyboard.press("ControlOrMeta+k")`.
+  The identical test passed in three other runs — the later CI on a superset
+  commit, the final `main` CI, and the local full `pre-push`.
+- **Root cause:** `waitForHydration` anchored on the topbar sync-pill label,
+  which is **server-rendered** (`"Synced"` from default store state) and so
+  present in the SSR HTML. The wait resolved before React hydrated and before
+  the shell's global keydown listener attached; `page.keyboard.press` has no
+  actionability delay (unlike `.click()`, which is why only the keyboard test
+  flaked), so it raced the handler and the keypress was dropped under CI load.
+- **Rule going forward:** A hydration-readiness wait must anchor on a signal
+  that only exists *after* client effects run — never on SSR-present DOM. Treat a
+  lone 10s "element not found" after a key shortcut as a hydration flake: confirm
+  with a re-run and harden the wait, don't chase a non-existent logic bug.
+  **Fixed in #31:** the shell exposes a post-mount `data-mc-ready` marker
+  (flipped only after the keydown effect attaches) and `waitForHydration` now
+  waits on `[data-mc-ready='true']` (`toBeAttached`) — deterministic, no
+  retries/sleeps, and it hardens every spec that waits for hydration.
+
+### 2026-06-16 (ET) — Static asset imports fail CI typecheck (gitignored next-env.d.ts)
+
+- **What happened:** Adding `import logo from "../../../public/brand/logo-horizontal-ink.png"`
+  for the branded `/signin` page passed `npm run typecheck` locally but failed
+  CI with `TS2307: Cannot find module ... .png`. The full pre-push gate had even
+  run green locally, so it looked safe to push.
+- **Root cause:** The `*.png` (and other static asset) module declaration ships
+  via `next/image-types/global`, referenced only from `next-env.d.ts` — which is
+  gitignored and generated by `next dev`/`next build`. `preflight --mode ci` runs
+  `tsc` *before* any build, so in CI the file is absent and `tsc` cannot resolve
+  the import. Locally it passed only because a prior build had left a stale
+  `next-env.d.ts` in the tree.
+- **Rule going forward:** Do not rely on static asset module imports for type
+  resolution. Load `public/` assets with `next/image` using a string `src`
+  (e.g. `src="/brand/x.png"`) plus explicit `width`/`height` — no ambient `*.png`
+  type needed. To reproduce the CI condition before pushing, run
+  `rm -f next-env.d.ts && npm run typecheck` so a stale generated file cannot mask
+  the failure. Fixed on PR #24.
+
 ### 2026-06-11 (ET) — PowerShell 7 round-trip de-escaped prod/ec2-secrets unicode
 
 - **What happened:** Merging `PLX_MC_DATABASE_URL` into `prod/ec2-secrets` via

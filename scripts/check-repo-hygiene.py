@@ -41,8 +41,12 @@ APPROVED_ROOT_FILES = {
     "next-env.d.ts",
     "eslint.config.mjs",
     "vitest.config.ts",
+    "playwright.config.ts",
+    "vercel.json",
     ".gitignore",
     ".pre-commit-config.yaml",
+    "ui-loop.config.json",
+    "ui-loop.schema.json",
 }
 
 FORBIDDEN_PATTERNS = [

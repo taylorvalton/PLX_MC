@@ -28,6 +28,11 @@ export interface Stage {
 export type PriorityKey = "urgent" | "high" | "medium" | "low";
 export type Tone = "ok" | "warn" | "info" | "hot" | "muted" | "acc";
 
+// The deployment target a task ships to. Defaults to "staging" (the active
+// environment per policy); promoting to "production" is normal progression, so
+// unlike `repos` it is NOT lifecycle-locked.
+export type TargetEnv = "staging" | "production";
+
 export interface PriorityConfig {
   label: string;
   cls: Extract<Tone, "hot" | "warn" | "info" | "muted">;
@@ -55,19 +60,58 @@ export interface Agent {
   init: string;
   model: string;
   team: string;
+  // Autonomy mode (EN-005): `auto` advances subject only to the EN-003 gates;
+  // `approve` requires an operator to approve the run before it enters the doing
+  // band (enforced in policy.ts stageAdvanceViolation — no longer a dead label).
   mode: AgentMode;
+  // Presence is honest: there is no agent heartbeat/session, so this static flag
+  // is false. Live "working now" presence is DERIVED from in-flight assignment
+  // (helpers.agentIsActive), never fabricated here (EN-005 obs. #1, #4).
   online: boolean;
+  // EN-005 operational model.
+  capabilities: string[]; // what the agent does — informs assignment + UI surfacing
+  defaultRepos: string[]; // advisory default repos (NOT a hard binding; the task allow-list governs — EN-005 decision 3)
 }
 
 export type Actor = Human | Agent;
+
+export type RepoVisibility = "public" | "private";
 
 export interface Repo {
   id: string;
   name: string;
   lang: string;
-  openPRs: number;
-  openTasks: number;
+  // Default branch (the repo's GitHub default). `def` predates EN-002.
   def: string;
+  // EN-002 governance metadata — the allow-list registry carries an owner,
+  // visibility, and a one-line scope. Honest values only (resolved from the
+  // GitHub org, never fabricated).
+  owner: string;
+  visibility: RepoVisibility;
+  scope: string;
+}
+
+// A self-service request to add a repo to the registry/allow-list (EN-002).
+// Any collaborator may file one; an approver (Owner/Admin) approves before it
+// joins the registry. `verified` records the GitHub-org validation outcome at
+// request time — an unverified request is never auto-promoted or fabricated.
+export type RepoRequestStatus = "pending" | "approved" | "rejected";
+
+export interface RepoRequest {
+  id: string;
+  name: string;
+  owner: string;
+  lang?: string;
+  visibility?: RepoVisibility;
+  scope?: string;
+  def?: string;
+  requestedBy: string;
+  requestedTs: string;
+  status: RepoRequestStatus;
+  verified: boolean;
+  note?: string;
+  decidedBy?: string;
+  decidedTs?: string;
 }
 
 export type Health = "track" | "risk" | "off";
@@ -94,6 +138,10 @@ export interface Bucket {
   sync: SyncRef;
   prd: string | null;
   empty?: boolean;
+  // Bucket-level discussion thread (EN-001 / WS-3). Optional + app-only; the
+  // runtime authority is the store's bucket-comment map (buckets have no
+  // server persistence layer yet).
+  comments?: Comment[];
 }
 
 export interface PullRequest {
@@ -103,11 +151,37 @@ export interface PullRequest {
   title: string;
 }
 
+// Sub-task status (EN-001 / WS-3 medium depth). `done` stays the canonical
+// completion flag (drives the existing checkbox + counts); `status` is the
+// richer lifecycle label, defaulting to derived from `done` when unset.
+export type SubtaskStatus = "todo" | "doing" | "blocked" | "done";
+
 export interface Subtask {
   id: string;
   t: string;
   done: boolean;
+  // Original single-avatar field; kept for back-compat. `assignee` (below)
+  // augments it as the explicit executor (human or agent) for v1 enrichment.
   who: string;
+  // EN-001 / WS-3 sub-task enrichment (all optional — additive over the
+  // prototype's flat checklist).
+  description?: string;
+  assignee?: string | null;
+  due?: string;
+  status?: SubtaskStatus;
+}
+
+// A free-form discussion comment (EN-001 / WS-3). App-only — never mirrored to
+// a SharePoint column (aligned decision); lives in the task jsonb blob (server
+// DB-only tier) or, for buckets, the store's bucket-comment map (no bucket
+// server persistence exists yet — see WS3-NOTES.md).
+export interface Comment {
+  id: string;
+  author: string;
+  body: string;
+  ts: string;
+  mentions: string[];
+  editedTs?: string;
 }
 
 export interface ActivityEntry {
@@ -146,8 +220,20 @@ export interface Task {
   assignee: string | null;
   coassignees: string[];
   reporter: string;
+  // Accountable owner — always a human (EN-003 split model): distinct from the
+  // executor (`assignee`, human or agent). null until a human takes it on; a
+  // task cannot advance past `planned` without one (see lib/mc-data/policy.ts).
+  accountableOwner: string | null;
+  // When set, agents cannot be the executor — enforced across the picker
+  // (allowAgents=false), the store mutation, and the server.
+  humanOnly?: boolean;
+  // Operator approval of an approve-mode agent's run (EN-005). Required before a
+  // task whose executor is a needs-approval agent can advance into the doing band
+  // (see lib/mc-data/policy.ts). DB-only; no SharePoint column.
+  agentRunApproved?: boolean;
   reqs: string[];
   repos: string[];
+  targetEnv?: TargetEnv;
   estimate: "S" | "M" | "L";
   labels: string[];
   prs: PullRequest[];
@@ -155,6 +241,10 @@ export interface Task {
   sync: SyncRef;
   subtasks: Subtask[];
   activity: ActivityEntry[];
+  // Task discussion thread (EN-001 / WS-3). Optional + app-only; persisted in
+  // the task jsonb blob (server DB-only tier), never mirrored to a SharePoint
+  // comment column (aligned decision).
+  comments?: Comment[];
   evidence?: Evidence;
   blocked?: boolean;
   blockedReason?: string;

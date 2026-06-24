@@ -2,9 +2,9 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 
-import { AGENTS, BUCKETS } from "@/lib/mc-data";
+import { AGENTS, CURRENT_USER } from "@/lib/mc-data";
 import { useMcVersion } from "@/lib/mc-data/hooks";
-import { allTasks } from "@/lib/mc-data/store";
+import { allBuckets, allTasks, pushNotice, reassignTask, setTaskStage } from "@/lib/mc-data/store";
 
 import type { Nav } from "./route";
 
@@ -45,30 +45,28 @@ export function CommandPalette({
   onClose,
   nav,
   onOpenNewTask,
+  onOpenNewInitiative,
 }: {
   onClose: () => void;
   nav: Nav;
   onOpenNewTask: () => void;
+  onOpenNewInitiative: () => void;
 }) {
-  useMcVersion();
+  const version = useMcVersion();
   const [query, setQuery] = useState("");
   const [selected, setSelected] = useState(0);
   const inputRef = useRef<HTMLInputElement | null>(null);
-  const tasks = allTasks();
 
+  // `version` is load-bearing: bucket/task commands read the live store, so a
+  // store mutation while the palette is open must recompute the groups.
   const groups = useMemo<PaletteGroup<PaletteCommand>[]>(() => {
-    const firstBucket = BUCKETS[0]?.id;
+    void version;
+    const tasks = allTasks();
+    const firstBucket = allBuckets()[0]?.id;
     const firstTask = tasks[0]?.id;
     const create: PaletteCommand[] = [
       { key: "create:new-task", icon: "+", label: "New task", hint: "create", run: onOpenNewTask },
-      { key: "create:new-bucket", icon: "+", label: "New bucket", hint: "create", run: () => {} },
-      {
-        key: "create:draft-prd",
-        icon: "✎",
-        label: "Draft PRD with Scribe",
-        hint: "agent",
-        run: () => {},
-      },
+      { key: "create:new-bucket", icon: "+", label: "New initiative", hint: "create", run: onOpenNewInitiative },
     ];
 
     const navigate: PaletteCommand[] = [
@@ -76,6 +74,8 @@ export function CommandPalette({
       { key: "nav:board", icon: "▦", label: "Go to Board", run: () => nav("board") },
       { key: "nav:list", icon: "≣", label: "Go to List", run: () => nav("list") },
       { key: "nav:timeline", icon: "▭", label: "Go to Timeline", run: () => nav("timeline") },
+      { key: "nav:mine", icon: "☉", label: "Go to My Tasks", run: () => nav("mine") },
+      { key: "nav:insights", icon: "◔", label: "Go to Insights", run: () => nav("insights") },
       { key: "nav:matrix", icon: "⊞", label: "Go to Traceability", run: () => nav("matrix") },
       { key: "nav:feed", icon: "◉", label: "Go to Agent activity", run: () => nav("feed") },
       {
@@ -101,7 +101,7 @@ export function CommandPalette({
       },
     ];
 
-    const buckets: PaletteCommand[] = BUCKETS.map((bucket) => ({
+    const buckets: PaletteCommand[] = allBuckets().map((bucket) => ({
       key: `bucket:${bucket.id}`,
       icon: "●",
       label: `Bucket · ${bucket.name}`,
@@ -109,20 +109,62 @@ export function CommandPalette({
       run: () => nav("bucket", { bucketId: bucket.id }),
     }));
 
-    const taskCommands: PaletteCommand[] = tasks.map((task) => ({
-      key: `task:${task.id}`,
-      icon: "▸",
-      label: `${task.id} · ${task.title}`,
-      hint: "task",
-      run: () => nav("task", { taskId: task.id }),
-    }));
+    // Per-task commands: the "go to detail" navigate (existing) plus two REAL
+    // spine-backed actions (Module G, SPEC §3.G.2) replacing the former dead
+    // create/agent stubs. Both route through the FROZEN spine wrappers
+    // (setTaskStage / reassignTask → patchTaskFields → optimistic + PATCH +
+    // reconcile/rollback + notice), so no new store code and no half-wire.
+    // "Done" = the `verified` stage (band=done); "to me" = CURRENT_USER.
+    // Already-done / already-mine are handled by HIDING the action (a per-task
+    // command rebuilt from `tasks`), so the palette never offers a no-op.
+    const taskCommands: PaletteCommand[] = tasks.flatMap((task) => {
+      const commands: PaletteCommand[] = [
+        {
+          key: `task:${task.id}`,
+          icon: "▸",
+          label: `${task.id} · ${task.title}`,
+          hint: "task",
+          run: () => nav("task", { taskId: task.id }),
+        },
+      ];
+      const isDone = task.stage === "verified" || task.stage === "merged";
+      if (!isDone) {
+        commands.push({
+          key: `task-done:${task.id}`,
+          icon: "✓",
+          label: `Mark ${task.id} done`,
+          hint: "task action",
+          run: () => setTaskStage(task.id, "verified"), // band=done; spine wrapper
+        });
+      }
+      if (task.assignee !== CURRENT_USER) {
+        commands.push({
+          key: `assign-me:${task.id}`,
+          icon: "☺",
+          label: `Assign ${task.id} to me`,
+          hint: "task action",
+          run: () => reassignTask(task.id, CURRENT_USER), // spine wrapper; honest deferred-mirror copy
+        });
+      }
+      return commands;
+    });
 
+    // Assign an agent to the first OPEN, agent-eligible task (unassigned, not
+    // human-only, not yet done) via the real reassignTask spine (EN-005 — replaces
+    // the former no-op). reassignTask enforces the human-only policy; a notice
+    // fires when nothing qualifies, so the command is never a silent no-op.
     const assignAgents: PaletteCommand[] = Object.values(AGENTS).map((agent) => ({
       key: `assign:${agent.id}`,
       icon: "◧",
       label: `Assign open task to ${agent.name}`,
       hint: agent.model,
-      run: () => {},
+      run: () => {
+        const open = tasks.find(
+          (t) => !t.assignee && !t.humanOnly && t.stage !== "merged" && t.stage !== "verified"
+        );
+        if (open) reassignTask(open.id, agent.id);
+        else pushNotice(`No open, agent-eligible task to assign to ${agent.name}.`, "info");
+      },
     }));
 
     return [
@@ -132,7 +174,7 @@ export function CommandPalette({
       { title: "Tasks", items: taskCommands },
       { title: "Assign agents", items: assignAgents },
     ];
-  }, [nav, onOpenNewTask, tasks]);
+  }, [nav, onOpenNewTask, onOpenNewInitiative, version]);
 
   const filtered = useMemo(() => filterPaletteGroups(groups, query), [groups, query]);
   const flat = useMemo(() => filtered.flatMap((group) => group.items), [filtered]);

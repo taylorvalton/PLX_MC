@@ -4,22 +4,43 @@ import { useState } from "react";
 
 import {
   ACTORS,
-  BUCKET_IDX,
+  AGENTS,
+  CURRENT_USER,
   PRIORITY,
   STAGES,
   STAGE_IDX,
+  TARGET_ENV,
   confidenceOf,
+  type PriorityKey,
   type SpColumn,
   type SyncDirection,
+  type TargetEnv,
   type Task,
 } from "@/lib/mc-data";
 import { useMcVersion } from "@/lib/mc-data/hooks";
 import {
+  addComment,
+  allBuckets,
   allTasks,
+  bucketById,
+  deleteComment,
+  editComment,
   markAllSynced,
+  mentionables,
   openConflicts,
   reassignTask,
   resolveConflict,
+  setAccountableOwner,
+  setAgentRunApproved,
+  setCoassignees,
+  setHumanOnly,
+  setTaskBucket,
+  setTaskDescription,
+  setTaskLabels,
+  setTaskPriority,
+  setTaskRepos,
+  setTaskStage,
+  setTaskTargetEnv,
   spLists,
   taskById,
 } from "@/lib/mc-data/store";
@@ -27,6 +48,7 @@ import {
 import {
   Assignee,
   Avatar,
+  AvatarStack,
   Estimate,
   Label,
   Priority,
@@ -35,8 +57,13 @@ import {
   Slate,
   SyncTick,
 } from "./atoms";
+import { LabelEditor } from "./label-editor";
 import { NotifyTrail, PeoplePicker } from "./people-picker";
+import { repoEditMode } from "./record-logic";
+import { RepoEditor } from "./repo-editor";
 import type { ScreenProps } from "./route";
+import { SubtaskList } from "./subtask-list";
+import { Timeline } from "./timeline";
 
 export const SOR_FIELD_NAMES = ["Status", "Assigned To", "Due Date", "Priority"] as const;
 type SorFieldName = (typeof SOR_FIELD_NAMES)[number];
@@ -102,13 +129,91 @@ function fieldValue(fieldName: SorFieldName, task: Task): string {
   return PRIORITY[task.priority]?.label ?? task.priority;
 }
 
+function RepoFact({ task }: { task: Task }) {
+  const [unlocked, setUnlocked] = useState(false);
+  const [retargeting, setRetargeting] = useState(false);
+  const [reason, setReason] = useState("");
+
+  const editable = repoEditMode(task.stage, task.repos.length > 0) === "open" || unlocked;
+
+  if (editable) {
+    return (
+      <RepoEditor
+        repos={task.repos}
+        onChange={(repos) => {
+          const pending = reason.trim();
+          if (unlocked && pending) {
+            setTaskRepos(task.id, repos, { reason: pending });
+            setReason("");
+            return;
+          }
+          setTaskRepos(task.id, repos);
+        }}
+      />
+    );
+  }
+
+  return (
+    <span className="repo-locked">
+      {task.repos.map((repo) => (
+        <RepoChip key={repo} id={repo} />
+      ))}
+      {!retargeting ? (
+        <button
+          type="button"
+          className="repo-retarget"
+          onClick={() => setRetargeting(true)}
+          title="Target is locked once work is in flight — retarget with a reason"
+        >
+          Retarget
+        </button>
+      ) : (
+        <span className="repo-retarget-form">
+          <input
+            className="le-input"
+            value={reason}
+            onChange={(event) => setReason(event.target.value)}
+            placeholder="Reason for retarget"
+            aria-label="Reason for retargeting repos"
+          />
+          <button
+            type="button"
+            className="btn ghost sm"
+            disabled={!reason.trim()}
+            onClick={() => {
+              setUnlocked(true);
+              setRetargeting(false);
+            }}
+          >
+            Unlock
+          </button>
+          <button
+            type="button"
+            className="btn ghost sm"
+            onClick={() => {
+              setRetargeting(false);
+              setReason("");
+            }}
+          >
+            Cancel
+          </button>
+        </span>
+      )}
+    </span>
+  );
+}
+
 export function TaskDetailView({ route, nav }: ScreenProps) {
   useMcVersion();
   const taskId = route.taskId ?? allTasks()[0]?.id ?? "";
   const task = taskById(taskId);
   const [resolved, setResolved] = useState<{ taskId: string; winner: "mc" | "sp" } | null>(null);
   const [pickerOpen, setPickerOpen] = useState(false);
+  const [accountablePickerOpen, setAccountablePickerOpen] = useState(false);
+  const [coPickerOpen, setCoPickerOpen] = useState(false);
   const [reassigned, setReassigned] = useState<{ taskId: string; actorId: string } | null>(null);
+  const [editingDesc, setEditingDesc] = useState(false);
+  const [descDraft, setDescDraft] = useState("");
 
   if (!task) {
     return (
@@ -130,12 +235,17 @@ export function TaskDetailView({ route, nav }: ScreenProps) {
     );
   }
 
-  const bucket = BUCKET_IDX[task.bucket];
+  const bucket = bucketById(task.bucket);
   const stageIdx = STAGE_IDX[task.stage] ?? 0;
   const todos = spLists().find((list) => list.key === "todos");
   const sharePointItem = task.sync.sp.split("· ")[1] ?? task.sync.sp;
   const progress = deriveEvidenceProgress(task);
   const conflict = openConflicts().find((entry) => entry.entityId === task.id);
+  // Approve-mode agent executor needs an explicit operator approval before the
+  // task advances into the doing band (EN-005). null when the executor isn't a
+  // needs-approval agent (the `?.` guards a human/empty assignee at runtime).
+  const runApprovalAgent =
+    task.assignee && AGENTS[task.assignee]?.mode === "approve" ? AGENTS[task.assignee] : null;
 
   // Real engine sweep; the demo inbound simulation is gone.
   const syncNow = () => {
@@ -187,6 +297,8 @@ export function TaskDetailView({ route, nav }: ScreenProps) {
                 />
                 {pickerOpen && (
                   <PeoplePicker
+                    // Human-only tasks hide agents from the executor picker (EN-003).
+                    allowAgents={!task.humanOnly}
                     current={task.assignee}
                     onPick={(actorId) => {
                       reassignTask(task.id, actorId);
@@ -197,18 +309,104 @@ export function TaskDetailView({ route, nav }: ScreenProps) {
                   />
                 )}
               </span>
+              {runApprovalAgent && (
+                <span className="asgwrap">
+                  <button
+                    type="button"
+                    className={`btn sm ${task.agentRunApproved ? "ok" : "acc"}`}
+                    onClick={() => setAgentRunApproved(task.id, !task.agentRunApproved)}
+                    title={`${runApprovalAgent.name} runs in needs-approval mode — operator approval gates advance into In Progress`}
+                  >
+                    {task.agentRunApproved
+                      ? `${runApprovalAgent.name} run approved ✓`
+                      : `Approve ${runApprovalAgent.name} run`}
+                  </button>
+                </span>
+              )}
+              <span className="asgwrap coasg">
+                {task.coassignees.length > 0 && <AvatarStack ids={task.coassignees} />}
+                <button
+                  type="button"
+                  className="coasg-add"
+                  onClick={() => setCoPickerOpen((open) => !open)}
+                  title="Add a co-assignee"
+                  aria-label="Add a co-assignee"
+                >
+                  +<span className="coasg-lab">Co-assign</span>
+                </button>
+                {coPickerOpen && (
+                  <PeoplePicker
+                    // Humans-only for coassignees (§5 Module C recommendation).
+                    allowAgents={false}
+                    current={null}
+                    onPick={(actorId) => {
+                      // Accumulate: the picker is single-pick, so toggle the
+                      // chosen id into the existing set; the store dedupes and
+                      // drops the primary assignee (setCoassignees).
+                      if (!actorId) return;
+                      const next = task.coassignees.includes(actorId)
+                        ? task.coassignees.filter((id) => id !== actorId)
+                        : [...task.coassignees, actorId];
+                      setCoassignees(task.id, next);
+                    }}
+                    onClose={() => setCoPickerOpen(false)}
+                    style={{ top: "calc(100% + 6px)", left: 0 }}
+                  />
+                )}
+              </span>
             </div>
             {reassigned?.taskId === task.id && <NotifyTrail id={reassigned.actorId} />}
           </div>
 
-          {task.description && (
-            <div className="blk">
-              <div className="bh">
-                <span className="kk">/ Description</span>
-              </div>
-              <div className="prose">{task.description}</div>
+          <div className="blk">
+            <div className="bh">
+              <span className="kk">/ Description</span>
+              {!editingDesc && (
+                <button
+                  type="button"
+                  className="tl-link"
+                  onClick={() => {
+                    setDescDraft(task.description ?? "");
+                    setEditingDesc(true);
+                  }}
+                >
+                  {task.description ? "Edit" : "Add description"}
+                </button>
+              )}
             </div>
-          )}
+            {editingDesc ? (
+              <div className="desc-edit">
+                <textarea
+                  className="desc-input"
+                  value={descDraft}
+                  onChange={(event) => setDescDraft(event.target.value)}
+                  placeholder="Describe the work — mirrors to the SharePoint Description column."
+                  aria-label="Edit description"
+                  rows={4}
+                  autoFocus
+                />
+                <div className="desc-edit-acts">
+                  <button type="button" className="btn ghost sm" onClick={() => setEditingDesc(false)}>
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    className="btn sm"
+                    onClick={() => {
+                      setTaskDescription(task.id, descDraft.trim());
+                      setEditingDesc(false);
+                    }}
+                  >
+                    Save
+                  </button>
+                </div>
+              </div>
+            ) : task.description ? (
+              <div className="prose">{task.description}</div>
+            ) : (
+              <div className="prose muted">No description yet.</div>
+            )}
+          </div>
 
           {task.evidence && (
             <div className="blk">
@@ -328,53 +526,35 @@ export function TaskDetailView({ route, nav }: ScreenProps) {
             </div>
           )}
 
-          {task.subtasks.length > 0 && (
-            <div className="blk">
-              <div className="bh">
-                <span className="kk">
-                  / Subtasks · <b>{task.subtasks.filter((subtask) => subtask.done).length}</b>/
-                  {task.subtasks.length}
-                </span>
-              </div>
-              <div className="subs">
-                {task.subtasks.map((subtask) => (
-                  <div className={`sub${subtask.done ? " done" : ""}`} key={subtask.id}>
-                    <span className="box">{subtask.done ? "✓" : ""}</span>
-                    <span className="id">{subtask.id}</span>
-                    <span className="t">{subtask.t}</span>
-                    <span className="who">
-                      <Avatar id={subtask.who} size="sm" />
-                    </span>
-                  </div>
-                ))}
-              </div>
+          <div className="blk">
+            <div className="bh">
+              <span className="kk">
+                / Subtasks · <b>{task.subtasks.filter((subtask) => subtask.done).length}</b>/
+                {task.subtasks.length}
+              </span>
             </div>
-          )}
+            <SubtaskList
+              taskId={task.id}
+              subtasks={task.subtasks}
+              // Human-only tasks hide agents from the sub-task assignee picker too.
+              allowAgents={!task.humanOnly}
+              onPromote={(newTaskId) => nav("task", { taskId: newTaskId })}
+            />
+          </div>
 
           <div className="blk">
             <div className="bh">
-              <span className="kk">/ Activity</span>
+              <span className="kk">/ Timeline · comments + activity</span>
             </div>
-            <div className="log">
-              {task.activity.length ? (
-                task.activity.map((entry, index) => {
-                  const actor = ACTORS[entry.who];
-                  return (
-                    <div className="logrow" key={`${entry.what}-${index}`}>
-                      <span>
-                        {actor ? <Avatar id={entry.who} size="sm" /> : <span className="fallback" />}
-                      </span>
-                      <span className="body">
-                        <b>{actor?.name ?? entry.who}</b> {entry.what}
-                      </span>
-                      <span className="age">{entry.age}</span>
-                    </div>
-                  );
-                })
-              ) : (
-                <div className="logempty">No activity yet.</div>
-              )}
-            </div>
+            <Timeline
+              comments={task.comments ?? []}
+              activity={task.activity}
+              people={mentionables()}
+              currentUser={CURRENT_USER}
+              onAdd={(body) => addComment(task.id, body)}
+              onEdit={(commentId, body) => editComment(task.id, commentId, body)}
+              onDelete={(commentId) => deleteComment(task.id, commentId)}
+            />
           </div>
         </div>
 
@@ -398,8 +578,23 @@ export function TaskDetailView({ route, nav }: ScreenProps) {
                       : index === stageIdx
                         ? "now"
                         : "";
+                const isCurrent = stage.key === task.stage;
                 return (
-                  <div className={`s ${cls}`} key={stage.key}>
+                  // Editable lifecycle rail (R7 non-drag path for `stage`):
+                  // clicking a step sets the task's stage via the spine wrapper.
+                  // Stays keyboard-accessible (a real <button>); the current
+                  // stage is a no-op (aria-current marks it).
+                  <button
+                    type="button"
+                    className={`s ${cls}`}
+                    key={stage.key}
+                    onClick={() => {
+                      if (!isCurrent) setTaskStage(task.id, stage.key);
+                    }}
+                    aria-current={isCurrent ? "step" : undefined}
+                    aria-label={`Set stage to ${stage.name}`}
+                    title={isCurrent ? `Current stage · ${stage.name}` : `Move to ${stage.name}`}
+                  >
                     <div className="gut">
                       <span className="mk" />
                       <span className="line" />
@@ -411,7 +606,7 @@ export function TaskDetailView({ route, nav }: ScreenProps) {
                         {stage.gate && <span className="gate">{stage.gate}</span>}
                       </div>
                     </div>
-                  </div>
+                  </button>
                 );
               })}
             </div>
@@ -436,18 +631,147 @@ export function TaskDetailView({ route, nav }: ScreenProps) {
                 <span className="k">Reporter</span>
                 <span className="v">{ACTORS[task.reporter]?.name ?? task.reporter}</span>
               </div>
+              {/* Accountable owner — always human (EN-003). A task can't advance
+                  past Planned without one (enforced in the store + server). */}
               <div className="rfact">
-                <span className="k">Repos</span>
-                <span className="v">
-                  {task.repos.length ? task.repos.map((repo) => <RepoChip key={repo} id={repo} />) : "—"}
+                <span className="k">Accountable owner</span>
+                <span className="v" style={{ position: "relative" }}>
+                  <button
+                    type="button"
+                    className="ntm-field-btn"
+                    onClick={() => setAccountablePickerOpen((open) => !open)}
+                  >
+                    {task.accountableOwner ? (
+                      <span className="who" style={{ display: "flex", alignItems: "center", gap: 7 }}>
+                        <Avatar id={task.accountableOwner} size="sm" />
+                        <span className="nm">{ACTORS[task.accountableOwner]?.name ?? task.accountableOwner}</span>
+                      </span>
+                    ) : (
+                      <span className="unassigned">+ Assign accountable owner</span>
+                    )}
+                    <span className="caret" aria-hidden="true">▾</span>
+                  </button>
+                  {accountablePickerOpen && (
+                    <PeoplePicker
+                      allowAgents={false}
+                      current={task.accountableOwner}
+                      onPick={(actorId) => setAccountableOwner(task.id, actorId)}
+                      onClose={() => setAccountablePickerOpen(false)}
+                      style={{ top: "calc(100% + 6px)", left: 0 }}
+                    />
+                  )}
                 </span>
               </div>
               <div className="rfact">
+                <span className="k">Human-only</span>
+                <span className="v">
+                  <label className="rfact-toggle">
+                    <input
+                      type="checkbox"
+                      checked={!!task.humanOnly}
+                      onChange={(event) => setHumanOnly(task.id, event.target.checked)}
+                      aria-label="Toggle human-only assignment policy"
+                    />
+                    <span>{task.humanOnly ? "Agents blocked" : "Agents allowed"}</span>
+                  </label>
+                </span>
+              </div>
+              {/* Priority — editable (R7 non-drag path); SP-tier, mirrors. */}
+              <div className="rfact">
+                <span className="k">Priority</span>
+                <span className="v">
+                  <label className="rfact-select">
+                    <Priority p={task.priority} />
+                    <select
+                      value={task.priority}
+                      onChange={(event) =>
+                        setTaskPriority(task.id, event.target.value as PriorityKey)
+                      }
+                      aria-label="Set priority"
+                    >
+                      {(Object.entries(PRIORITY) as [PriorityKey, (typeof PRIORITY)[PriorityKey]][]).map(
+                        ([key, cfg]) => (
+                          <option key={key} value={key}>
+                            {cfg.label}
+                          </option>
+                        )
+                      )}
+                    </select>
+                    <span className="caret" aria-hidden="true">▾</span>
+                  </label>
+                </span>
+              </div>
+              {/* Initiative (bucket) — editable, DB-only (Initiative is an SP
+                  Lookup → Roadmap; the lookup-id write lands with the directory
+                  increment, so no sync claim here). This is also the non-drag /
+                  touch-reachable path for `bucket` (R7). */}
+              <div className="rfact">
+                <span className="k">Initiative</span>
+                <span className="v">
+                  <label className="rfact-select">
+                    <select
+                      value={task.bucket}
+                      onChange={(event) => setTaskBucket(task.id, event.target.value)}
+                      aria-label="Set initiative"
+                    >
+                      {allBuckets().map((bucketOption) => (
+                        <option key={bucketOption.id} value={bucketOption.id}>
+                          {bucketOption.name}
+                        </option>
+                      ))}
+                    </select>
+                    <span className="caret" aria-hidden="true">▾</span>
+                  </label>
+                  <span
+                    className="rfact-note"
+                    title="Initiative mirror lands with the directory/lookup increment"
+                  >
+                    mirror deferred
+                  </span>
+                </span>
+              </div>
+              {/* Repos — editable target (PUSHED). Lifecycle-gated: free while
+                  planning / unset, locked behind Retarget once in flight. */}
+              <div className="rfact">
+                <span className="k">Repos</span>
+                <span className="v">
+                  <RepoFact key={task.id} task={task} />
+                </span>
+              </div>
+              {/* Target environment — editable (PUSHED). Not lifecycle-locked:
+                  staging → production is normal progression toward go-live. */}
+              <div className="rfact">
+                <span className="k">Environment</span>
+                <span className="v">
+                  <label className="rfact-select">
+                    <select
+                      value={task.targetEnv ?? "staging"}
+                      onChange={(event) =>
+                        setTaskTargetEnv(task.id, event.target.value as TargetEnv)
+                      }
+                      aria-label="Set target environment"
+                    >
+                      {(Object.entries(TARGET_ENV) as [TargetEnv, (typeof TARGET_ENV)[TargetEnv]][]).map(
+                        ([key, cfg]) => (
+                          <option key={key} value={key}>
+                            {cfg.label}
+                          </option>
+                        )
+                      )}
+                    </select>
+                    <span className="caret" aria-hidden="true">▾</span>
+                  </label>
+                </span>
+              </div>
+              {/* Labels — editable inline (DB-only, no sync claim). Shares the
+                  LabelEditor with the New Task modal (Pillar 3). */}
+              <div className="rfact">
                 <span className="k">Labels</span>
                 <span className="v">
-                  {task.labels.length
-                    ? task.labels.map((label) => <Label key={label} text={label} />)
-                    : "—"}
+                  <LabelEditor
+                    labels={task.labels}
+                    onChange={(labels) => setTaskLabels(task.id, labels)}
+                  />
                 </span>
               </div>
               <div className="rfact">
