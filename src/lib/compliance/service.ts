@@ -146,10 +146,14 @@ async function recordVerdict(
   actorKind: ActorKind,
   taskId: string | null,
   actorIdentity: string,
-  result: VerifyResult
+  result: VerifyResult,
+  // Stable per-record key: the resolved taskId, else the checkout id (so several
+  // INVALID checkouts on one PR — all taskId null — don't collide on a single
+  // "none" row), else null for an operator PR.
+  subjectId: string | null
 ): Promise<void> {
   await repo.recordCheck({
-    id: checkId(input.repo, input.prNumber, input.headSha, taskId),
+    id: checkId(input.repo, input.prNumber, input.headSha, subjectId),
     repo: input.repo,
     prNumber: input.prNumber,
     headSha: input.headSha,
@@ -165,10 +169,10 @@ async function recordVerdict(
     taskId,
     pr: String(input.prNumber),
     payload: { actorKind, tier, headSha: input.headSha, reasons: result.reasons },
-    // Idempotent per (repo, pr, sha, task, verdict): a replay dedups; a re-verify
-    // that flips a task's verdict still records (review S3). taskId keeps the
-    // tasks of a multi-task PR distinct.
-    dedupKey: `gate:${input.repo}:${input.prNumber}:${input.headSha}:${taskId ?? "none"}:${result.verdict}`,
+    // Idempotent per (repo, pr, sha, subject, verdict): a replay dedups; a
+    // re-verify that flips a verdict still records (review S3). subjectId keeps
+    // each task — and each invalid checkout — of a multi-task PR distinct.
+    dedupKey: `gate:${input.repo}:${input.prNumber}:${input.headSha}:${subjectId ?? "none"}:${result.verdict}`,
   });
 }
 
@@ -188,7 +192,7 @@ export async function verifyPr(input: VerifyPrInput): Promise<VerifyPrResult> {
   // "unknown" (no server bucket store yet, EN-005/006) → advisory (review S1).
   if (ids.length === 0) {
     const result = verifyCompliance({ task: null, actor: "operator", tier, bucketPrd: "unknown" });
-    await recordVerdict(input, tier, "operator", null, "operator", result);
+    await recordVerdict(input, tier, "operator", null, "operator", result, null);
     return { ...result, tier, actorKind: "operator", taskId: null, tasks: [] };
   }
 
@@ -202,7 +206,7 @@ export async function verifyPr(input: VerifyPrInput): Promise<VerifyPrResult> {
     const actorIdentity = d?.runtime ?? "agent";
     const task = await loadTask(taskId);
     const result = verifyCompliance({ task, actor: "agent", tier, bucketPrd: "unknown" });
-    await recordVerdict(input, tier, "agent", taskId, actorIdentity, result);
+    await recordVerdict(input, tier, "agent", taskId, actorIdentity, result, taskId ?? cid);
     tasks.push({ checkoutId: cid, taskId, verdict: result.verdict, reasons: result.reasons });
   }
 

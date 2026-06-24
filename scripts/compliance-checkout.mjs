@@ -26,6 +26,8 @@
 // self-authenticate. Against a gated instance set MC_BASIC_AUTH (break-glass);
 // local/open dev needs none.
 
+import { pathToFileURL } from "node:url";
+
 /**
  * @param {{
  *   env?: Record<string, string | undefined>,
@@ -101,8 +103,10 @@ export async function capture({ env = process.env, fetch = globalThis.fetch, log
   return { enabled: true, created, stamps, taskIds };
 }
 
-// Run when invoked as a CLI (the hook), not when imported by a test.
-if (import.meta.url === `file://${process.argv[1]}`) {
+// Run when invoked as a CLI (the hook), not when imported by a test. pathToFileURL
+// makes this robust to relative paths, symlinks, spaces, and Windows drive letters
+// (a hand-built `file://` + argv[1] is none of those).
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   capture().catch((e) => {
     console.error(`[compliance-capture] ${e.message}`);
     process.exit(1);
