@@ -78,7 +78,6 @@ standard `{ data, meta }` envelope, and composed swarm delegation.
 | Stdio client | `tools/plx-mc-mcp/index.ts` |
 | Cursor REST API | `/api/cursor/*` |
 | Streamable HTTP MCP | `/api/cursor/mcp` |
-| Legacy shim | `tools/swarm-dispatch-mcp/` (deprecated — use PLX-MC) |
 
 | Attribute | Value |
 |---|---|
