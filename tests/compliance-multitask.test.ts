@@ -154,4 +154,24 @@ describe("verifyPr — multi-task PRs (checkoutIds)", () => {
     expect(db.checks.filter((c) => c.id.includes("_34_")).length).toBe(2);
     expect(db.events.filter((e) => e.kind === "gate.passed").length).toBe(2);
   });
+
+  it("records each INVALID checkout distinctly — no audit-key collision on the null task", async () => {
+    // Two expired checkouts → both resolve to null task → both block. Keyed by
+    // checkout id (not the shared null task), so they are two distinct check rows.
+    const expired = (id: string, taskId: string) => ({
+      id, actorKind: "agent" as const, runtime: "cursor", taskId,
+      accountableHuman: "vince", repo: "PLX_MC", revoked: false,
+      expiresAt: new Date(Date.now() - 1000).toISOString(),
+    });
+    db.dispatches.set("dsp_x", expired("dsp_x", "TASK-1"));
+    db.dispatches.set("dsp_y", expired("dsp_y", "TASK-2"));
+
+    const r = await verifyPr({ repo: "PLX_MC", prNumber: 35, headSha: "sha35", changedPaths: ["src/x.ts"], checkoutIds: ["dsp_x", "dsp_y"] });
+
+    expect(r.verdict).toBe("block");
+    expect(r.tasks.length).toBe(2);
+    // Two distinct block rows (would be 1 if the null-task keys collided).
+    expect(db.checks.filter((c) => c.id.includes("_35_") && c.verdict === "block").length).toBe(2);
+    expect(db.events.filter((e) => e.kind === "gate.blocked").length).toBe(2);
+  });
 });

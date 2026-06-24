@@ -58,6 +58,10 @@ jobs:
             | { grep -oE 'MC-Checkout: dsp_[A-Za-z0-9]+' || true; } \
             | sed 's/.* //' | sort -u \
             | jq -R -s 'split("\n") | map(select(length>0))')
+          # Also send checkoutId (first stamp) so a not-yet-deployed single-task
+          # verify still gates the PR during the deploy window (back-compat); the
+          # multi-task verify prefers checkoutIds and ignores it.
+          checkout=$(printf '%s' "$checkoutIds" | jq -r '.[0] // ""')
           body=$(jq -n \
             --arg repo "$REPO_NAME" \
             --argjson prNumber "$PR_NUMBER" \
@@ -65,7 +69,9 @@ jobs:
             --argjson changedPaths "$changed" \
             --argjson labels "${PR_LABELS:-[]}" \
             --argjson checkoutIds "${checkoutIds:-[]}" \
-            '{repo:$repo, prNumber:$prNumber, headSha:$headSha, changedPaths:$changedPaths, labels:$labels, checkoutIds:$checkoutIds}')
+            --arg checkoutId "${checkout:-}" \
+            '{repo:$repo, prNumber:$prNumber, headSha:$headSha, changedPaths:$changedPaths, labels:$labels, checkoutIds:$checkoutIds}
+             + (if $checkoutId != "" then {checkoutId:$checkoutId} else {} end)')
           resp=$(curl -sS --max-time 20 -X POST "${MC_BASE_URL%/}/api/compliance/verify" \
             -H 'content-type: application/json' \
             -H "authorization: Bearer ${MC_CI_TOKEN:-}" \
