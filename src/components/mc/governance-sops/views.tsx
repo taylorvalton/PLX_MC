@@ -91,8 +91,16 @@ function Block({ node }: { node: MdNode }) {
     case "hr":
       return <hr className="gs-hr" />;
     case "code":
+      // Focusable + labelled so the horizontal scroll on long code lines is
+      // reachable by keyboard (axe scrollable-region-focusable).
       return (
-        <pre className="gs-pre" data-lang={node.lang ?? undefined}>
+        <pre
+          className="gs-pre"
+          data-lang={node.lang ?? undefined}
+          tabIndex={0}
+          role="group"
+          aria-label={node.lang ? `Code block (${node.lang})` : "Code block"}
+        >
           <code>{node.value}</code>
         </pre>
       );
