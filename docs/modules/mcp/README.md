@@ -19,7 +19,7 @@ dispatch logic.
 | REST cursor API | `src/app/api/cursor/*` — self-auth via `PLX_MC_MCP_API_KEY` + operator headers |
 | Streamable HTTP MCP | `GET/POST/DELETE /api/cursor/mcp` — remote team registration |
 | Stdio MCP client | `tools/plx-mc-mcp/index.ts` — local Cursor + Cloud Agents |
-| Swarm compose | `tools/plx-mc-mcp/lib/swarm-client.mjs` (shared with legacy `swarm-dispatch-mcp`) |
+| Swarm compose | `tools/plx-mc-mcp/lib/swarm-client.mjs` (composed into the PLX-MC client) |
 | Audit | `mcp.tool.invoked` events in `mc_events` via `src/lib/mcp/audit.ts` |
 | Capture hook | `scripts/compliance-checkout.mjs` prefers `/api/cursor/checkout` when `MC_MCP_API_KEY` set |
 
@@ -48,7 +48,8 @@ session-gated `/api/tasks`) when `MC_MCP_API_KEY` is set.
 
 - `src/lib/compliance/*` — checkout/complete ledger
 - `src/lib/sync/*` — task mutations → SharePoint mirror
-- `tools/swarm-dispatch-mcp/` — legacy stdio shim (deprecated; use PLX-MC server)
+- swarm delegation runs through the composed `swarm-client.mjs` in the PLX-MC client
+  (the standalone `swarm-dispatch-mcp` shim was removed in P5)
 - `@modelcontextprotocol/sdk` — stdio + Streamable HTTP transport
 
 ## Owner
