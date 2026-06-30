@@ -67,7 +67,9 @@ def main() -> int:
     parser.add_argument(
         "--allowlist",
         type=Path,
-        default=Path(__file__).resolve().parent.parent / "config" / "company-skills-allowlist.json",
+        default=Path(__file__).resolve().parent.parent
+        / "config"
+        / "company-skills-allowlist.json",
     )
     parser.add_argument(
         "--swarm-root",
@@ -82,7 +84,9 @@ def main() -> int:
         help="Output plx-cursor-skills repo root",
     )
     parser.add_argument("--version", default="1.0.0")
-    parser.add_argument("--git-ref", default="", help="Commit SHA (fill after first commit if empty)")
+    parser.add_argument(
+        "--git-ref", default="", help="Commit SHA (fill after first commit if empty)"
+    )
     args = parser.parse_args()
 
     allowlist = json.loads(args.allowlist.read_text(encoding="utf-8"))
@@ -95,7 +99,12 @@ def main() -> int:
     out_skills = args.out / "skills"
     out_skills.mkdir(parents=True, exist_ok=True)
 
-    imported_at = datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+    imported_at = (
+        datetime.now(timezone.utc)
+        .replace(microsecond=0)
+        .isoformat()
+        .replace("+00:00", "Z")
+    )
     manifest_skills = []
 
     for sid in skill_ids:
@@ -149,13 +158,20 @@ def main() -> int:
         "skills": manifest_skills,
     }
 
-    schema_src = args.allowlist.parent.parent / "docs" / "plx-cursor-skills" / "manifest.schema.json"
+    schema_src = (
+        args.allowlist.parent.parent
+        / "docs"
+        / "plx-cursor-skills"
+        / "manifest.schema.json"
+    )
     schemas_dir = args.out / "schemas"
     schemas_dir.mkdir(parents=True, exist_ok=True)
     if schema_src.is_file():
         shutil.copy2(schema_src, schemas_dir / "manifest.schema.json")
 
-    (args.out / "manifest.json").write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
+    (args.out / "manifest.json").write_text(
+        json.dumps(manifest, indent=2) + "\n", encoding="utf-8"
+    )
     print(f"Wrote manifest.json ({len(manifest_skills)} skills) -> {args.out}")
     return 0
 
