@@ -24,15 +24,21 @@ test.describe("MC-SOP-Guide (governance-sops)", () => {
     await expect(navItem).toHaveClass(/active/);
   });
 
-  test("index lists the seed catalog; Collaborator SOP is active + ready", async ({ page }) => {
+  test("index lists the seed catalog; active SOPs are ready", async ({ page }) => {
     const rows = page.locator("[data-testid='gs-row']");
-    await expect(rows).toHaveCount(4);
+    await expect(rows).toHaveCount(5);
 
     const collab = page.locator("[data-testid='gs-row'][data-slug='mc-sop-collaborator']");
     await expect(collab).toBeVisible();
     await expect(collab).toHaveAttribute("data-state", "ready");
     await expect(collab).toContainText("Collaborator SOP");
     await expect(collab).toContainText("Active");
+
+    const skills = page.locator("[data-testid='gs-row'][data-slug='mc-sop-skills']");
+    await expect(skills).toBeVisible();
+    await expect(skills).toHaveAttribute("data-state", "ready");
+    await expect(skills).toContainText("Company Skills SOP");
+    await expect(skills).toContainText("Active");
 
     // A planned entry renders as a calm "coming soon" row (visible, not hidden).
     const planned = page.locator("[data-testid='gs-row'][data-state='planned']").first();
@@ -72,6 +78,18 @@ test.describe("MC-SOP-Guide (governance-sops)", () => {
     await page.locator(".gs-back").first().click();
     await expect(page.locator("[data-testid='gs-index-table']")).toBeVisible();
     await expect(detail).not.toBeVisible();
+  });
+
+  test("opens the Company Skills SOP and renders bootstrap guidance", async ({ page }) => {
+    await page.locator("[data-testid='gs-row'][data-slug='mc-sop-skills']").click();
+
+    const detail = page.locator("[data-testid='gs-detail-view']");
+    await expect(detail).toBeVisible();
+    await expect(detail.locator(".gs-doc-title")).toContainText("Company Skills SOP");
+
+    const reader = page.locator("[data-testid='gs-reader']");
+    await expect(reader).toContainText("plx-cursor-skills");
+    await expect(reader.locator("table.gs-table").first()).toBeVisible();
   });
 
   test("a planned SOP opens a calm no-content panel (loud-but-not-error)", async ({ page }) => {

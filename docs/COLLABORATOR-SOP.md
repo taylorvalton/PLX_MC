@@ -199,48 +199,24 @@ metadata is captured — never your source code.
 
 ## 9. Personal environment — company skills + PLX-MC MCP
 
+> **Full guide:** Mission Control → **SOP guide** → **Company Skills SOP**
+> (`docs/SKILLS-SOP.md`) — install, verify, share skills, troubleshooting.
+
 **PLX-MC access and company skills are separate.** Registering the PLX-MC MCP server
 (checkout / progress / complete) does **not** install Cursor or Claude skills on your
 machine. Do both steps below once per laptop (and again after the company catalog
 changes).
 
-### 9.1 Company-approved skills (curated subset)
+### 9.1 Company-approved skills (quick start)
 
-The full `agentic-swarm` repo contains operator-only skills (trading loops, VMC
-autopilot, etc.). **Do not** run the all-skills installer unless you are on the
-operator fleet.
+The full `agentic-swarm` repo contains operator-only skills. **Do not** run the
+all-skills installer on a team laptop.
 
-Instead, bootstrap from the **`taylorvalton/plx-cursor-skills`** content repo
-(company-approved catalog only):
+Instead, bootstrap from **`taylorvalton/plx-cursor-skills`** (29 published skills):
 
-**Windows (Git Bash required):**
+**Windows:** `.\scripts\bootstrap-company-skills.ps1` · **macOS/Linux:** `./scripts/bootstrap-company-skills.sh`
 
-```powershell
-cd C:\path\to\PLX_MC   # or plx-customer-portal
-.\scripts\bootstrap-company-skills.ps1
-```
-
-**macOS / Linux:**
-
-```bash
-cd /path/to/PLX_MC
-./scripts/bootstrap-company-skills.sh
-```
-
-What it does:
-
-1. Clone or update `~/plx-cursor-skills` (or `%USERPROFILE%\plx-cursor-skills` on Windows).
-2. Install **published** skills from `manifest.json` into `~/.cursor/skills` and `~/.claude/skills`.
-3. Merge any **project-native** skills from this repo (e.g. `mc-sync`).
-4. Mirror the combined set into the project `.cursor/skills/` and `.agents/skills/`.
-5. Write `~/.agentic/skills.registry.json` for runtimes that read the registry.
-
-**After bootstrap:** start a **new** Cursor Agent session — skills load at session
-start, not mid-chat.
-
-Dry run: add `--dry-run` (bash) or `-DryRun` (PowerShell).
-
-To refresh after catalog updates: re-run the same command.
+Then start a **new** Cursor session. See **Company Skills SOP** for verify, refresh, and share workflows.
 
 ### 9.2 PLX-MC MCP (task governance)
 
@@ -253,10 +229,8 @@ Follow `docs/runbooks/plx-mc-mcp-team-registration.md`:
   `taylorvalton/plx-customer-portal`).
 - Verify with tool `mc_self_check`.
 
-### 9.3 Sharing a personal skill (future)
+### 9.3 Sharing a personal skill
 
-A **Skills Directory** module in Mission Control (planned) will let you opt in to
-share a skill you authored locally — see `docs/SKILLS-DIRECTORY-ARCHITECTURE.md`
-for the target design (separate content repo + MC approval workflow). Until that
-ships, propose additions by PR to `taylorvalton/plx-cursor-skills`.
+See **Company Skills SOP** (SOP guide in Mission Control) — §8 covers the PR workflow
+to `taylorvalton/plx-cursor-skills` until the Skills Directory UI ships.
 

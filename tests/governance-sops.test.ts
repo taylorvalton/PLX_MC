@@ -223,4 +223,18 @@ describe("seed registry + Collaborator SOP (integration)", () => {
       expect(detail.nodes.some((n) => n.type === "table")).toBe(true);
     }
   });
+
+  it("loads + renders the real Skills SOP", async () => {
+    const raw = readFileSync(join(process.cwd(), "config/governance-sops-registry.json"), "utf8");
+    const r = parseSopRegistryJson(raw);
+    if (!r.ok) throw new Error("seed registry invalid");
+    const skills = r.config.sops.find((s) => s.slug === "mc-sop-skills")!;
+    expect(skills.status).toBe("active");
+    const detail = await getSopDetail(skills, createSopSource());
+    expect(detail.ok).toBe(true);
+    if (detail.ok) {
+      expect(detail.nodes.length).toBeGreaterThan(5);
+      expect(detail.toc.some((h) => /install/i.test(h.text))).toBe(true);
+    }
+  });
 });
