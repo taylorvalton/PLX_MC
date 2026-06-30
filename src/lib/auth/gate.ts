@@ -29,7 +29,8 @@ export function isPublicAsset(pathname: string): boolean {
   return (
     pathname === "/signin" ||
     pathname.startsWith("/brand/") ||
-    pathname.startsWith("/fonts/")
+    pathname.startsWith("/fonts/") ||
+    pathname.startsWith("/presentations/")
   );
 }
 
