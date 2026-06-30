@@ -72,6 +72,7 @@ describe("public asset + sign-in bypass", () => {
     expect(isPublicAsset("/signin")).toBe(true);
     expect(isPublicAsset("/brand/logo-horizontal-ink.png")).toBe(true);
     expect(isPublicAsset("/fonts/mazius/MaziusDisplay-Regular.woff2")).toBe(true);
+    expect(isPublicAsset("/presentations/plx-platform-vision.html")).toBe(true);
     expect(isPublicAsset("/")).toBe(false);
     expect(isPublicAsset("/tasks")).toBe(false);
     // Prefix safety: a sibling route must not inherit the /brand/ bypass.

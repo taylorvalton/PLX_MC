@@ -27,6 +27,6 @@ export const config = {
   // `/api/cursor/*` is exempt because every handler verifies PLX_MC_MCP_API_KEY
   // + operator allowlist server-side (same pattern as VMC cursor routes).
   matcher: [
-    "/((?!api/auth|api/cron|api/compliance/webhook|api/compliance/verify|api/cursor|_next/static|_next/image|favicon.ico|signin|brand|fonts).*)",
+    "/((?!api/auth|api/cron|api/compliance/webhook|api/compliance/verify|api/cursor|_next/static|_next/image|favicon.ico|signin|brand|fonts|presentations).*)",
   ],
 };
