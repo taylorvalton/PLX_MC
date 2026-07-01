@@ -110,7 +110,7 @@ describe("skills-directory catalog config", () => {
     }
   });
 
-  it("parses legacy v2 allowlist with skills[]", () => {
+  it("parses deprecated v2 allowlist redirect with empty skills[]", () => {
     const raw = readFileSync(
       join(process.cwd(), "config/company-skills-allowlist.json"),
       "utf8"
@@ -118,7 +118,8 @@ describe("skills-directory catalog config", () => {
     const r = parseAllowlistJson(raw);
     expect(r.ok).toBe(true);
     if (r.ok) {
-      expect(r.config.skills.length).toBeGreaterThan(20);
+      expect(r.config.skills).toEqual([]);
+      expect(r.config.schemaVersion).toBe("plx-company-skills-allowlist/v2");
     }
   });
 
