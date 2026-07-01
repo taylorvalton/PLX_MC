@@ -19,7 +19,13 @@ const { publicKey, privateKey } = generateKeyPairSync("rsa", {
   privateKeyEncoding: { type: "pkcs8", format: "pem" },
 });
 
-const APP_ENV = ["GITHUB_APP_ID", "GITHUB_APP_PRIVATE_KEY", "GITHUB_APP_INSTALLATION_ID", "GITHUB_TOKEN"] as const;
+const APP_ENV = [
+  "GITHUB_APP_ID",
+  "GITHUB_APP_PRIVATE_KEY",
+  "GITHUB_APP_INSTALLATION_ID",
+  "GITHUB_APP_INSTALLATION_ID_PLX",
+  "GITHUB_TOKEN",
+] as const;
 const saved: Record<string, string | undefined> = {};
 
 function configureApp() {
@@ -158,5 +164,17 @@ describe("resolveGithubToken fallback contract", () => {
     expect(token).toBe("ghp_fallback");
     expect(warn).toHaveBeenCalled();
     warn.mockRestore();
+  });
+
+  it("uses the PAT for petralabx when the org App installation is not configured", async () => {
+    configureApp();
+    process.env.GITHUB_TOKEN = "ghp_org_fallback";
+    const fetchImpl = vi.fn(async () => tokenResponse("ghs_app", Date.now() + 3_600_000));
+    const token = await resolveGithubToken({
+      repoOwner: "petralabx",
+      fetchImpl: fetchImpl as unknown as typeof fetch,
+    });
+    expect(token).toBe("ghp_org_fallback");
+    expect(fetchImpl).not.toHaveBeenCalled();
   });
 });
