@@ -19,7 +19,13 @@ const { publicKey, privateKey } = generateKeyPairSync("rsa", {
   privateKeyEncoding: { type: "pkcs8", format: "pem" },
 });
 
-const APP_ENV = ["GITHUB_APP_ID", "GITHUB_APP_PRIVATE_KEY", "GITHUB_APP_INSTALLATION_ID", "GITHUB_TOKEN"] as const;
+const APP_ENV = [
+  "GITHUB_APP_ID",
+  "GITHUB_APP_PRIVATE_KEY",
+  "GITHUB_APP_INSTALLATION_ID",
+  "GITHUB_APP_INSTALLATION_ID_PLX",
+  "GITHUB_TOKEN",
+] as const;
 const saved: Record<string, string | undefined> = {};
 
 function configureApp() {
