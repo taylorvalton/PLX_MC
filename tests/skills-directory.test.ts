@@ -4,8 +4,9 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
+import { PATCH as patchSubmission } from "@/app/api/skills-directory/submissions/[id]/route";
 import {
   buildSkillsInstallPlan,
   createSkillSubmission,
@@ -17,6 +18,7 @@ import {
   packageSkillIds,
   parseAllowlistJson,
   parseManifestJson,
+  publishApprovedSkillSubmission,
   parseSkillsRegistryJson,
   publishedSkills,
   resolveAllowIds,
@@ -27,6 +29,8 @@ import type {
   CatalogPointer,
   ContentFetchResult,
   ManifestFetchResult,
+  SkillSubmission,
+  SkillsPublishGithubClient,
   SkillsSourceReader,
 } from "@/lib/skills-directory";
 
@@ -61,6 +65,10 @@ if (!parsedFixtureManifest.ok) {
   throw new Error("fixture manifest invalid");
 }
 const FIXTURE_MANIFEST_OBJ = parsedFixtureManifest.manifest;
+
+afterEach(() => {
+  vi.unstubAllEnvs();
+});
 
 function fakeSource(opts: {
   manifest?: ManifestFetchResult;
@@ -295,5 +303,147 @@ describe("skills-directory submissions store", () => {
     });
     expect(updated?.status).toBe("approved");
     expect(updated?.reviewComment).toBe("Ship it.");
+  });
+});
+
+describe("skills-directory publish", () => {
+  const submission: SkillSubmission = {
+    id: "skill-sub-123",
+    skillId: "new-skill",
+    title: "New Skill",
+    description: "Adds a new company skill.",
+    submitterEmail: "vince@petrasoap.com",
+    contentUrl: "https://example.com/new-skill/SKILL.md",
+    status: "pending",
+    createdAt: "2026-07-01T12:00:00.000Z",
+    updatedAt: "2026-07-01T12:00:00.000Z",
+  };
+
+  it("returns publish-instructions.md content when GitHub writes are disabled", async () => {
+    const result = await publishApprovedSkillSubmission(submission, {
+      writeEnabled: false,
+      now: new Date("2026-07-01T12:00:00.000Z"),
+    });
+
+    expect(result.mode).toBe("instructions");
+    if (result.mode === "instructions") {
+      expect(result.branchName).toBe("submit/skill-sub-123-20260701T120000Z");
+      expect(result.instructionsPath).toBe("publish-instructions.md");
+      expect(result.content).toContain("SKILLS_SUBMIT_GITHUB_WRITE_ENABLED");
+      expect(result.content).toContain("skills/new-skill/SKILL.md");
+      expect(result.content).toContain('status: "published"');
+    }
+  });
+
+  it("creates a publish branch, writes skill + manifest, and opens a PR", async () => {
+    const manifest = {
+      ...FIXTURE_MANIFEST_OBJ,
+      packages: [
+        {
+          id: "plx-engineering-core",
+          name: "PLX Engineering Core",
+          skillIds: ["create-skill"],
+        },
+      ],
+      skills: [
+        ...FIXTURE_MANIFEST_OBJ.skills,
+        {
+          id: "new-skill",
+          name: "New Skill",
+          description: "Waiting for approval.",
+          status: "pending_review",
+          contentPath: "skills/new-skill/",
+        },
+      ],
+    };
+    const calls: string[] = [];
+    const writes: Array<{ path: string; content: string; sha?: string }> = [];
+    const github: SkillsPublishGithubClient = {
+      async getBranchHead(input) {
+        calls.push(`head:${input.branch}`);
+        return "base-sha";
+      },
+      async createBranch(input) {
+        calls.push(`branch:${input.branch}:${input.sha}`);
+      },
+      async getFile(input) {
+        calls.push(`get:${input.path}:${input.ref}`);
+        if (input.path === "manifest.json") {
+          return { sha: "manifest-sha", content: JSON.stringify(manifest) };
+        }
+        return null;
+      },
+      async putFile(input) {
+        calls.push(`put:${input.path}:${input.branch}`);
+        writes.push({
+          path: input.path,
+          content: input.content,
+          sha: input.sha,
+        });
+      },
+      async openPullRequest(input) {
+        calls.push(`pr:${input.head}:${input.base}`);
+        return {
+          number: 42,
+          htmlUrl: `https://github.com/taylorvalton/plx-cursor-skills/pull/42`,
+        };
+      },
+    };
+    const fetchImpl = vi.fn(async () => new Response("# New Skill\n\nInstructions.\n"));
+
+    const result = await publishApprovedSkillSubmission(submission, {
+      github,
+      fetchImpl,
+      token: "test-token",
+      writeEnabled: true,
+      now: new Date("2026-07-01T12:00:00.000Z"),
+    });
+
+    expect(result.mode).toBe("github_pr");
+    expect(fetchImpl).toHaveBeenCalledWith(submission.contentUrl, {
+      headers: { accept: "text/plain, text/markdown, */*" },
+    });
+    expect(calls).toContain("branch:submit/skill-sub-123-20260701T120000Z:base-sha");
+    expect(calls).toContain("pr:submit/skill-sub-123-20260701T120000Z:main");
+    const skillWrite = writes.find((w) => w.path === "skills/new-skill/SKILL.md");
+    expect(skillWrite?.content).toBe("# New Skill\n\nInstructions.\n");
+    const manifestWrite = writes.find((w) => w.path === "manifest.json");
+    expect(manifestWrite?.sha).toBe("manifest-sha");
+    const nextManifest = JSON.parse(manifestWrite?.content ?? "{}");
+    const nextEntry = nextManifest.skills.find(
+      (entry: { id: string }) => entry.id === "new-skill"
+    );
+    expect(nextEntry.status).toBe("published");
+    expect(nextManifest.packages[0].skillIds).toEqual(["create-skill", "new-skill"]);
+  });
+
+  it("approval PATCH includes publish fallback metadata", async () => {
+    vi.stubEnv("PLX_MC_DATABASE_URL", "");
+    vi.stubEnv("SKILLS_SUBMIT_GITHUB_WRITE_ENABLED", "0");
+    const created = await createSkillSubmission({
+      skillId: "api-skill",
+      title: "API Skill",
+      submitterEmail: "vince@petrasoap.com",
+      description: "API publish check.",
+    });
+
+    const res = await patchSubmission(
+      new Request(`http://localhost/api/skills-directory/submissions/${created.id}`, {
+        method: "PATCH",
+        body: JSON.stringify({
+          status: "approved",
+          reviewComment: "Approved through API.",
+        }),
+      }),
+      { params: Promise.resolve({ id: created.id }) }
+    );
+    const body = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(body.data.status).toBe("approved");
+    expect(body.data.reviewComment).toBe("Approved through API.");
+    expect(body.data.publish.mode).toBe("instructions");
+    expect(body.data.publish.instructionsPath).toBe("publish-instructions.md");
+    expect(body.data.publish.content).toContain("skills/api-skill/SKILL.md");
   });
 });

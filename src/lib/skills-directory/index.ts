@@ -20,6 +20,12 @@ export type {
   SkillSubmissionStatus,
   UpdateSkillSubmissionInput,
 } from "./submissions-store";
+export type {
+  GithubFile,
+  GithubPullRequest,
+  SkillPublishResult,
+  SkillsPublishGithubClient,
+} from "./publish";
 
 export {
   CATALOG_CONFIG_FILES,
@@ -48,3 +54,4 @@ export {
   listSkillSubmissions,
   updateSkillSubmission,
 } from "./submissions-store";
+export { buildPublishedManifest, publishApprovedSkillSubmission } from "./publish";
