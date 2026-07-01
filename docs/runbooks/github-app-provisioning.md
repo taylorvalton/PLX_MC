@@ -15,7 +15,8 @@ private key lives only in the secret stores — never here):
 
 - **App:** `PLX MC Compliance` (slug `plx-mc-compliance`), **App ID `4125227`**
 - **Installation ID `142149327`** (account `taylorvalton`, selected repos:
-  `agentic-swarm`, `PLX_MC`, `plx-customer-portal`)
+  `agentic-swarm`, `PLX_MC`, `plx-customer-portal`, **`plx-cursor-skills`**
+  — required for Skills Directory; see Step 2a)
 - **PLX org installation (EN-008):** install the same App on
   [`petralabx`](https://github.com/petralabx) and store the org installation id as
   `GITHUB_APP_INSTALLATION_ID_PLX` (see Step 2b). Code routes by repo owner via
@@ -25,7 +26,8 @@ private key lives only in the secret stores — never here):
   `staging/ec2-secrets`, and Vercel project `plx-mission-control`
   (production + preview). Production was redeployed to pick them up.
 - **Verified:** installation token mints with `contents:read, metadata:read` and
-  resolves all three repos.
+  resolves loop-ledger repos; Skills Directory additionally requires
+  `plx-cursor-skills` on the same installation (Step 2a + Step 4).
 - **PAT note:** Vercel never had a `GITHUB_TOKEN` (the deployed app is App-only).
   The AWS `GITHUB_TOKEN` is a **shared** dev-box credential used by other tooling
   and was intentionally left in place — do not remove it as part of this module.
@@ -54,9 +56,29 @@ the `taylorvalton` account):
 
 On the App page → **Install App** → install on the `taylorvalton` account →
 **Only select repositories** → choose `agentic-swarm`, `PLX_MC`,
-`plx-customer-portal`. After installing, the URL is
+`plx-customer-portal`, and **`plx-cursor-skills`**. After installing, the URL is
 `…/settings/installations/{INSTALLATION_ID}` — note the **Installation ID**
 (or `GET /app/installations` with an App JWT returns it).
+
+## Step 2a — Add `plx-cursor-skills` to an existing install (Phase 3)
+
+Skills Directory (`GET /api/skills-directory`) reads the private content repo
+via `resolveGithubToken()`. If `plx-cursor-skills` is **not** on installation
+`142149327`, the catalog loads **degraded** (allowlist ids only — no manifest
+metadata or rendered `SKILL.md`).
+
+**One-time (account owner):**
+
+1. GitHub → **Settings → Developer settings → GitHub Apps → PLX MC Compliance**
+   → **Install App** → **Configure** on the `taylorvalton` installation.
+2. Under **Repository access**, add **`plx-cursor-skills`** (keep the other repos).
+3. **Redeploy** Vercel production (`plx-mission-control`) so the running build
+   picks up no secret change — optional but recommended after any App-scope change.
+4. Verify (Step 4 — Skills Directory row).
+
+> **API note:** `PUT /user/installations/{installation_id}/repositories/{repository_id}`
+> requires App-admin permission on the account. If automation gets HTTP 403, use the
+> UI above. Repo id for `taylorvalton/plx-cursor-skills`: `1285406973`.
 
 ## Step 2b — Install the App on `petralabx` (EN-008, one-time)
 
@@ -106,6 +128,31 @@ python scripts/sync-github-app-plx-installation.py --installation-id <ORG_INSTAL
 No code change is needed — `githubAppConfigured()` flips true once all three are
 present and the module starts minting installation tokens automatically.
 
+## Step 3a — Skills Directory publish writes (Phase 4 P5, optional)
+
+The GitHub App above remains read-only. Skills Directory submission approval can
+optionally create a publish PR in `taylorvalton/plx-cursor-skills`, but only when
+the separate write gate is explicitly enabled.
+
+Create a fine-scoped token for **only** `taylorvalton/plx-cursor-skills` with:
+
+- Contents: **Read and write** (create `submit/<id>-<ts>` branches and write
+  `skills/<id>/SKILL.md` + `manifest.json`)
+- Pull requests: **Read and write** (open the publish PR)
+- Metadata: **Read-only** (automatic)
+
+Store these keys in the same runtime secret stores used by PLX_MC:
+
+| Key | Value |
+|---|---|
+| `SKILLS_SUBMIT_GITHUB_WRITE_ENABLED` | `1` to enable writes; unset/`0` keeps fallback mode |
+| `SKILLS_SUBMIT_GITHUB_TOKEN` | the fine-scoped token above |
+
+Fallback behavior is intentional: when the write flag is off, approving a
+submission returns `publish-instructions.md` content in the API response and does
+not write to GitHub. This lets reviewers approve and publish manually until the
+write token is provisioned.
+
 ## Step 4 — Verify
 
 ```bash
@@ -117,6 +164,20 @@ Or simpler: hit the deployed `GET /api/loop-ledgers` and confirm the rows resolv
 (agentic-swarm healthy; PLX_MC healthy now that its ledger is on `main`;
 plx-customer-portal `no_ledgers` until it commits one) — and that none report
 `token_missing` or `permission_denied`.
+
+**Skills Directory (Phase 3):** sign in to MC → **System of record → Skills
+directory**. The meta strip should show **`ready`**, pin **`v1.0.0`**, source
+`plx-cursor-skills`, and **29** skills — not **degraded**. Open **create-skill**
+and confirm `SKILL.md` renders. If degraded, re-check Step 2a (repo on the App
+installation) and `resolveGithubToken()` on the Vercel host.
+
+**Skills Directory publish (Phase 4 P5):** with
+`SKILLS_SUBMIT_GITHUB_WRITE_ENABLED=0` or unset, approve a test submission and
+confirm the API response includes
+`publish.instructionsPath: "publish-instructions.md"`. After enabling the write
+token in staging, approve a test submission with a valid `contentUrl` and
+confirm GitHub receives a `submit/<id>-<ts>` branch plus a PR that changes
+`skills/<id>/SKILL.md` and `manifest.json`.
 
 ## Step 5 — Retire the broad PAT
 
