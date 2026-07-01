@@ -10,6 +10,7 @@
 @import "../styles/mc-auth.css";
 @import "../styles/mc-loop-ledgers.css";
 @import "../styles/mc-governance-sops.css";
+@import "../styles/mc-skills-directory.css";
 
 * {
   box-sizing: border-box;
