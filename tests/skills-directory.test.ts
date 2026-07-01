@@ -9,9 +9,12 @@ import { describe, expect, it } from "vitest";
 import {
   getSkillDetail,
   listSkillCatalog,
+  loadCatalogConfig,
+  packageSkillIds,
   parseAllowlistJson,
   parseManifestJson,
   publishedSkills,
+  resolveAllowIds,
 } from "@/lib/skills-directory";
 import type {
   AllowlistConfig,
@@ -30,14 +33,20 @@ const FIXTURE_SKILL = readFileSync(
   "utf8"
 );
 
-const TEST_ALLOWLIST: AllowlistConfig = {
-  schemaVersion: "plx-company-skills-allowlist/v2",
+const TEST_CATALOG_V3: AllowlistConfig = {
+  schemaVersion: "plx-skills-catalog/v3",
   sourceRepo: "taylorvalton/plx-cursor-skills",
   sourceBranch: "main",
   manifestPath: "manifest.json",
   packageId: "plx-engineering-core",
   pinTag: "v1.0.0-test",
   pinSha: "abc123",
+  skills: [],
+};
+
+const TEST_ALLOWLIST: AllowlistConfig = {
+  ...TEST_CATALOG_V3,
+  schemaVersion: "plx-company-skills-allowlist/v2",
   skills: ["create-skill", "wterm-preflight", "missing-from-manifest"],
 };
 
@@ -76,8 +85,18 @@ function fakeSource(opts: {
   };
 }
 
-describe("skills-directory allowlist", () => {
-  it("parses the committed allowlist", () => {
+describe("skills-directory catalog config", () => {
+  it("loads committed v3 skills-catalog.json", () => {
+    const r = loadCatalogConfig();
+    expect(r.ok).toBe(true);
+    if (r.ok) {
+      expect(r.config.schemaVersion).toBe("plx-skills-catalog/v3");
+      expect(r.config.sourceRepo).toBe("taylorvalton/plx-cursor-skills");
+      expect(r.config.skills).toEqual([]);
+    }
+  });
+
+  it("parses legacy v2 allowlist with skills[]", () => {
     const raw = readFileSync(
       join(process.cwd(), "config/company-skills-allowlist.json"),
       "utf8"
@@ -85,7 +104,6 @@ describe("skills-directory allowlist", () => {
     const r = parseAllowlistJson(raw);
     expect(r.ok).toBe(true);
     if (r.ok) {
-      expect(r.config.sourceRepo).toBe("taylorvalton/plx-cursor-skills");
       expect(r.config.skills.length).toBeGreaterThan(20);
     }
   });
@@ -93,6 +111,18 @@ describe("skills-directory allowlist", () => {
   it("never throws on garbage JSON", () => {
     expect(() => parseAllowlistJson("{bad")).not.toThrow();
     expect(parseAllowlistJson("{bad").ok).toBe(false);
+  });
+
+  it("resolveAllowIds uses manifest package when v3", () => {
+    const ids = resolveAllowIds(TEST_CATALOG_V3, FIXTURE_MANIFEST_OBJ);
+    expect([...ids].sort()).toEqual(["create-skill", "wterm-preflight"]);
+  });
+
+  it("packageSkillIds reads package from manifest", () => {
+    expect(packageSkillIds(FIXTURE_MANIFEST_OBJ, "plx-engineering-core")).toEqual([
+      "create-skill",
+      "wterm-preflight",
+    ]);
   });
 });
 
@@ -113,14 +143,20 @@ describe("skills-directory manifest", () => {
 });
 
 describe("skills-directory loader", () => {
-  it("lists ready catalog from manifest", async () => {
+  it("lists ready catalog from manifest (v3, no skills[])", async () => {
+    const result = await listSkillCatalog(TEST_CATALOG_V3, fakeSource({}));
+    expect(result.meta.state).toBe("ready");
+    expect(result.skills.map((s) => s.id)).toEqual(["create-skill", "wterm-preflight"]);
+  });
+
+  it("lists ready catalog from legacy allowlist", async () => {
     const result = await listSkillCatalog(TEST_ALLOWLIST, fakeSource({}));
     expect(result.meta.state).toBe("ready");
     expect(result.meta.version).toBe("1.0.0-test");
     expect(result.skills.map((s) => s.id)).toEqual(["create-skill", "wterm-preflight"]);
   });
 
-  it("degrades loudly when manifest fetch fails", async () => {
+  it("degrades with legacy fallback ids when manifest fetch fails", async () => {
     const result = await listSkillCatalog(
       TEST_ALLOWLIST,
       fakeSource({
@@ -131,6 +167,17 @@ describe("skills-directory loader", () => {
     expect(result.meta.note).toContain("token");
     expect(result.skills).toHaveLength(3);
     expect(result.skills[0].status).toBe("unknown");
+  });
+
+  it("degrades empty when v3 and manifest fetch fails", async () => {
+    const result = await listSkillCatalog(
+      TEST_CATALOG_V3,
+      fakeSource({
+        manifest: { ok: false, reason: "token_missing", note: "no token" },
+      })
+    );
+    expect(result.meta.state).toBe("degraded");
+    expect(result.skills).toHaveLength(0);
   });
 
   it("detail returns markdown nodes for a published skill", async () => {

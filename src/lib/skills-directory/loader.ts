@@ -1,7 +1,8 @@
-// Loader — catalog list + skill detail from allowlist pointer + GitHub source.
+// Loader — catalog list + skill detail from catalog pointer + GitHub source.
 
 import { extractToc, parseMarkdown } from "@/lib/governance-sops";
 
+import { degradedFallbackIds, resolveAllowIds } from "./catalog";
 import { pointerFromAllowlist } from "./allowlist";
 import { publishedSkills } from "./manifest";
 import type {
@@ -29,14 +30,14 @@ function toSummary(skill: {
 }
 
 export async function listSkillCatalog(
-  allowlist: AllowlistConfig,
+  config: AllowlistConfig,
   source: SkillsSourceReader
 ): Promise<CatalogListResult> {
-  const pointer = pointerFromAllowlist(allowlist);
-  const allowIds = new Set(allowlist.skills);
+  const pointer = pointerFromAllowlist(config);
   const fetched = await source.fetchManifest(pointer);
 
   if (!fetched.ok) {
+    const fallback = degradedFallbackIds(config);
     return {
       meta: {
         sourceRepo: pointer.sourceRepo,
@@ -47,7 +48,7 @@ export async function listSkillCatalog(
         state: "degraded",
         note: fetched.note,
       },
-      skills: allowlist.skills.map((id) => ({
+      skills: fallback.map((id) => ({
         id,
         name: id,
         description: "",
@@ -57,6 +58,7 @@ export async function listSkillCatalog(
     };
   }
 
+  const allowIds = resolveAllowIds(config, fetched.manifest);
   const entries = publishedSkills(fetched.manifest, pointer.packageId, allowIds);
   return {
     meta: {
@@ -72,22 +74,25 @@ export async function listSkillCatalog(
 }
 
 export async function getSkillDetail(
-  allowlist: AllowlistConfig,
+  config: AllowlistConfig,
   source: SkillsSourceReader,
   skillId: string
 ): Promise<SkillDetailResult> {
-  const pointer = pointerFromAllowlist(allowlist);
-  const allowIds = new Set(allowlist.skills);
+  const pointer = pointerFromAllowlist(config);
+  const fetched = await source.fetchManifest(pointer);
+  const allowIds = fetched.ok
+    ? resolveAllowIds(config, fetched.manifest)
+    : new Set(degradedFallbackIds(config));
+
   if (!allowIds.has(skillId)) {
     return {
       ok: false,
       id: skillId,
       reason: "skill_not_found",
-      note: `skill "${skillId}" is not in the company allowlist`,
+      note: `skill "${skillId}" is not in the company catalog package`,
     };
   }
 
-  const fetched = await source.fetchManifest(pointer);
   if (!fetched.ok) {
     return {
       ok: false,

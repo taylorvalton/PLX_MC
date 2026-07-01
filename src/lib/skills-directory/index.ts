@@ -13,7 +13,15 @@ export type {
   SkillsSourceReader,
 } from "./types";
 
+export {
+  CATALOG_CONFIG_FILES,
+  degradedFallbackIds,
+  loadCatalogConfig,
+  loadCatalogConfigRaw,
+  parseCatalogConfig,
+  resolveAllowIds,
+} from "./catalog";
 export { parseAllowlistJson, pointerFromAllowlist } from "./allowlist";
-export { parseManifestJson, publishedSkills } from "./manifest";
+export { packageSkillIds, parseManifestJson, publishedSkills } from "./manifest";
 export { createSkillsSource, GithubSkillsSource } from "./github";
 export { getSkillDetail, listSkillCatalog } from "./loader";

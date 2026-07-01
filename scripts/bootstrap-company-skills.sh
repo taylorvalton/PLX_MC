@@ -19,7 +19,10 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 PROJECT_ROOT="${PROJECT_ROOT:-${REPO_ROOT}}"
 SKILLS_REPO="${SKILLS_REPO:-${HOME}/plx-cursor-skills}"
-ALLOWLIST="${ALLOWLIST:-${REPO_ROOT}/config/company-skills-allowlist.json}"
+ALLOWLIST="${ALLOWLIST:-${REPO_ROOT}/config/skills-catalog.json}"
+if [[ ! -f "$ALLOWLIST" ]]; then
+  ALLOWLIST="${REPO_ROOT}/config/company-skills-allowlist.json"
+fi
 DRY_RUN=0
 
 while [[ $# -gt 0 ]]; do
@@ -73,8 +76,6 @@ fi
 import json, sys
 data = json.load(open(sys.argv[1], encoding="utf-8"))
 skills = data.get("skills") or []
-if not skills:
-    raise SystemExit("allowlist contains no skills")
 print(data.get("sourceRepo", "taylorvalton/plx-cursor-skills"))
 print(data.get("sourceBranch", "main"))
 print(data.get("pinSha") or "")
@@ -94,8 +95,8 @@ MANIFEST_PATH="$(trim_var "$MANIFEST_PATH")"
 PACKAGE_ID="$(trim_var "$PACKAGE_ID")"
 SKILLS_CSV="$(trim_var "$SKILLS_CSV")"
 
-if [[ -z "$SOURCE_REPO" || -z "$SKILLS_CSV" ]]; then
-  echo "error: failed to parse allowlist (is Python installed?)" >&2
+if [[ -z "$SOURCE_REPO" ]]; then
+  echo "error: failed to parse catalog config (is Python installed?)" >&2
   exit 2
 fi
 
@@ -149,14 +150,15 @@ ids = []
 if package_id:
     pkg = next((p for p in data.get("packages") or [] if p.get("id") == package_id), None)
     if pkg:
-        ids = [s for s in pkg.get("skillIds") or [] if s in allow]
+        pkg_ids = pkg.get("skillIds") or []
+        ids = [s for s in pkg_ids if s in allow] if allow else list(pkg_ids)
 if not ids:
     ids = [
         s["id"]
         for s in data.get("skills") or []
-        if s.get("status") == "published" and s.get("id") in allow
+        if s.get("status") == "published" and (not allow or s.get("id") in allow)
     ]
-if not ids:
+if not ids and allow:
     ids = sorted(allow)
 print(",".join(ids))
 PY

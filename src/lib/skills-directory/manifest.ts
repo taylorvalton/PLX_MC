@@ -50,18 +50,25 @@ export function parseManifestJson(raw: string):
   }
 }
 
+export function packageSkillIds(manifest: SkillsManifest, packageId: string): string[] {
+  const pkg = manifest.packages.find((p) => p.id === packageId);
+  return pkg?.skillIds ?? [];
+}
+
 export function publishedSkills(
   manifest: SkillsManifest,
   packageId: string,
   allowIds: Set<string>
 ): SkillsManifest["skills"] {
+  const effectiveAllow =
+    allowIds.size > 0 ? allowIds : new Set(packageSkillIds(manifest, packageId));
   let ids: string[] | null = null;
   if (packageId) {
     const pkg = manifest.packages.find((p) => p.id === packageId);
-    if (pkg) ids = pkg.skillIds.filter((id) => allowIds.has(id));
+    if (pkg) ids = pkg.skillIds.filter((id) => effectiveAllow.has(id));
   }
   const pool = manifest.skills.filter(
-    (s) => s.status === "published" && allowIds.has(s.id)
+    (s) => s.status === "published" && effectiveAllow.has(s.id)
   );
   if (!ids) return pool;
   const byId = new Map(pool.map((s) => [s.id, s]));
