@@ -1,0 +1,96 @@
+/* ──────────────────────────────────────────────────────────────────────────────
+   MC SKILLS DIRECTORY — scoped under .mc (inherits brand tokens).
+   Reuses gs- catalog/reader primitives from mc-governance-sops.css where
+   possible; sk- namespace for skills-specific chrome only.
+   ────────────────────────────────────────────────────────────────────────── */
+
+.sk-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 8px;
+  border-radius: var(--p-radius-sm);
+  border: 1px solid var(--p-grid);
+  background: var(--p-canvas);
+  font-family: var(--mono);
+  font-size: var(--p-text-meta);
+  letter-spacing: var(--p-track-tick);
+  text-transform: uppercase;
+  color: var(--p-muted);
+}
+
+.sk-pill.catalog { color: var(--p-ink-2); }
+.sk-pill.ready { color: var(--p-ok); border-color: color-mix(in srgb, var(--p-ok) 30%, transparent); }
+.sk-pill.degraded { color: var(--p-hot); border-color: color-mix(in srgb, var(--p-hot) 30%, transparent); }
+
+.sk-banner {
+  display: flex;
+  align-items: center;
+  gap: var(--p-space-2);
+  padding: 10px var(--p-space-3);
+  border: 1px solid var(--p-grid);
+  border-left: 3px solid var(--p-hot);
+  background: var(--p-paper);
+  border-radius: var(--p-radius);
+  margin-bottom: var(--p-space-3);
+  font-size: var(--p-text-small);
+}
+
+.sk-banner .dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--p-hot);
+  flex-shrink: 0;
+}
+
+.sk-banner-body { flex: 1; color: var(--p-ink-2); line-height: 1.5; }
+.sk-banner-ct { font-weight: 700; color: var(--p-hot); }
+
+.sk-meta-strip {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--p-space-2);
+  margin-bottom: var(--p-space-4);
+}
+
+.sk-meta-item {
+  padding: var(--p-space-3);
+  border: 1px solid var(--p-grid);
+  background: var(--p-paper);
+  border-radius: var(--p-radius);
+}
+
+.sk-meta-label {
+  display: block;
+  font-family: var(--mono);
+  font-size: var(--p-text-meta);
+  letter-spacing: var(--p-track-tick);
+  text-transform: uppercase;
+  color: var(--p-muted);
+  margin-bottom: 4px;
+}
+
+.sk-meta-value { font-size: var(--p-text-small); color: var(--p-ink-2); }
+
+.sk-head {
+  grid-template-columns: 1fr 160px 100px !important;
+}
+
+.sk-id { font-size: var(--p-text-meta); }
+
+.sk-status {
+  font-family: var(--mono);
+  font-size: var(--p-text-meta);
+  letter-spacing: var(--p-track-tick);
+  text-transform: uppercase;
+  color: var(--p-muted);
+  border: 1px solid var(--p-grid);
+  padding: 1px 6px;
+  border-radius: var(--p-radius-sm);
+}
+
+@media (max-width: 640px) {
+  .sk-meta-strip { grid-template-columns: 1fr; }
+  .sk-head { display: none; }
+}

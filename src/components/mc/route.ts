@@ -21,6 +21,7 @@ export type Screen =
   | "task"
   | "loop-ledgers"
   | "governance-sops"
+  | "skills-directory"
   | "ai-spend";
 
 export interface Route {

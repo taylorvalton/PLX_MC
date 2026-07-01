@@ -253,14 +253,17 @@ Full PR/compliance context: **SOP guide → Collaborator SOP** in [Mission Contr
 
 ## 12. Roadmap (Mission Control Skills Directory)
 
-Planned MC module ([architecture draft](docs/SKILLS-DIRECTORY-ARCHITECTURE.md)):
+**Browse (Phase 3 MVP — shipped):** In Mission Control, open **System of record → Skills directory**
+to search and read company skills from the pinned `plx-cursor-skills` release. Install still
+uses bootstrap (§3) until one-click install ships.
 
-- Browse/search company catalog in [Mission Control](https://mc.plxcustomer.io/)
-- MCP tools: `mc_list_skills`, `mc_install_skills`, `mc_submit_skill` (future)
+Planned next ([architecture draft](docs/SKILLS-DIRECTORY-ARCHITECTURE.md)):
+
+- MCP tools: `mc_list_skills`, `mc_install_skills`, `mc_submit_skill`
 - Opt-in prompt when you create a personal skill: **Share with PLX?**
 - Approval workflow before publish
 
-Until then, **`plx-cursor-skills` + bootstrap** is the supported path.
+Until one-click install lands, **`plx-cursor-skills` + bootstrap** remains the install path.
 
 ---
 
@@ -271,6 +274,7 @@ Until then, **`plx-cursor-skills` + bootstrap** is the supported path.
 | Content repo | https://github.com/taylorvalton/plx-cursor-skills |
 | Bootstrap scripts | `PLX_MC/scripts/bootstrap-company-skills.{sh,ps1}` |
 | Catalog pin | `PLX_MC/config/company-skills-allowlist.json` |
+| MC browse UI | Mission Control → System of record → **Skills directory** |
 | MCP runbook | `PLX_MC/docs/runbooks/plx-mc-mcp-team-registration.md` |
 | Repo layout / manifest schema | `PLX_MC/docs/plx-cursor-skills/` |
 | PR compliance | `PLX_MC/docs/COLLABORATOR-SOP.md` |
