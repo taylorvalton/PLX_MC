@@ -27,6 +27,7 @@ const EXPECTED_SCREENS = {
   task: true,
   "loop-ledgers": true,
   "governance-sops": true,
+  "skills-directory": true,
   "ai-spend": true,
 } satisfies Record<Screen, true>;
 

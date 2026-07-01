@@ -194,3 +194,43 @@ metadata is captured — never your source code.
   validation / hygiene checks). Green compliance ≠ green CI.
 - **Kill switch (owner only):** a repo can be reverted to soft (`COMPLIANCE_MODE=soft`)
   or the gate removed entirely; the audit log is append-only and retains history.
+
+---
+
+## 9. Personal environment — company skills + PLX-MC MCP
+
+> **Full guide:** Mission Control → **SOP guide** → **Company Skills SOP**
+> (`docs/SKILLS-SOP.md`) — install, verify, share skills, troubleshooting.
+
+**PLX-MC access and company skills are separate.** Registering the PLX-MC MCP server
+(checkout / progress / complete) does **not** install Cursor or Claude skills on your
+machine. Do both steps below once per laptop (and again after the company catalog
+changes).
+
+### 9.1 Company-approved skills (quick start)
+
+The full `agentic-swarm` repo contains operator-only skills. **Do not** run the
+all-skills installer on a team laptop.
+
+Instead, bootstrap from **`taylorvalton/plx-cursor-skills`** (29 published skills):
+
+**Windows:** `.\scripts\bootstrap-company-skills.ps1` · **macOS/Linux:** `./scripts/bootstrap-company-skills.sh`
+
+Then start a **new** Cursor session. See **Company Skills SOP** for verify, refresh, and share workflows.
+
+### 9.2 PLX-MC MCP (task governance)
+
+Follow `docs/runbooks/plx-mc-mcp-team-registration.md`:
+
+- Set `MC_MCP_API_KEY`, `MC_OPERATOR_EMAIL`, `PLX_MC_MCP_ENABLED=1`.
+- Register `https://mc.plxcustomer.io/api/cursor/mcp` (remote) or the stdio client
+  under `tools/plx-mc-mcp/`.
+- Set `MC_REPO` to the repo you are working in (e.g. `taylorvalton/PLX_MC` or
+  `taylorvalton/plx-customer-portal`).
+- Verify with tool `mc_self_check`.
+
+### 9.3 Sharing a personal skill
+
+See **Company Skills SOP** (SOP guide in Mission Control) — §8 covers the PR workflow
+to `taylorvalton/plx-cursor-skills` until the Skills Directory UI ships.
+

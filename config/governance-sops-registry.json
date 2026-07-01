@@ -13,6 +13,17 @@
       "source": { "repo_path": "docs/COLLABORATOR-SOP.md" }
     },
     {
+      "slug": "mc-sop-skills",
+      "title": "Company Skills SOP",
+      "description": "Install company-approved Cursor/Claude skills on your machine, refresh when the catalog changes, create personal skills, and propose new skills for the team via plx-cursor-skills.",
+      "audience": "PLX contributors using Cursor, Claude Code, or other agents on personal laptops",
+      "owner": "Vince",
+      "effective_date": "2026-06-30",
+      "status": "active",
+      "tags": ["Skills", "Cursor", "Claude", "Bootstrap", "Agent workflow"],
+      "source": { "repo_path": "docs/SKILLS-SOP.md" }
+    },
+    {
       "slug": "mc-sop-agent-pr",
       "title": "Agent PR & MC-Checkout discipline",
       "description": "Linking agent work to a Mission Control task: checkout, the MC-Checkout stamp (one per task), the human accountable owner, and the tier bundle the gate expects.",

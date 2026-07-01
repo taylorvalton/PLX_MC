@@ -1,0 +1,40 @@
+{
+  "schemaVersion": "plx-cursor-skills-manifest/v1",
+  "version": "1.0.0-test",
+  "publishedAt": "2026-06-30T12:00:00Z",
+  "gitRef": "v1.0.0-test",
+  "repo": "taylorvalton/plx-cursor-skills",
+  "defaultBranch": "main",
+  "packages": [
+    {
+      "id": "plx-engineering-core",
+      "name": "PLX Engineering Core",
+      "skillIds": ["create-skill", "wterm-preflight"]
+    }
+  ],
+  "skills": [
+    {
+      "id": "create-skill",
+      "name": "Create Skill",
+      "description": "Guide for authoring Cursor skills.",
+      "status": "published",
+      "contentPath": "skills/create-skill",
+      "tags": ["authoring"]
+    },
+    {
+      "id": "wterm-preflight",
+      "name": "Wterm Preflight",
+      "description": "Local CI gate before commit/push.",
+      "status": "published",
+      "contentPath": "skills/wterm-preflight",
+      "tags": ["ci"]
+    },
+    {
+      "id": "draft-only",
+      "name": "Draft Only",
+      "description": "Not published.",
+      "status": "draft",
+      "contentPath": "skills/draft-only"
+    }
+  ]
+}
