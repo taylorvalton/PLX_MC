@@ -1,6 +1,8 @@
 import { z } from "zod";
 
 import { ApiError, parseBody, route } from "@/lib/api/route";
+import { ACTORS } from "@/lib/mc-data/data";
+import { isApprover } from "@/lib/mc-data/repos";
 import {
   getSkillSubmission,
   publishApprovedSkillSubmission,
@@ -8,6 +10,7 @@ import {
 } from "@/lib/skills-directory";
 
 const patchSchema = z.object({
+  actor: z.string().min(1),
   status: z.enum(["pending", "approved", "rejected"]).optional(),
   notes: z.string().optional(),
   reviewComment: z.string().optional(),
@@ -16,6 +19,13 @@ const patchSchema = z.object({
 export const PATCH = route(async (req, ctx) => {
   const { id } = await ctx.params;
   const body = await parseBody(req, patchSchema);
+  if (!isApprover(ACTORS[body.actor])) {
+    throw new ApiError(
+      "not_approver",
+      "Only an Owner or Admin can review skill submissions.",
+      403
+    );
+  }
   if (body.status === "approved") {
     const current = await getSkillSubmission(id);
     if (!current) {

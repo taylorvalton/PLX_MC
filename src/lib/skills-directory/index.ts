@@ -37,6 +37,7 @@ export {
   resolveAllowIds,
 } from "./catalog";
 export { parseAllowlistJson, pointerFromAllowlist } from "./allowlist";
+export { assertValidSkillId, isValidSkillId, SKILL_ID_PATTERN } from "./ids";
 export { packageSkillIds, parseManifestJson, publishedSkills } from "./manifest";
 export { createSkillsSource, GithubSkillsSource } from "./github";
 export { getSkillDetail, listSkillCatalog } from "./loader";

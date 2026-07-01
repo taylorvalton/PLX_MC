@@ -2,6 +2,7 @@
 
 import { skillsSubmitGithubToken, skillsSubmitGithubWriteEnabled } from "@/lib/secrets";
 
+import { assertValidSkillId } from "./ids";
 import { parseManifestJson } from "./manifest";
 import type { SkillSubmission } from "./submissions-store";
 import type { SkillManifestEntry, SkillsManifest } from "./types";
@@ -10,8 +11,6 @@ const DEFAULT_TARGET_REPO = "taylorvalton/plx-cursor-skills";
 const DEFAULT_BASE_BRANCH = "main";
 const DEFAULT_MANIFEST_PATH = "manifest.json";
 const DEFAULT_PACKAGE_ID = "plx-engineering-core";
-
-type FetchLike = typeof fetch;
 
 export interface GithubFile {
   content: string;
@@ -80,7 +79,6 @@ export type SkillPublishResult =
 
 export interface PublishApprovedSkillOptions {
   github?: SkillsPublishGithubClient;
-  fetchImpl?: FetchLike;
   now?: Date;
   writeEnabled?: boolean;
   token?: string;
@@ -111,11 +109,11 @@ function timestampForBranch(now: Date): string {
 }
 
 function skillPath(skillId: string): string {
-  return `skills/${branchSafe(skillId)}/SKILL.md`;
+  return `skills/${assertValidSkillId(skillId)}/SKILL.md`;
 }
 
 function skillContentPath(skillId: string): string {
-  return `skills/${branchSafe(skillId)}/`;
+  return `skills/${assertValidSkillId(skillId)}/`;
 }
 
 function jsonStable(value: unknown): string {
@@ -154,25 +152,26 @@ export function buildPublishedManifest(
   packageId: string,
   now: Date
 ): SkillsManifest {
-  const existing = manifest.skills.find((entry) => entry.id === submission.skillId);
+  const skillId = assertValidSkillId(submission.skillId);
+  const existing = manifest.skills.find((entry) => entry.id === skillId);
   const nextEntry: SkillManifestEntry = {
     ...(existing ?? {}),
-    id: submission.skillId,
-    name: submission.title || existing?.name || submission.skillId,
+    id: skillId,
+    name: submission.title || existing?.name || skillId,
     description: submission.description || existing?.description || "",
     status: "published",
-    contentPath: existing?.contentPath || skillContentPath(submission.skillId),
+    contentPath: existing?.contentPath || skillContentPath(skillId),
     owner: submission.submitterEmail || existing?.owner,
   };
   const skills = existing
     ? manifest.skills.map((entry) =>
-        entry.id === submission.skillId ? nextEntry : entry
+        entry.id === skillId ? nextEntry : entry
       )
     : [...manifest.skills, nextEntry];
   return {
     ...manifest,
     publishedAt: now.toISOString(),
-    packages: upsertPackageSkill(manifest, packageId, submission.skillId),
+    packages: upsertPackageSkill(manifest, packageId, skillId),
     skills,
   };
 }
@@ -212,9 +211,9 @@ function instructionsContent(input: {
     `- Skill: \`${input.submission.skillId}\``,
     `- Title: ${input.submission.title}`,
     `- Submitter: ${input.submission.submitterEmail}`,
-    input.submission.contentUrl
-      ? `- Content URL: ${input.submission.contentUrl}`
-      : "- Content URL: not supplied; reviewer must provide SKILL.md content before publishing.",
+    input.submission.skillMd
+      ? "- SKILL.md content: supplied with submission"
+      : "- SKILL.md content: not supplied; reviewer must provide it before publishing.",
     input.submission.repoUrl ? `- Source repo: ${input.submission.repoUrl}` : "",
     input.submission.notes ? `- Notes: ${input.submission.notes}` : "",
     "",
@@ -223,22 +222,10 @@ function instructionsContent(input: {
     .join("\n");
 }
 
-async function fetchSkillMarkdown(
-  submission: SkillSubmission,
-  fetchImpl: FetchLike
-): Promise<string> {
-  if (!submission.contentUrl) {
-    throw new Error("contentUrl is required when GitHub write publishing is enabled");
-  }
-  const res = await fetchImpl(submission.contentUrl, {
-    headers: { accept: "text/plain, text/markdown, */*" },
-  });
-  if (!res.ok) {
-    throw new Error(`submitted SKILL.md fetch failed (HTTP ${res.status})`);
-  }
-  const content = await res.text();
+function submittedSkillMarkdown(submission: SkillSubmission): string {
+  const content = submission.skillMd ?? "";
   if (!content.trim()) {
-    throw new Error("submitted SKILL.md content is empty");
+    throw new Error("submitted SKILL.md content is required when GitHub write publishing is enabled");
   }
   return content.endsWith("\n") ? content : `${content}\n`;
 }
@@ -303,9 +290,8 @@ export async function publishApprovedSkillSubmission(
 
   const token = options.token ?? skillsSubmitGithubToken();
   const github = options.github ?? new RestSkillsPublishGithubClient(token);
-  const fetchImpl = options.fetchImpl ?? fetch;
   const { owner, repo } = parseRepo(targetRepo);
-  const submittedSkill = await fetchSkillMarkdown(submission, fetchImpl);
+  const submittedSkill = submittedSkillMarkdown(submission);
   const baseSha = await github.getBranchHead({ owner, repo, branch: baseBranch });
   const manifestFile = await github.getFile({
     owner,

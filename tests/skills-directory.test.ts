@@ -281,6 +281,17 @@ describe("skills-directory registry + installer", () => {
     });
     expect(synced.installSkillIds).toEqual([]);
   });
+
+  it("rejects unsafe skill ids before generating installer scripts", () => {
+    expect(() =>
+      buildSkillsInstallPlan({
+        mode: "install",
+        allowlist: TEST_ALLOWLIST,
+        manifest: FIXTURE_MANIFEST_OBJ,
+        ids: ["../escape"],
+      })
+    ).toThrow(/invalid skill id/);
+  });
 });
 
 describe("skills-directory submissions store", () => {
@@ -291,6 +302,7 @@ describe("skills-directory submissions store", () => {
       title: "Improve skill",
       submitterEmail: "vince@petrasoap.com",
       description: "Add clearer examples.",
+      skillMd: "# Improve skill\n",
     });
     expect(created.id).toMatch(/^skill-sub-/);
     expect(created.status).toBe("pending");
@@ -305,6 +317,17 @@ describe("skills-directory submissions store", () => {
     expect(updated?.status).toBe("approved");
     expect(updated?.reviewComment).toBe("Ship it.");
   });
+
+  it("rejects unsafe ids at submission persistence boundary", async () => {
+    vi.stubEnv("PLX_MC_DATABASE_URL", "");
+    await expect(
+      createSkillSubmission({
+        skillId: "../escape",
+        title: "Bad Skill",
+        submitterEmail: "vince@petrasoap.com",
+      })
+    ).rejects.toThrow(/invalid skill id/);
+  });
 });
 
 describe("skills-directory publish", () => {
@@ -314,7 +337,7 @@ describe("skills-directory publish", () => {
     title: "New Skill",
     description: "Adds a new company skill.",
     submitterEmail: "vince@petrasoap.com",
-    contentUrl: "https://example.com/new-skill/SKILL.md",
+    skillMd: "# New Skill\n\nInstructions.\n",
     status: "pending",
     createdAt: "2026-07-01T12:00:00.000Z",
     updatedAt: "2026-07-01T12:00:00.000Z",
@@ -390,20 +413,17 @@ describe("skills-directory publish", () => {
         };
       },
     };
-    const fetchImpl = vi.fn(async () => new Response("# New Skill\n\nInstructions.\n"));
+    const fetchImpl = vi.fn();
 
     const result = await publishApprovedSkillSubmission(submission, {
       github,
-      fetchImpl,
       token: "test-token",
       writeEnabled: true,
       now: new Date("2026-07-01T12:00:00.000Z"),
     });
 
     expect(result.mode).toBe("github_pr");
-    expect(fetchImpl).toHaveBeenCalledWith(submission.contentUrl, {
-      headers: { accept: "text/plain, text/markdown, */*" },
-    });
+    expect(fetchImpl).not.toHaveBeenCalled();
     expect(calls).toContain("branch:submit/skill-sub-123-20260701T120000Z:base-sha");
     expect(calls).toContain("pr:submit/skill-sub-123-20260701T120000Z:main");
     const skillWrite = writes.find((w) => w.path === "skills/new-skill/SKILL.md");
@@ -426,6 +446,7 @@ describe("skills-directory publish", () => {
       title: "API Skill",
       submitterEmail: "vince@petrasoap.com",
       description: "API publish check.",
+      skillMd: "# API Skill\n",
     });
 
     const res = await patchSubmission(
@@ -433,6 +454,7 @@ describe("skills-directory publish", () => {
         method: "PATCH",
         body: JSON.stringify({
           status: "approved",
+          actor: "vince",
           reviewComment: "Approved through API.",
         }),
       }),
@@ -446,5 +468,35 @@ describe("skills-directory publish", () => {
     expect(body.data.publish.mode).toBe("instructions");
     expect(body.data.publish.instructionsPath).toBe("publish-instructions.md");
     expect(body.data.publish.content).toContain("skills/api-skill/SKILL.md");
+  });
+
+  it("approval PATCH rejects non-approver actors before publishing", async () => {
+    vi.stubEnv("PLX_MC_DATABASE_URL", "");
+    vi.stubEnv("SKILLS_SUBMIT_GITHUB_WRITE_ENABLED", "0");
+    const created = await createSkillSubmission({
+      skillId: "blocked-skill",
+      title: "Blocked Skill",
+      submitterEmail: "vince@petrasoap.com",
+      description: "Rejected by server-side approver gate.",
+      skillMd: "# Blocked Skill\n",
+    });
+
+    const res = await patchSubmission(
+      new Request(`http://localhost/api/skills-directory/submissions/${created.id}`, {
+        method: "PATCH",
+        body: JSON.stringify({
+          status: "approved",
+          actor: "greg",
+          reviewComment: "Should not publish.",
+        }),
+      }),
+      { params: Promise.resolve({ id: created.id }) }
+    );
+    const body = await res.json();
+
+    expect(res.status).toBe(403);
+    expect(body.error.code).toBe("not_approver");
+    const stored = await listSkillSubmissions("pending");
+    expect(stored.some((item) => item.id === created.id)).toBe(true);
   });
 });

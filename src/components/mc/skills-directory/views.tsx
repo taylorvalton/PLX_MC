@@ -139,7 +139,7 @@ export function IndexView({
           title: `Skill review: ${id}`,
           description: description.trim() || undefined,
           submitterEmail: currentSubmitterEmail(),
-          notes: markdown,
+          skillMd: markdown,
         }),
       });
       setSubmitState({ kind: "success", id: created.id });
@@ -157,7 +157,7 @@ export function IndexView({
       "/skills-directory/submissions/" + encodeURIComponent(id),
       {
         method: "PATCH",
-        body: JSON.stringify({ status, reviewComment: label }),
+        body: JSON.stringify({ actor: CURRENT_USER, status, reviewComment: label }),
       }
     );
     setSubmissions((rows) => rows?.map((row) => (row.id === id ? updated : row)) ?? [updated]);

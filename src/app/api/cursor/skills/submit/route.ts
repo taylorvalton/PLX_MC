@@ -3,16 +3,16 @@ import { z } from "zod";
 import { ApiError } from "@/lib/api/route";
 import { cursorRoute, parseCursorBody } from "@/lib/mcp/route";
 import { actionSubmitSkill } from "@/lib/mcp/skills-actions";
-import { createSkillSubmission } from "@/lib/skills-directory";
+import { createSkillSubmission, SKILL_ID_PATTERN } from "@/lib/skills-directory";
 
 const submitSchema = z.object({
-  id: z.string().min(1).optional(),
+  id: z.string().regex(SKILL_ID_PATTERN).optional(),
   name: z.string().min(1).optional(),
   description: z.string().optional(),
   skillMd: z.string().min(1).optional(),
   tags: z.array(z.string().min(1)).optional(),
   owner: z.string().min(1).optional(),
-  skillId: z.string().min(1).optional(),
+  skillId: z.string().regex(SKILL_ID_PATTERN).optional(),
   title: z.string().min(1).optional(),
   submitterEmail: z.string().email().optional(),
   repoUrl: z.string().url().optional(),
@@ -54,6 +54,7 @@ export const POST = cursorRoute("mc_skills_submit", async (req, _ctx, identity) 
       submitterEmail: body.submitterEmail,
       repoUrl: body.repoUrl,
       contentUrl: body.contentUrl,
+      skillMd: body.skillMd,
       notes: body.notes,
     }),
   };

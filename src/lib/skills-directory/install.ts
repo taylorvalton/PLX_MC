@@ -1,6 +1,7 @@
 // Build local install/sync scripts for company skills. Server returns scripts only.
 
 import { pointerFromAllowlist } from "./allowlist";
+import { assertValidSkillId } from "./ids";
 import { publishedSkills } from "./manifest";
 import {
   detectRegistryDrift,
@@ -56,6 +57,10 @@ function refForInstall(allowlist: AllowlistConfig, manifest: SkillsManifest): st
 
 function uniqueNonEmpty(values: string[] | undefined): string[] {
   return [...new Set((values ?? []).map((v) => v.trim()).filter(Boolean))];
+}
+
+function validateSkillIds(ids: string[]): string[] {
+  return ids.map(assertValidSkillId);
 }
 
 function normalizeRuntimes(values: SkillsRuntime[] | undefined): SkillsRuntime[] {
@@ -205,10 +210,11 @@ function buildPowershellScript(
 
 export function buildSkillsInstallPlan(options: BuildSkillsInstallOptions): SkillsInstallPlan {
   const pointer = pointerFromAllowlist(options.allowlist);
-  const requestedSkillIds = uniqueNonEmpty(options.ids);
+  const requestedSkillIds = validateSkillIds(uniqueNonEmpty(options.ids));
   const runtimes = normalizeRuntimes(options.runtimes);
-  const allowIds = new Set(options.allowlist.skills);
+  const allowIds = new Set(validateSkillIds(options.allowlist.skills));
   const allowedSkills = publishedSkills(options.manifest, pointer.packageId, allowIds);
+  allowedSkills.forEach((skill) => assertValidSkillId(skill.id));
   const requested = new Set(requestedSkillIds);
   const skills = requested.size
     ? allowedSkills.filter((skill) => requested.has(skill.id))

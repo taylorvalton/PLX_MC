@@ -5,6 +5,8 @@ import { randomUUID } from "node:crypto";
 
 import { query } from "@/lib/db";
 
+import { assertValidSkillId } from "./ids";
+
 export type SkillSubmissionStatus = "pending" | "approved" | "rejected";
 
 export interface SkillSubmission {
@@ -15,6 +17,7 @@ export interface SkillSubmission {
   submitterEmail: string;
   repoUrl?: string;
   contentUrl?: string;
+  skillMd?: string;
   status: SkillSubmissionStatus;
   notes?: string;
   reviewComment?: string;
@@ -29,6 +32,7 @@ export interface CreateSkillSubmissionInput {
   submitterEmail: string;
   repoUrl?: string;
   contentUrl?: string;
+  skillMd?: string;
   notes?: string;
 }
 
@@ -46,6 +50,7 @@ interface SkillSubmissionRow {
   submitter_email: string;
   repo_url: string | null;
   content_url: string | null;
+  skill_md: string | null;
   status: SkillSubmissionStatus;
   notes: string | null;
   review_comment: string | null;
@@ -85,6 +90,7 @@ function toSubmission(row: SkillSubmissionRow): SkillSubmission {
     submitterEmail: row.submitter_email,
     repoUrl: row.repo_url ?? undefined,
     contentUrl: row.content_url ?? undefined,
+    skillMd: row.skill_md ?? undefined,
     status: row.status,
     notes: row.notes ?? undefined,
     reviewComment: row.review_comment ?? undefined,
@@ -97,16 +103,18 @@ export async function createSkillSubmission(
   input: CreateSkillSubmissionInput
 ): Promise<SkillSubmission> {
   const id = `skill-sub-${randomUUID()}`;
+  const skillId = assertValidSkillId(input.skillId);
   if (!hasDb()) {
     const ts = nowIso();
     const submission: SkillSubmission = {
       id,
-      skillId: input.skillId,
+      skillId,
       title: input.title,
       description: input.description ?? "",
       submitterEmail: input.submitterEmail,
       repoUrl: input.repoUrl,
       contentUrl: input.contentUrl,
+      skillMd: input.skillMd,
       status: "pending",
       notes: input.notes,
       createdAt: ts,
@@ -118,18 +126,19 @@ export async function createSkillSubmission(
 
   const rows = await query<SkillSubmissionRow>(
     `INSERT INTO skill_submissions
-       (id, skill_id, title, description, submitter_email, repo_url, content_url, notes)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
+       (id, skill_id, title, description, submitter_email, repo_url, content_url, skill_md, notes)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
      RETURNING id, skill_id, title, description, submitter_email, repo_url,
-               content_url, status, notes, review_comment, created_at, updated_at`,
+               content_url, skill_md, status, notes, review_comment, created_at, updated_at`,
     [
       id,
-      input.skillId,
+      skillId,
       input.title,
       input.description ?? "",
       input.submitterEmail,
       input.repoUrl ?? null,
       input.contentUrl ?? null,
+      input.skillMd ?? null,
       input.notes ?? null,
     ]
   );
@@ -149,7 +158,7 @@ export async function listSkillSubmissions(
   const where = status ? "WHERE status = $1" : "";
   const rows = await query<SkillSubmissionRow>(
     `SELECT id, skill_id, title, description, submitter_email, repo_url,
-            content_url, status, notes, review_comment, created_at, updated_at
+            content_url, skill_md, status, notes, review_comment, created_at, updated_at
        FROM skill_submissions
        ${where}
       ORDER BY created_at DESC, id`,
@@ -164,7 +173,7 @@ export async function getSkillSubmission(id: string): Promise<SkillSubmission | 
   }
   const rows = await query<SkillSubmissionRow>(
     `SELECT id, skill_id, title, description, submitter_email, repo_url,
-            content_url, status, notes, review_comment, created_at, updated_at
+            content_url, skill_md, status, notes, review_comment, created_at, updated_at
        FROM skill_submissions WHERE id = $1`,
     [id]
   );
@@ -197,7 +206,7 @@ export async function updateSkillSubmission(
        updated_at = now()
      WHERE id = $1
      RETURNING id, skill_id, title, description, submitter_email, repo_url,
-               content_url, status, notes, review_comment, created_at, updated_at`,
+               content_url, skill_md, status, notes, review_comment, created_at, updated_at`,
     [id, input.status ?? null, input.notes ?? null, input.reviewComment ?? null]
   );
   return rows[0] ? toSubmission(rows[0]) : null;

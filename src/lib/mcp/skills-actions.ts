@@ -165,6 +165,7 @@ export async function actionSubmitSkill(identity: McpIdentity, input: SubmitSkil
     title: input.name,
     description: input.description,
     submitterEmail: ownerAsEmail(input.owner, identity.operatorEmail),
+    skillMd: input.skillMd,
     notes: noteParts.join("\n\n"),
   });
 }

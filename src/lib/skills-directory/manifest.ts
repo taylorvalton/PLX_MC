@@ -2,10 +2,11 @@
 
 import { z } from "zod";
 
+import { SKILL_ID_PATTERN } from "./ids";
 import type { SkillsManifest } from "./types";
 
 const SkillEntrySchema = z.object({
-  id: z.string().min(1),
+  id: z.string().regex(SKILL_ID_PATTERN),
   name: z.string().min(1),
   description: z.string(),
   status: z.string(),
@@ -26,7 +27,7 @@ const ManifestSchema = z.object({
       z.object({
         id: z.string(),
         name: z.string(),
-        skillIds: z.array(z.string()),
+        skillIds: z.array(z.string().regex(SKILL_ID_PATTERN)),
       })
     )
     .default([]),
