@@ -56,7 +56,7 @@
 
 .mc .feed .frow .ftime {
   font-family: var(--mono);
-  font-size: 9px;
+  font-size: var(--p-text-tick);
   letter-spacing: 0.06em;
   color: var(--p-muted);
   padding-top: 3px;
@@ -88,7 +88,7 @@
   color: var(--p-accent);
   text-decoration: none;
   font-family: var(--mono);
-  font-size: 11px;
+  font-size: var(--p-text-mono);
   background: transparent;
   border: 0;
   padding: 0;
@@ -221,7 +221,7 @@
 
 .mc .bk .bkfacts .f .v.sm {
   font-family: var(--mono);
-  font-size: 12px;
+  font-size: var(--p-text-small);
   letter-spacing: 0.02em;
   font-weight: 500;
 }
@@ -259,7 +259,7 @@
 
 .mc .trace-empty {
   margin: 0;
-  font-size: 12px;
+  font-size: var(--p-text-small);
   color: var(--p-muted);
 }
 
@@ -280,7 +280,7 @@
 
 .mc .prd .ph2 .t {
   font-family: var(--mono);
-  font-size: 9px;
+  font-size: var(--p-text-tick);
   letter-spacing: 0.18em;
   text-transform: uppercase;
   color: var(--p-ink);
@@ -346,7 +346,7 @@
 }
 
 .mc .prd .nongoals li {
-  font-size: 12px;
+  font-size: var(--p-text-small);
   color: var(--p-ink-2);
   padding: 4px 0 4px 16px;
   position: relative;
@@ -380,7 +380,7 @@
   cursor: pointer;
   text-decoration: none;
   color: var(--p-ink-2);
-  font-size: 12px;
+  font-size: var(--p-text-small);
   text-align: left;
 }
 
@@ -395,7 +395,7 @@
 
 .mc .doclinks .dl .ic {
   font-family: var(--mono);
-  font-size: 11px;
+  font-size: var(--p-text-mono);
   color: var(--p-accent);
   width: 18px;
   text-align: center;
@@ -423,7 +423,7 @@
 
 .mc .doclinks .dl .ext {
   color: var(--p-muted);
-  font-size: 10px;
+  font-size: var(--p-text-meta);
   flex: 0 0 auto;
 }
 
@@ -448,7 +448,7 @@
   align-items: center;
   gap: 8px;
   font-family: var(--mono);
-  font-size: 9.5px;
+  font-size: var(--p-text-kicker);
   letter-spacing: 0.04em;
   color: var(--p-ink-2);
 }
@@ -503,12 +503,12 @@
 
 .mc .splist-table .sprow .id {
   font-family: var(--mono);
-  font-size: 9.5px;
+  font-size: var(--p-text-kicker);
   color: var(--p-muted);
 }
 
 .mc .splist-table .sprow .ti {
-  font-size: 12px;
+  font-size: var(--p-text-small);
   color: var(--p-ink);
   white-space: nowrap;
   overflow: hidden;
@@ -517,7 +517,7 @@
 
 .mc .splist-table .sprow .st {
   font-family: var(--mono);
-  font-size: 9px;
+  font-size: var(--p-text-tick);
   letter-spacing: 0.04em;
   color: var(--p-accent);
   white-space: nowrap;
@@ -526,7 +526,7 @@
 .mc .splist-table .sprow .asg .none {
   color: var(--p-muted);
   font-family: var(--mono);
-  font-size: 10px;
+  font-size: var(--p-text-meta);
 }
 
 .mc .splist-foot {
@@ -568,7 +568,7 @@
 }
 
 .mc .risk .mit {
-  font-size: 11px;
+  font-size: var(--p-text-mono);
   color: var(--p-muted);
   margin-top: 3px;
   line-height: 1.4;
@@ -612,7 +612,7 @@
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  font-size: 12px;
+  font-size: var(--p-text-small);
   color: var(--p-ink-2);
 }
 
@@ -661,7 +661,7 @@
 
 .mc .mrow .req {
   font-family: var(--mono);
-  font-size: 11px;
+  font-size: var(--p-text-mono);
   letter-spacing: 0.04em;
   color: var(--p-ink);
   font-weight: 600;
@@ -681,7 +681,7 @@
 
 .mc .mrow .cell .x {
   font-family: var(--mono);
-  font-size: 9px;
+  font-size: var(--p-text-tick);
   letter-spacing: 0.04em;
   color: var(--p-ink-2);
 }
@@ -705,7 +705,7 @@
 
 .mc .mrow .merge {
   font-family: var(--mono);
-  font-size: 10px;
+  font-size: var(--p-text-meta);
   color: var(--p-ink);
 }
 

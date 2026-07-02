@@ -45,7 +45,7 @@
 
 .mc .board .bhead .nm {
   font-family: var(--mono);
-  font-size: 9.5px;
+  font-size: var(--p-text-kicker);
   letter-spacing: 0.16em;
   text-transform: uppercase;
   color: var(--p-ink);
@@ -130,7 +130,7 @@
 
 .mc .tcard .ct-id {
   font-family: var(--mono);
-  font-size: 9px;
+  font-size: var(--p-text-tick);
   letter-spacing: 0.06em;
   color: var(--p-muted);
 }
@@ -228,7 +228,7 @@
 
 .mc .list .grouphd .nm {
   font-family: var(--mono);
-  font-size: 9.5px;
+  font-size: var(--p-text-kicker);
   letter-spacing: 0.18em;
   text-transform: uppercase;
   color: var(--p-ink);
@@ -236,7 +236,7 @@
 
 .mc .list .grouphd .ct {
   font-family: var(--mono);
-  font-size: 9.5px;
+  font-size: var(--p-text-kicker);
   color: var(--p-muted);
 }
 
@@ -285,7 +285,7 @@
 
 .mc .lrow .id {
   font-family: var(--mono);
-  font-size: 10px;
+  font-size: var(--p-text-meta);
   letter-spacing: 0.04em;
   color: var(--p-ink);
   font-weight: 500;
@@ -301,7 +301,7 @@
 
 .mc .lrow .stagecell {
   font-family: var(--mono);
-  font-size: 9px;
+  font-size: var(--p-text-tick);
   letter-spacing: 0.1em;
   text-transform: uppercase;
   color: var(--p-accent);
@@ -364,7 +364,7 @@
 .mc .tl .grp .nm {
   padding: 8px 20px;
   font-family: var(--mono);
-  font-size: 9px;
+  font-size: var(--p-text-tick);
   letter-spacing: 0.14em;
   text-transform: uppercase;
   color: var(--p-ink);
@@ -481,7 +481,7 @@
   position: absolute;
   right: -3px;
   top: -8px;
-  font-size: 9px;
+  font-size: var(--p-text-tick);
   color: var(--p-muted);
 }
 
@@ -548,7 +548,7 @@
 }
 
 .mc .filterbar .fb-mag {
-  font-size: 11px;
+  font-size: var(--p-text-mono);
   color: var(--p-muted);
 }
 
@@ -558,7 +558,7 @@
   outline: none;
   padding: 6px 0;
   font-family: inherit;
-  font-size: 12px;
+  font-size: var(--p-text-small);
   color: var(--p-ink);
   width: 180px;
 }
@@ -633,7 +633,7 @@
 
 .mc .filterbar .fb-pop-empty {
   padding: 8px;
-  font-size: 11px;
+  font-size: var(--p-text-mono);
   color: var(--p-muted);
 }
 
@@ -647,7 +647,7 @@
   border: 0;
   cursor: pointer;
   padding: 6px 8px;
-  font-size: 12px;
+  font-size: var(--p-text-small);
   color: var(--p-ink-2);
   transition: background var(--p-dur-fast) var(--p-ease);
 }
@@ -663,7 +663,7 @@
   justify-content: center;
   width: 11px;
   color: var(--p-accent);
-  font-size: 10px;
+  font-size: var(--p-text-meta);
 }
 
 .mc .filterbar .fb-chips {
@@ -678,7 +678,7 @@
   align-items: center;
   gap: 4px;
   font-family: var(--mono);
-  font-size: 9px;
+  font-size: var(--p-text-tick);
   letter-spacing: 0.06em;
   text-transform: uppercase;
   color: var(--p-ink);
@@ -700,7 +700,7 @@
 
 .mc .filterbar .fb-count {
   font-family: var(--mono);
-  font-size: 10px;
+  font-size: var(--p-text-meta);
   letter-spacing: 0.12em;
   text-transform: uppercase;
   color: var(--p-muted);
@@ -731,7 +731,7 @@
 
 .mc .filterbar .fb-viewstrigger {
   font-family: var(--mono);
-  font-size: 9px;
+  font-size: var(--p-text-tick);
   letter-spacing: 0.08em;
   text-transform: uppercase;
 }
@@ -773,7 +773,7 @@
   background: none;
   cursor: pointer;
   color: var(--p-muted);
-  font-size: 9px;
+  font-size: var(--p-text-tick);
   padding: 4px 6px;
   transition: color var(--p-dur-fast) var(--p-ease);
 }
@@ -798,7 +798,7 @@
   border: 1px solid var(--p-grid);
   background: var(--p-canvas);
   padding: 5px 8px;
-  font-size: 11px;
+  font-size: var(--p-text-mono);
 }
 
 .mc .filterbar .fb-viewname:focus-visible {

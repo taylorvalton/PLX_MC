@@ -253,7 +253,7 @@
   width: 12px;
   flex-shrink: 0;
   color: var(--p-accent);
-  font-size: 10px;
+  font-size: var(--p-text-meta);
 }
 
 .ll-sort-hint {

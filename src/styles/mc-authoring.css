@@ -35,7 +35,7 @@
 
 .mc-cmdk .cin .pre {
   font-family: var(--mono);
-  font-size: 11px;
+  font-size: var(--p-text-mono);
   color: var(--p-accent);
   letter-spacing: 0.1em;
 }
@@ -89,7 +89,7 @@
 
 .mc-cmdk .cres .ic {
   font-family: var(--mono);
-  font-size: 11px;
+  font-size: var(--p-text-mono);
   color: var(--p-muted);
   width: 16px;
   text-align: center;
@@ -212,7 +212,7 @@
 
 .ntm .ntm-head .kk {
   font-family: var(--mono);
-  font-size: 9px;
+  font-size: var(--p-text-tick);
   letter-spacing: 0.22em;
   text-transform: uppercase;
   color: var(--p-muted);
@@ -339,7 +339,7 @@
 
 .ntm .ntm-field-btn .caret {
   font-family: var(--mono);
-  font-size: 9px;
+  font-size: var(--p-text-tick);
   color: var(--p-muted);
   flex: 0 0 auto;
 }
@@ -362,7 +362,7 @@
   padding: 8px 30px 8px 10px;
   border-radius: 0;
   font-family: var(--sans);
-  font-size: 12px;
+  font-size: var(--p-text-small);
   outline: none;
 }
 
@@ -384,7 +384,7 @@
   transform: translateY(-50%);
   pointer-events: none;
   font-family: var(--mono);
-  font-size: 9px;
+  font-size: var(--p-text-tick);
   color: var(--p-muted);
 }
 
@@ -436,7 +436,7 @@
 
 .ntm .ntm-chip {
   font-family: var(--mono);
-  font-size: 9.5px;
+  font-size: var(--p-text-kicker);
   letter-spacing: 0.06em;
   padding: 4px 9px;
   border: 1px dashed var(--p-grid);
@@ -479,7 +479,7 @@
   background: transparent;
   padding: 3px 2px;
   font-family: var(--mono);
-  font-size: 9.5px;
+  font-size: var(--p-text-kicker);
   color: var(--p-ink);
   min-width: 68px;
   outline: none;
@@ -504,7 +504,7 @@
 
 .ntm .ntm-hint {
   font-family: var(--mono);
-  font-size: 9px;
+  font-size: var(--p-text-tick);
   letter-spacing: 0.08em;
   color: var(--p-muted);
   display: flex;
@@ -616,7 +616,7 @@
 
 .mc .ppick-block {
   padding: 10px 13px;
-  font-size: 11px;
+  font-size: var(--p-text-mono);
   line-height: 1.5;
   color: var(--p-hot);
   background: color-mix(in srgb, var(--p-info) 12%, transparent);
@@ -629,7 +629,7 @@
 .mc .ppick-empty {
   padding: 14px 13px;
   font-family: var(--mono);
-  font-size: 9px;
+  font-size: var(--p-text-tick);
   letter-spacing: 0.14em;
   text-transform: uppercase;
   color: var(--p-muted);
