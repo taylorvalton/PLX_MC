@@ -5,6 +5,6 @@
   "sourceBranch": "main",
   "manifestPath": "manifest.json",
   "packageId": "plx-engineering-core",
-  "pinTag": "v1.0.0",
-  "pinSha": "f5013b3014f024a1828a9d273d93e7bfc8872271"
+  "pinTag": "v1.1.0",
+  "pinSha": "c0be5326b92bbda2e59ec756ffba11830cd2a7fd"
 }
