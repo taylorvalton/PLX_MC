@@ -41,7 +41,7 @@
 
 .mc .insights .kpi .k {
   font-family: var(--mono);
-  font-size: 9.5px;
+  font-size: var(--p-text-kicker);
   letter-spacing: 0.14em;
   text-transform: uppercase;
   color: var(--p-muted);
@@ -90,7 +90,7 @@
 .mc .insights .chartcard-title,
 .mc .insights .catbar-title {
   font-family: var(--mono);
-  font-size: 9.5px;
+  font-size: var(--p-text-kicker);
   letter-spacing: 0.16em;
   text-transform: uppercase;
   color: var(--p-ink);
@@ -153,7 +153,7 @@
 
 .mc .donut .total-cap {
   font-family: var(--mono);
-  font-size: 9px;
+  font-size: var(--p-text-tick);
   letter-spacing: 0.14em;
   text-transform: uppercase;
   fill: var(--p-muted);
@@ -225,7 +225,7 @@
 }
 
 .mc .catrow .nm {
-  font-size: 12px;
+  font-size: var(--p-text-small);
   color: var(--p-ink);
   white-space: nowrap;
   overflow: hidden;
@@ -251,7 +251,7 @@
 
 .mc .catrow .ct {
   font-family: var(--mono);
-  font-size: 12px;
+  font-size: var(--p-text-small);
   font-variant-numeric: tabular-nums;
   color: var(--p-ink-2);
   text-align: right;
@@ -272,7 +272,7 @@
 }
 .mc .catbar-empty .cap {
   font-family: var(--mono);
-  font-size: 9.5px;
+  font-size: var(--p-text-kicker);
   letter-spacing: 0.12em;
   text-transform: uppercase;
   color: var(--p-muted);
@@ -344,13 +344,13 @@
 
 .mc .clegend .nm {
   flex: 1;
-  font-size: 12px;
+  font-size: var(--p-text-small);
   color: var(--p-ink);
 }
 
 .mc .clegend .ct {
   font-family: var(--mono);
-  font-size: 12px;
+  font-size: var(--p-text-small);
   font-variant-numeric: tabular-nums;
   color: var(--p-ink-2);
 }
