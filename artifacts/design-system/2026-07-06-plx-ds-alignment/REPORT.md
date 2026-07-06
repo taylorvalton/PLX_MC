@@ -29,7 +29,7 @@ specs from identical fixtures.
 | Sync console · Files · Repos · Meeting intake | `mc-record.css` | 36 literals; **zero breakpoints** — 4-up registry grid, 5-col files table, 2-sided conflict rows crushed/overflowed below desktop | Tokenized; new ≤1024 block (regs 2-up, files table = only h-scroll surface, `min-width:680px`); new ≤640 block (regs 1-up, conflict sides stack, repo body indent → gutter) |
 | Bucket detail · Traceability · Agent feed | `mc-overview.css` | 28 literals; bespoke 760px breakpoint; 5-up facts strip + 2-col body had no tablet/phone reflow | Tokenized; 760 → canonical 640; new tiers: facts 5→2→1, body 2→1 |
 | Insights (KPIs · donut · bars) | `mc-charts.css` | 1 literal tracking | Tokenized (28/30px KPI/donut display sizes kept — one-off data-viz sizes, documented below) |
-| Command palette · New Task modal · pickers | `mc-authoring.css` | 17 literals; bespoke 840px breakpoint; modals floated mid-screen on phone | Tokenized; 840 → 1024; ≤640: modals full-screen, top-anchored, square corners (RESPONSIVE.md §4) |
+| Command palette · New Task modal · pickers | `mc-authoring.css`, `command-palette.tsx` | 17 literals; bespoke 840px breakpoint; modals floated mid-screen on phone; ⌘K missing nav entries for 4 sidebar destinations | Tokenized; 840 → 1024; ≤640: modals full-screen, top-anchored, square corners (RESPONSIVE.md §4); nav entries added for Loop ledgers / SOP guide / Skills directory / AI Spend |
 | Loop ledgers | `mc-loop-ledgers.css` | Bespoke 960px + 760px breakpoints; 2 literal stat sizes | Breakpoints → 1024 (stats + table h-scroll wrappers, inert when content fits); `--p-text-stat` |
 | SOP guide | `mc-governance-sops.css` | 2 literal sizes (already canonical tiers) | `--p-text-stat`; reader sizes kept (editorial serif measure) |
 | Skills directory | `mc-skills-directory.css` | `box-shadow: var(--p-shadow-sm)` referenced an **undefined token** — the active-tab lift silently rendered nothing | Defined `--p-shadow-sm` in `mc-surface.css` (elevation family complete) |
@@ -73,6 +73,18 @@ See the ADR-004 addendum for full rationale. Upstream candidates
 in `mc-surface.css`): the seven MC type-scale tokens. No Portal `--p-*` value
 was changed; `brand-tokens.css` (runtime mirror) is untouched.
 
+## Follow-up fixes (same pass, second commit series)
+
+- **Command palette parity with the sidebar** — added the four missing nav
+  entries (Loop ledgers ◰ · SOP guide § · Skills directory ◈ · AI Spend ◎) so
+  every sidebar destination is reachable from ⌘K.
+- **`mrp-design.css` out of the runtime tree** — the MRP surface port was
+  never imported by the app but sat in `src/styles/` with 28 raw hex values
+  inside the token-scan surface. Relocated to
+  `docs/design-system/source-snapshot/mrp/` (with the frozen MRP handoff
+  source) and updated all references (mc-surface comment, ADR-004,
+  HANDOFF-README). Move it back + import it if MRP chrome is ever adopted.
+
 ## Deliberate non-changes (noted, not fixed)
 
 - One-off display sizes kept as literals: 35px New-Task title input, 30px task
@@ -80,8 +92,3 @@ was changed; `brand-tokens.css` (runtime mirror) is untouched.
   15/15.5px card-title/reader sizes, and sub-8px micro-decorations (7/7.5px
   tags) — each a single deliberate prototype size; blessing them as tokens
   would just relocate the entropy.
-- The command palette lacks nav entries for Loop ledgers / SOP guide / Skills
-  directory / AI Spend (sidebar-only) — a wiring gap, out of scope for a
-  styling pass; flagged for a follow-up task.
-- `mrp-design.css` still contains raw hex but is not imported by the app
-  (design-bundle artifact); left untouched per the canonical-source policy.

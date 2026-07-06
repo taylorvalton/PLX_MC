@@ -11,7 +11,8 @@
    This layer ADDS the MC-only surface tokens — it does NOT alter any existing
    --p-* value (those stay the Portal's verbatim). --p-rail / --p-canvas values
    are taken from DESIGN_TOKENS.md and match the precedent already in the bundle
-   (src/styles/mrp-design.css `.mrp-shell`); the --p-shadow-* elevation tokens
+   (docs/design-system/source-snapshot/mrp/mrp-design.css `.mrp-shell`); the
+   --p-shadow-* elevation tokens
    are MC-local too (the Portal mirror at fb8e065 defines no shadow tokens) and
    match the hairline-soft shadows used inline elsewhere in the MC skin.
    Decision recorded in

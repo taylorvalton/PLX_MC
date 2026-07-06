@@ -29,7 +29,8 @@ tokens**, scoped to the `.mc` shell in `src/styles/mc-surface.css`.
   missing tokens are added.
 - **Values are not invented.** They are taken from
   `docs/product/DESIGN_TOKENS.md` and match the precedent already present in
-  this repo: `src/styles/mrp-design.css` (`.mrp-shell`) defines the same
+  this repo: `mrp-design.css` (`.mrp-shell`, now at
+  `docs/design-system/source-snapshot/mrp/`) defines the same
   document-model hierarchy for the MRP surface.
 - **`brand-tokens.css` is not edited.** It is the Portal runtime mirror that
   must stay in sync with `docs/design-system/tokens.css`; the additions live in
@@ -43,9 +44,9 @@ tokens**, scoped to the `.mc` shell in `src/styles/mc-surface.css`.
   re-valuing any shared token.
 - **Reconciliation path:** if the Portal promotes `--p-rail`/`--p-canvas` into
   `brand-tokens.css` upstream, delete the additions here and consume the global
-  values. Until then, the two definitions (here and in `mrp-design.css`) share
-  the documented `DESIGN_TOKENS.md` values; a value drift between them is a
-  hygiene failure to catch in review.
+  values. Until then, the two definitions (here and in the parked
+  `mrp-design.css`) share the documented `DESIGN_TOKENS.md` values; a value
+  drift between them is a hygiene failure to catch in review.
 - This is a surface-local decision under ADR-003 (no shared-token value change),
   so it does not require upstream brand sign-off — but it is recorded here so
   the two repos do not silently diverge.
