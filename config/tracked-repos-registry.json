@@ -1,0 +1,153 @@
+{
+  "schema_version": "plx-tracked-repos/v1",
+  "description": "Repos that must follow PLX_MC governance (config/governance-contract.yaml + COLLABORATOR-SOP). MC visibility is optional per tier.",
+  "governance_contract": {
+    "repo": "taylorvalton/PLX_MC",
+    "path": "config/governance-contract.yaml",
+    "surfaces_generator": "scripts/generate-governance-surfaces.py",
+    "compliance_gate_generator": "scripts/generate-compliance-gate.py"
+  },
+  "collaborator_sop": {
+    "repo": "taylorvalton/PLX_MC",
+    "path": "docs/COLLABORATOR-SOP.md"
+  },
+  "onboarding_runbook": "docs/runbooks/REPO-ONBOARDING.md",
+  "scaffold_script": "scripts/scaffold-tracked-repo.sh",
+  "repos": [
+    {
+      "repo": "taylorvalton/PLX_MC",
+      "display_name": "PLX Mission Control",
+      "org": "taylorvalton",
+      "tier": "hub",
+      "integration_branch": "main",
+      "release_branch": null,
+      "compliance_mode": "hard",
+      "quality_ledger": {
+        "enabled": true,
+        "glob": "docs/plx-mc/quality-ledger/*.artifacts.json",
+        "evidence_dir": "docs/plx-mc/quality-ledger/evidence"
+      },
+      "status": "active",
+      "contributing_path": "docs/COLLABORATOR-SOP.md"
+    },
+    {
+      "repo": "taylorvalton/plx-customer-portal",
+      "display_name": "PLX Customer Portal",
+      "org": "taylorvalton",
+      "tier": "product_app",
+      "integration_branch": "staging",
+      "release_branch": "master",
+      "compliance_mode": "soft",
+      "quality_ledger": {
+        "enabled": true,
+        "glob": "docs/portal/quality-ledger/*.artifacts.json",
+        "evidence_dir": "docs/portal/quality-ledger/evidence"
+      },
+      "status": "active",
+      "contributing_path": "docs/runbooks/CONTRIBUTING.md"
+    },
+    {
+      "repo": "taylorvalton/agentic-swarm",
+      "display_name": "Agentic Swarm",
+      "org": "taylorvalton",
+      "tier": "product_platform",
+      "integration_branch": "main",
+      "release_branch": null,
+      "compliance_mode": "soft",
+      "quality_ledger": {
+        "enabled": true,
+        "glob": "docs/vmc/quality-ledger/*.artifacts.json",
+        "evidence_dir": "docs/vmc/quality-ledger/evidence"
+      },
+      "status": "active",
+      "contributing_path": "docs/runbooks/CONTRIBUTING.md",
+      "notes": "Maintains a synced copy of governance-contract.yaml — run check-governance-alignment.py; canonical SSOT is PLX_MC."
+    },
+    {
+      "repo": "petralabx/skills",
+      "display_name": "PLX Cursor Skills",
+      "org": "petralabx",
+      "tier": "skills",
+      "integration_branch": "main",
+      "release_branch": null,
+      "compliance_mode": "soft",
+      "quality_ledger": {
+        "enabled": false
+      },
+      "status": "pending_adoption",
+      "contributing_path": "CONTRIBUTING.md",
+      "notes": "Company skill content repo (formerly planned as taylorvalton/plx-cursor-skills). Catalog pointer: config/skills-catalog.json."
+    },
+    {
+      "repo": "petralabx/local-inference",
+      "display_name": "PLX Local Inference",
+      "org": "petralabx",
+      "tier": "tooling",
+      "integration_branch": "main",
+      "release_branch": null,
+      "compliance_mode": "soft",
+      "quality_ledger": {
+        "enabled": false
+      },
+      "status": "pending_adoption",
+      "contributing_path": "CONTRIBUTING.md"
+    },
+    {
+      "repo": "petralabx/1hr-after",
+      "display_name": "PLX 1hr-after",
+      "org": "petralabx",
+      "tier": "tooling",
+      "integration_branch": "main",
+      "release_branch": null,
+      "compliance_mode": "soft",
+      "quality_ledger": {
+        "enabled": false
+      },
+      "status": "pending_adoption",
+      "contributing_path": "CONTRIBUTING.md"
+    },
+    {
+      "repo": "petralabx/furgenics",
+      "display_name": "PLX Furgenics",
+      "org": "petralabx",
+      "tier": "tooling",
+      "integration_branch": "main",
+      "release_branch": null,
+      "compliance_mode": "soft",
+      "quality_ledger": {
+        "enabled": false
+      },
+      "status": "pending_adoption",
+      "contributing_path": "CONTRIBUTING.md"
+    },
+    {
+      "repo": "petralabx/for-and-against",
+      "display_name": "PLX For-and-Against",
+      "org": "petralabx",
+      "tier": "tooling",
+      "integration_branch": "main",
+      "release_branch": null,
+      "compliance_mode": "soft",
+      "quality_ledger": {
+        "enabled": false
+      },
+      "status": "pending_adoption",
+      "contributing_path": "CONTRIBUTING.md"
+    },
+    {
+      "repo": "petralabx/test-perms-check",
+      "display_name": "Test Perms Check",
+      "org": "petralabx",
+      "tier": "sandbox",
+      "integration_branch": "main",
+      "release_branch": null,
+      "compliance_mode": "soft",
+      "quality_ledger": {
+        "enabled": false
+      },
+      "status": "pending_adoption",
+      "contributing_path": "CONTRIBUTING.md",
+      "notes": "Temporary permissions sandbox — adopt governance or archive."
+    }
+  ]
+}

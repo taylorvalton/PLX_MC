@@ -26,14 +26,24 @@ Two things now happen automatically on PRs to a tracked repo:
 
 ### Where it's on, and how strict
 
-| Repo | Gate | Mode today | What that means |
+The authoritative fleet list is `config/tracked-repos-registry.json`. Snapshot:
+
+| Repo | Tier | Gate mode today | Status |
 |---|---|---|---|
-| `PLX_MC` | ✅ on | **hard (required)** | A PR **cannot merge** until `compliance` passes. |
-| `agentic-swarm` | ✅ on | **soft (warn-only)** | The check runs + records, but does **not** block merge yet. |
-| `plx-customer-portal` | ✅ on | **soft (warn-only)** | Same — runs + records, does not block yet. |
+| `taylorvalton/PLX_MC` | hub | **hard (required)** — a PR **cannot merge** until `compliance` passes | active |
+| `taylorvalton/plx-customer-portal` | product_app | soft (warn-only) | active |
+| `taylorvalton/agentic-swarm` | product_platform | soft (warn-only) | active |
+| `petralabx/skills` | skills | soft | pending adoption |
+| `petralabx/local-inference` | tooling | soft | pending adoption |
+| `petralabx/1hr-after` | tooling | soft | pending adoption |
+| `petralabx/furgenics` | tooling | soft | pending adoption |
+| `petralabx/for-and-against` | tooling | soft | pending adoption |
+| `petralabx/test-perms-check` | sandbox | soft | pending adoption |
 
 > Soft repos will move to **hard** later, once they've run clean for a while. Treat
 > a soft warning as a real signal now so the cutover is a non-event.
+> New repos join the fleet via `docs/runbooks/REPO-ONBOARDING.md` +
+> `scripts/scaffold-tracked-repo.sh` — never by copying governance files by hand.
 
 ---
 
