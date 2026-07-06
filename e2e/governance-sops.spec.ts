@@ -26,7 +26,7 @@ test.describe("MC-SOP-Guide (governance-sops)", () => {
 
   test("index lists the seed catalog; active SOPs are ready", async ({ page }) => {
     const rows = page.locator("[data-testid='gs-row']");
-    await expect(rows).toHaveCount(5);
+    await expect(rows).toHaveCount(6);
 
     const collab = page.locator("[data-testid='gs-row'][data-slug='mc-sop-collaborator']");
     await expect(collab).toBeVisible();

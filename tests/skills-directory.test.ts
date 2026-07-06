@@ -105,7 +105,7 @@ describe("skills-directory catalog config", () => {
     expect(r.ok).toBe(true);
     if (r.ok) {
       expect(r.config.schemaVersion).toBe("plx-skills-catalog/v3");
-      expect(r.config.sourceRepo).toBe("taylorvalton/plx-cursor-skills");
+      expect(r.config.sourceRepo).toBe("petralabx/skills");
       expect(r.config.skills).toEqual([]);
     }
   });
