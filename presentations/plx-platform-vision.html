@@ -121,13 +121,19 @@ em{font-style:italic;color:var(--p-accent)}
 .org-db{width:100%;background:var(--p-rail);border:1px solid var(--p-grid);padding:14px clamp(24px,3vw,36px);display:flex;align-items:center;justify-content:center;gap:16px;flex-wrap:wrap;position:relative;z-index:1}
 .org-db .k{font-family:var(--mono);font-size:11px;letter-spacing:.22em;text-transform:uppercase;color:var(--p-muted)}
 .org-db .t{font-size:clamp(16px,1.6vw,21px);font-weight:600;color:var(--p-ink-2)}
-.org-fb{position:absolute;top:calc(clamp(20px,2.4vw,28px) + 20px);bottom:clamp(90px,10vw,120px);width:1px;border-left:2px dotted color-mix(in srgb,var(--p-ink-2) 45%,transparent);z-index:0}
-.org-fb.l{left:clamp(-10px,-1vw,-4px)}
-.org-fb.r{right:clamp(-10px,-1vw,-4px)}
-.org-fb .head{position:absolute;top:-7px;left:-6.5px;color:var(--p-accent);font-size:11px;line-height:1}
-.org-fb .lb{position:absolute;top:50%;left:-7px;transform:rotate(-90deg) translateX(50%);transform-origin:left center;font-family:var(--mono);font-size:10px;letter-spacing:.4em;text-transform:uppercase;color:var(--p-muted);white-space:nowrap}
+/* feedback rails: rise from the shared-context row and turn INTO the human plane */
+.org-fb{position:absolute;top:clamp(24px,3vw,42px);bottom:clamp(96px,10vw,128px);width:0;border-left:2px dotted color-mix(in srgb,var(--p-ink-2) 42%,transparent);z-index:0}
+.org-fb.l{left:clamp(6px,4vw,72px)}
+.org-fb.r{right:clamp(6px,4vw,72px)}
+.org-fb .elbow{position:absolute;top:-1px;height:0;border-top:2px dotted color-mix(in srgb,var(--p-accent) 65%,transparent);width:clamp(22px,3vw,58px)}
+.org-fb.l .elbow{left:0}
+.org-fb.r .elbow{right:0}
+.org-fb .tip{position:absolute;top:-6px;width:0;height:0;border-top:5px solid transparent;border-bottom:5px solid transparent}
+.org-fb.l .tip{left:clamp(22px,3vw,58px);border-left:8px solid var(--p-accent)}
+.org-fb.r .tip{right:clamp(22px,3vw,58px);border-right:8px solid var(--p-accent)}
+.org-fb .lb{position:absolute;bottom:32%;left:-7px;transform:rotate(-90deg) translateX(50%);transform-origin:left center;font-family:var(--mono);font-size:10px;letter-spacing:.4em;text-transform:uppercase;color:var(--p-muted);white-space:nowrap}
 .org-fb.r .lb{left:auto;right:-7px;transform:rotate(90deg) translateX(-50%);transform-origin:right center}
-.org-fb .origin{position:absolute;bottom:-4px;left:-5px;width:9px;height:9px;border-radius:50%;background:var(--p-accent)}
+.org-fb .origin{position:absolute;bottom:-5px;left:-5px;width:9px;height:9px;border-radius:50%;background:var(--p-accent)}
 @media(max-width:860px){.org-agents{grid-template-columns:repeat(2,1fr)}.org-fb{display:none}}
 @media(max-width:520px){.org-agents{grid-template-columns:1fr}}
 
@@ -152,28 +158,35 @@ em{font-style:italic;color:var(--p-accent)}
 .stack-found .cell .s{font-family:var(--mono);font-size:clamp(9px,.95vw,12px);letter-spacing:.1em;text-transform:uppercase;color:var(--p-muted);line-height:1.5}
 @media(max-width:640px){.stack-found{flex-direction:column}.stack-row{padding-left:20px;padding-right:20px}.stack-row .n{position:static;margin-bottom:2px}}
 
-/* ── pillars ── */
-.pillars{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--p-grid);border:1px solid var(--p-grid)}
-.pillar{background:var(--p-paper);padding:clamp(28px,3vw,44px);display:flex;flex-direction:column}
+/* ── pillars — subgrid keeps the You / list / interact / pills rows aligned across all three ── */
+.pillars{display:grid;grid-template-columns:repeat(3,1fr);grid-template-rows:auto auto 1fr auto auto;column-gap:1px;row-gap:0;background:var(--p-grid);border:1px solid var(--p-grid)}
+.pillar{grid-row:1 / 6;display:grid;grid-template-rows:subgrid;row-gap:0;background:var(--p-paper);padding:clamp(28px,3vw,44px)}
+.pillar .phead{display:flex;flex-direction:column}
 .pillar .picon{color:var(--p-muted);margin-bottom:20px}
 .pillar .pk{font-family:var(--mono);font-size:12px;letter-spacing:.2em;text-transform:uppercase;color:var(--p-muted)}
 .pillar .pt{font-family:var(--mazius);font-size:clamp(26px,2.6vw,34px);line-height:1;margin-top:8px;color:var(--p-ink)}
 .pillar .pcode{font-family:var(--mono);font-size:13px;letter-spacing:.06em;color:var(--p-muted);margin-top:10px}
-.pillar .pyou{display:flex;align-items:center;gap:14px;min-height:58px;padding:14px 0;margin-top:18px;border-top:1px solid var(--p-grid-2);border-bottom:1px solid var(--p-grid-2)}
+.pillar .pcode a{color:var(--p-accent);text-decoration:none;border-bottom:1px solid color-mix(in srgb,var(--p-accent) 35%,transparent);padding-bottom:1px;transition:color var(--p-dur) var(--p-ease),border-color var(--p-dur) var(--p-ease)}
+.pillar .pcode a:hover{color:var(--p-ink);border-bottom-color:var(--p-ink)}
+.pillar .pcode .ext{font-size:11px}
+.pillar .pyou{display:flex;align-items:center;gap:14px;min-height:64px;padding:16px 0;border-top:1px solid var(--p-grid-2);border-bottom:1px solid var(--p-grid-2)}
 .pillar .pyou .k{flex:none;font-family:var(--mono);font-size:11px;letter-spacing:.2em;text-transform:uppercase;color:var(--p-muted)}
 .pillar .pyou .t{font-family:var(--mazius);font-size:clamp(18px,1.8vw,23px);line-height:1.2;color:var(--p-ink)}
-.pillar ul{list-style:none;margin:20px 0 0;padding:0;display:flex;flex-direction:column;gap:13px}
+.pillar ul{list-style:none;margin:0;padding:20px 0 0;display:flex;flex-direction:column;gap:13px}
 .pillar li{display:flex;gap:14px;align-items:flex-start;font-size:var(--w-small);line-height:1.45;color:var(--p-ink-2)}
 .pillar li::before{content:"";flex:0 0 auto;width:14px;height:0;border-top:1.5px solid var(--p-accent);margin-top:11px}
-.pillar .pspace{flex:1 1 auto;min-height:24px}
 .pillar .pint{font-family:var(--mono);font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--p-muted);padding-top:18px;border-top:1px solid var(--p-grid-2);line-height:1.6}
 .pillar .ppills{display:flex;gap:10px;flex-wrap:wrap;margin-top:16px}
-.pillars-floor{grid-column:1 / -1;border-top:1px solid var(--p-grid);background:var(--p-rail);padding:20px clamp(28px,3vw,44px);display:flex;align-items:center;justify-content:space-between;gap:20px;flex-wrap:wrap}
+.pillars-floor{grid-column:1 / -1;grid-row:6;border-top:1px solid var(--p-grid);background:var(--p-rail);padding:20px clamp(28px,3vw,44px);display:flex;align-items:center;justify-content:space-between;gap:20px;flex-wrap:wrap}
 .pillars-floor .l{display:flex;align-items:baseline;gap:16px;flex-wrap:wrap}
 .pillars-floor .k{font-family:var(--mono);font-size:12px;letter-spacing:.2em;text-transform:uppercase;color:var(--p-muted)}
 .pillars-floor .t{font-family:var(--mazius);font-size:clamp(18px,1.9vw,22px);line-height:1;color:var(--p-ink)}
 .pillars-floor .r{font-family:var(--mono);font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--p-muted)}
-@media(max-width:1020px){.pillars{grid-template-columns:1fr}}
+@media(max-width:1020px){
+  .pillars{display:flex;flex-direction:column}
+  .pillar{display:flex;flex-direction:column}
+  .pillar ul{flex:1 1 auto}
+}
 
 /* ── deep-dive (lead + card grid) ── */
 .dive{display:grid;grid-template-columns:.9fr 1.35fr;gap:clamp(36px,5vw,64px);align-items:center}
@@ -310,15 +323,15 @@ em{font-style:italic;color:var(--p-accent)}
         <span class="kick">/ 01 · AI operating model</span>
         <h2 class="stitle">The new <em>org chart</em></h2>
       </div>
-      <p class="aside">Humans hold strategy, taste, judgment and trust. Function agents do the work. Everything sits on one shared context layer — and context feeds back up.</p>
+      <p class="aside">The human plane holds strategy, taste, judgment and trust. Function agents do the work. Everything sits on one shared context layer — and context feeds back up.</p>
     </div>
 
     <div class="org rv">
-      <div class="org-fb l" aria-hidden="true"><span class="head">▲</span><span class="lb">Feedback</span><span class="origin"></span></div>
-      <div class="org-fb r" aria-hidden="true"><span class="head">▲</span><span class="lb">Feedback</span><span class="origin"></span></div>
+      <div class="org-fb l" aria-hidden="true"><span class="elbow"></span><span class="tip"></span><span class="lb">Feedback</span><span class="origin"></span></div>
+      <div class="org-fb r" aria-hidden="true"><span class="elbow"></span><span class="tip"></span><span class="lb">Feedback</span><span class="origin"></span></div>
 
       <div class="org-humans">
-        <div class="k">Humans</div>
+        <div class="k">Human plane</div>
         <div class="t">Strategy · Taste · Judgment · Trust</div>
       </div>
 
@@ -405,10 +418,12 @@ em{font-style:italic;color:var(--p-accent)}
     <div class="pillars rv">
       <!-- Mission Control -->
       <article class="pillar">
-        <svg class="picon" width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m12 14 4-4"></path><path d="M3.34 19a10 10 0 1 1 17.32 0"></path></svg>
-        <div class="pk">Cockpit · directs work</div>
-        <h3 class="pt">Mission <em>Control</em></h3>
-        <div class="pcode">PLX_MC · mc.plxcustomer.io</div>
+        <div class="phead">
+          <svg class="picon" width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m12 14 4-4"></path><path d="M3.34 19a10 10 0 1 1 17.32 0"></path></svg>
+          <div class="pk">Cockpit · directs work</div>
+          <h3 class="pt">Mission <em>Control</em></h3>
+          <div class="pcode">PLX_MC · <a href="https://mc.plxcustomer.io" target="_blank" rel="noopener">mc.plxcustomer.io<span class="ext"> ↗</span></a></div>
+        </div>
         <div class="pyou"><span class="k">You</span><span class="t">Work <em>on</em> your function</span></div>
         <ul>
           <li>Two-way SharePoint mirror with full audit trail</li>
@@ -416,7 +431,6 @@ em{font-style:italic;color:var(--p-accent)}
           <li>PLX-MC MCP with optional swarm dispatch</li>
           <li>Every PR traces back to a requirement</li>
         </ul>
-        <div class="pspace"></div>
         <div class="pint">You interact: checkout tasks · review PRs · resolve conflicts</div>
         <div class="ppills">
           <span class="pill"><span class="dot" style="background:var(--p-ok)"></span>Live app</span>
@@ -426,10 +440,12 @@ em{font-style:italic;color:var(--p-accent)}
 
       <!-- PLX Portal -->
       <article class="pillar">
-        <svg class="picon" width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 21.73a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73z"></path><path d="M12 22V12"></path><polyline points="3.29 7 12 12 20.71 7"></polyline><path d="m7.5 4.27 9 5.15"></path></svg>
-        <div class="pk">Product · customer value</div>
-        <h3 class="pt">PLX <em>Portal</em></h3>
-        <div class="pcode">plx-customer-portal · staging</div>
+        <div class="phead">
+          <svg class="picon" width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 21.73a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73z"></path><path d="M12 22V12"></path><polyline points="3.29 7 12 12 20.71 7"></polyline><path d="m7.5 4.27 9 5.15"></path></svg>
+          <div class="pk">Product · customer value</div>
+          <h3 class="pt">PLX <em>Portal</em></h3>
+          <div class="pcode">plx-customer-portal · <a href="https://plxcustomer.io" target="_blank" rel="noopener">plxcustomer.io<span class="ext"> ↗</span></a></div>
+        </div>
         <div class="pyou"><span class="k">You</span><span class="t">Work <em>in</em> your function</span></div>
         <ul>
           <li>Onboarding, DocuSign &amp; the manufacturing suite</li>
@@ -437,7 +453,6 @@ em{font-style:italic;color:var(--p-accent)}
           <li>SharePoint-backed workflows with UAT feedback</li>
           <li>Where most Mission Control work ships</li>
         </ul>
-        <div class="pspace"></div>
         <div class="pint">You interact: feature work · SOP updates · staging deploy</div>
         <div class="ppills">
           <span class="pill"><span class="dot" style="background:var(--p-info)"></span>Brand SoT</span>
@@ -447,10 +462,12 @@ em{font-style:italic;color:var(--p-accent)}
 
       <!-- Shared Context -->
       <article class="pillar">
-        <svg class="picon" width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="16" y="16" width="6" height="6" rx="1"></rect><rect x="2" y="16" width="6" height="6" rx="1"></rect><rect x="9" y="2" width="6" height="6" rx="1"></rect><path d="M5 16v-3a1 1 0 0 1 1-1h12a1 1 0 0 1 1 1v3"></path><path d="M12 12V8"></path></svg>
-        <div class="pk">Connective · one record</div>
-        <h3 class="pt">Shared <em>Context</em></h3>
-        <div class="pcode">governance-contract · SharePoint SoR</div>
+        <div class="phead">
+          <svg class="picon" width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="16" y="16" width="6" height="6" rx="1"></rect><rect x="2" y="16" width="6" height="6" rx="1"></rect><rect x="9" y="2" width="6" height="6" rx="1"></rect><path d="M5 16v-3a1 1 0 0 1 1-1h12a1 1 0 0 1 1 1v3"></path><path d="M12 12V8"></path></svg>
+          <div class="pk">Connective · one record</div>
+          <h3 class="pt">Shared <em>Context</em></h3>
+          <div class="pcode">governance-contract · SharePoint SoR</div>
+        </div>
         <div class="pyou"><span class="k">You</span><span class="t">Interact <em>with</em> colleagues, partners &amp; agents</span></div>
         <ul>
           <li>One SharePoint system of record — no forks</li>
@@ -458,7 +475,6 @@ em{font-style:italic;color:var(--p-accent)}
           <li>QMS, SOPs &amp; permissions everyone reads from</li>
           <li>Agent doctrine — AGENTS.md · SOUL.md · evidence</li>
         </ul>
-        <div class="pspace"></div>
         <div class="pint">You interact: handoffs · approvals · shared docs</div>
         <div class="ppills">
           <span class="pill"><span class="dot" style="background:var(--p-ok)"></span>One record</span>
