@@ -177,3 +177,57 @@ export function complianceCiTokenConfigured(): boolean {
 export function complianceCiToken(): string {
   return requireSecret("COMPLIANCE_CI_TOKEN");
 }
+
+// Vendor spend (AI Spend) adapter credentials. Each automated adapter is
+// default-off: when its key is absent the adapter returns a visible degraded
+// result and the vendor stays manual-entry — never fabricated spend.
+//
+// AWS Cost Explorer uses the standard AWS credential chain (env keys on the
+// box, or an instance role) rather than a bespoke env var, so its presence
+// check looks for either an explicit access key or the ambient-credential
+// opt-in flag set where an IAM role is known to exist.
+export function awsCostExplorerConfigured(): boolean {
+  return !!(
+    (process.env.AWS_ACCESS_KEY_ID && process.env.AWS_SECRET_ACCESS_KEY) ||
+    process.env.AWS_COST_EXPLORER_USE_AMBIENT === "1"
+  );
+}
+
+export interface AwsCostExplorerCredentials {
+  accessKeyId: string;
+  secretAccessKey: string;
+  sessionToken?: string;
+  region: string;
+}
+
+/** Explicit env credentials, or null to let the SDK use its ambient chain. */
+export function awsCostExplorerCredentials(): AwsCostExplorerCredentials | null {
+  if (!(process.env.AWS_ACCESS_KEY_ID && process.env.AWS_SECRET_ACCESS_KEY)) {
+    return null;
+  }
+  return {
+    accessKeyId: requireSecret("AWS_ACCESS_KEY_ID"),
+    secretAccessKey: requireSecret("AWS_SECRET_ACCESS_KEY"),
+    sessionToken: process.env.AWS_SESSION_TOKEN || undefined,
+    region: process.env.AWS_REGION ?? "us-east-1",
+  };
+}
+
+// Anthropic org cost report needs an ADMIN key (sk-ant-admin01-…); the
+// standard ANTHROPIC_API_KEY cannot read /v1/organizations/cost_report.
+export function anthropicAdminConfigured(): boolean {
+  return !!process.env.ANTHROPIC_ADMIN_API_KEY;
+}
+
+export function anthropicAdminApiKey(): string {
+  return requireSecret("ANTHROPIC_ADMIN_API_KEY");
+}
+
+// Cursor team spend needs an Enterprise Admin API key (/teams/spend).
+export function cursorAdminConfigured(): boolean {
+  return !!process.env.CURSOR_ADMIN_API_KEY;
+}
+
+export function cursorAdminApiKey(): string {
+  return requireSecret("CURSOR_ADMIN_API_KEY");
+}

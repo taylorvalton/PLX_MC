@@ -48,6 +48,7 @@ DESIGN_TOKENS).
 | loop-ledgers | Vince | Medium |
 | github-app | Vince | Medium |
 | mcp | Vince | Critical |
+| vendor-spend | Vince | Medium |
 
 ## Canonical Operations Docs
 
