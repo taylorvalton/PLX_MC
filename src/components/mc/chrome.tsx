@@ -12,6 +12,7 @@ import { meetingIntakeEnabled } from "@/lib/meeting-intake";
 
 import { Avatar, PMark } from "./atoms";
 import type { Nav, Route, Screen } from "./route";
+import { useVendorAlertCount } from "./vendor-spend/use-alert-badge";
 
 export function Topbar({
   nav,
@@ -101,6 +102,8 @@ export function Sidebar({
   const live = liveAgentCount(allTasks());
   const sc = storeSyncCounts();
   const conflicts = sc.conflict + sc.error;
+  // Vendors at warn/critical/over budget (MTD) — the AI Spend proactive badge.
+  const vendorAlerts = useVendorAlertCount();
 
   const item = (target: Screen, ic: string, label: string, badge?: ReactNode) => (
     <button
@@ -165,7 +168,12 @@ export function Sidebar({
         {item("loop-ledgers", "◰", "Loop ledgers")}
         {item("governance-sops", "§", "SOP guide")}
         {item("skills-directory", "◈", "Skills directory")}
-        {item("ai-spend", "◎", "AI Spend")}
+        {item(
+          "ai-spend",
+          "◎",
+          "AI Spend",
+          vendorAlerts ? <span className="badge hot">{vendorAlerts}</span> : null
+        )}
         {/* Meeting bridge nav appears only when the WS-4 flag is on (off by default). */}
         {meetingIntakeEnabled() ? item("intake", "🗒", "Meeting intake") : null}
       </div>

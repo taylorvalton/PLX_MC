@@ -6,7 +6,7 @@
 
 import { cursorAdminApiKey, cursorAdminConfigured } from "@/lib/secrets";
 
-import type { AdapterPullResult, PeriodRange } from "../types";
+import type { AdapterPullResult } from "../types";
 
 import { degraded, type VendorAdapter } from "./contract";
 
@@ -34,7 +34,9 @@ function memberCents(m: TeamMemberSpend): number {
   return (m.spendCents ?? 0) + (m.includedSpendCents ?? 0);
 }
 
-async function pull(_range: PeriodRange): Promise<AdapterPullResult> {
+// The Admin API always reports the CURRENT billing cycle — the requested
+// range does not parameterize the pull, so the contract param is unused.
+async function pull(): Promise<AdapterPullResult> {
   if (!cursorAdminConfigured()) {
     return degraded(
       VENDOR_ID,
