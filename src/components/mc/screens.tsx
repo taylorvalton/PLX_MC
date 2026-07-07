@@ -1,7 +1,7 @@
 // Screen registry — the shell renders SCREENS[route.screen].
 import type { ComponentType } from "react";
 
-import { AiSpendView } from "./ai-spend";
+import { AiSpendView } from "./vendor-spend";
 import { AgentFeed } from "./agent-feed";
 import { BucketDetail } from "./bucket-detail";
 import { ProjectDetail } from "./project-detail";

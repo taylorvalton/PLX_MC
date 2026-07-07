@@ -11,6 +11,7 @@
 @import "../styles/mc-loop-ledgers.css";
 @import "../styles/mc-governance-sops.css";
 @import "../styles/mc-skills-directory.css";
+@import "../styles/mc-vendor-spend.css";
 
 * {
   box-sizing: border-box;
