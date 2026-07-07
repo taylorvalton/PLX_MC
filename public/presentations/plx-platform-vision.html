@@ -2,11 +2,686 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta http-equiv="refresh" content="0; url=./plx-platform-vision/">
-<title>PLX Platform Vision</title>
-<link rel="canonical" href="./plx-platform-vision/">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<title>PLX Platform Vision · Team Briefing · Petra Lab-X</title>
+<link href="https://api.fontshare.com/v2/css?f[]=mazius-display@400,401&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root {
+  --p-paper:#FBF9F5; --p-paper-2:#F2EDE2; --p-rail:#EEEBE3;
+  --p-ink:#1B1A17; --p-ink-2:#3A3833; --p-muted:#6B665B;
+  --p-grid:rgba(27,26,23,0.16); --p-grid-2:rgba(27,26,23,0.08);
+  --p-accent:#244A39; --p-accent-soft:#BCCFBF;
+  --p-ok:#5C7A55; --p-warn:#C99340; --p-info:#5B7B91;
+  --mazius:"Mazius Display","Times New Roman",Georgia,serif;
+  --sans:"Inter",-apple-system,system-ui,sans-serif;
+  --mono:"JetBrains Mono",ui-monospace,monospace;
+  --w-display:clamp(54px,9vw,120px);
+  --w-h1:clamp(34px,5.4vw,72px);
+  --w-h2:clamp(28px,3.4vw,48px);
+  --w-h3:clamp(22px,2.4vw,32px);
+  --w-lede:clamp(18px,1.7vw,24px);
+  --w-body:clamp(16px,1.45vw,20px);
+  --w-small:clamp(14px,1.2vw,16px);
+  --w-kicker:13px;
+  --w-wrap:1320px;
+  --w-pad:clamp(22px,5vw,104px);
+  --w-sec:clamp(80px,11vh,140px);
+  --p-ease:cubic-bezier(.2,.8,.2,1);
+  --p-dur:180ms;
+}
+*,*::before,*::after{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{margin:0;background:var(--p-paper);color:var(--p-ink);font-family:var(--sans);font-size:var(--w-body);line-height:1.55;-webkit-font-smoothing:antialiased;font-feature-settings:"ss01","ss02";overflow-x:hidden}
+.wrap{width:100%;max-width:var(--w-wrap);margin:0 auto;padding-left:var(--w-pad);padding-right:var(--w-pad)}
+.kick{font-family:var(--mono);font-size:var(--w-kicker);letter-spacing:.24em;text-transform:uppercase;color:var(--p-muted)}
+.mono{font-family:var(--mono);font-variant-numeric:tabular-nums}
+em{font-style:italic;color:var(--p-accent)}
+.stitle{font-family:var(--mazius);font-weight:400;font-size:var(--w-h1);line-height:1.02;letter-spacing:-.022em;margin:0;text-wrap:balance}
+.lede{font-size:var(--w-lede);line-height:1.5;color:var(--p-ink-2);margin:0;text-wrap:pretty;max-width:62ch}
+.small{font-size:var(--w-small);line-height:1.5;color:var(--p-ink-2);margin:0}
+.pill{display:inline-flex;align-items:center;gap:8px;padding:6px 12px;border:1px solid var(--p-grid);font-family:var(--mono);font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--p-ink-2);white-space:nowrap}
+.pill .dot{width:7px;height:7px;border-radius:50%;flex:none}
+.pmark{position:relative;display:inline-block;width:1em;height:1em;border:1.5px solid currentColor;flex:none}
+.pmark>.n{position:absolute;top:9%;left:13%;font-family:var(--mono);font-size:.185em;letter-spacing:.04em;line-height:1}
+.pmark>.s{position:absolute;bottom:6%;right:11%;font-family:var(--mazius);font-size:.5em;line-height:1;letter-spacing:-.02em}
+.btn{display:inline-flex;align-items:center;gap:14px;padding:16px 26px;background:var(--p-ink);color:var(--p-paper);font-family:var(--mono);font-size:var(--w-small);letter-spacing:.16em;text-transform:uppercase;border:1px solid var(--p-ink);cursor:pointer;text-decoration:none;transition:background var(--p-dur) var(--p-ease),border-color var(--p-dur) var(--p-ease)}
+.btn .sq{width:8px;height:8px;background:var(--p-accent-soft)}
+.btn:hover{background:var(--p-accent);border-color:var(--p-accent)}
+.btn.ghost{background:transparent;color:var(--p-ink);border-color:var(--p-grid)}
+.btn.ghost:hover{background:transparent;color:var(--p-accent);border-color:var(--p-accent)}
+
+/* ── sitebar ── */
+.sitebar{position:fixed;top:0;left:0;right:0;z-index:100;display:flex;align-items:center;justify-content:space-between;gap:24px;padding:16px var(--w-pad);background:color-mix(in srgb,var(--p-paper) 78%,transparent);backdrop-filter:blur(14px);border-bottom:1px solid transparent;transition:border-color var(--p-dur) var(--p-ease)}
+.sitebar.scrolled{border-bottom-color:var(--p-grid)}
+.sitebar .left{display:flex;align-items:center;gap:16px;min-width:0}
+.sitebar .pmark{font-size:30px;color:var(--p-ink)}
+.sitebar .lab{font-family:var(--mono);font-size:11px;letter-spacing:.2em;text-transform:uppercase;color:var(--p-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sitebar .lab b{color:var(--p-ink);font-weight:500}
+.sitebar nav{display:flex;gap:22px}
+.sitebar nav a{font-family:var(--mono);font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--p-muted);text-decoration:none;transition:color var(--p-dur) var(--p-ease)}
+.sitebar nav a:hover{color:var(--p-ink)}
+@media(max-width:1080px){.sitebar nav{display:none}}
+
+/* ── sections ── */
+.sec{padding-top:var(--w-sec);padding-bottom:var(--w-sec);position:relative}
+.sec.tint{background:var(--p-paper-2)}
+.sec-rule{border:0;border-top:1px solid var(--p-grid);margin:0}
+.sec-head{display:grid;grid-template-columns:1.15fr .85fr;gap:clamp(28px,4vw,72px);align-items:end;margin-bottom:clamp(40px,5vw,76px)}
+.sec-head .kick{margin-bottom:24px;display:block}
+.sec-head .aside{text-align:right;color:var(--p-muted);max-width:42ch;justify-self:end;line-height:1.5}
+@media(max-width:820px){.sec-head{grid-template-columns:1fr;gap:22px}.sec-head .aside{text-align:left;justify-self:start}}
+.tagline{font-family:var(--mazius);font-weight:400;font-size:clamp(22px,2.6vw,33px);line-height:1.3;color:var(--p-ink-2);margin:clamp(40px,5vw,64px) auto 0;text-align:center;max-width:34ch;text-wrap:balance}
+
+/* ── hero ── */
+.hero{position:relative;min-height:100vh;min-height:100svh;display:flex;flex-direction:column;justify-content:center;padding-top:clamp(120px,16vh,220px);padding-bottom:clamp(60px,9vh,120px);overflow:hidden}
+.hero .wrap{position:relative;z-index:2}
+.hero .ghostmark{position:absolute;z-index:0;font-family:var(--mazius);font-style:italic;color:color-mix(in srgb,var(--p-accent) 7%,transparent);line-height:.8;pointer-events:none;user-select:none;font-size:clamp(420px,60vw,900px);right:-8vw;top:-6vh}
+.hero .grid-lines{position:absolute;inset:0;z-index:0;pointer-events:none;background-image:linear-gradient(var(--p-grid-2) 1px,transparent 1px);background-size:100% clamp(80px,9vh,132px);opacity:.6;-webkit-mask-image:linear-gradient(180deg,transparent,#000 22%,#000 70%,transparent);mask-image:linear-gradient(180deg,transparent,#000 22%,#000 70%,transparent)}
+.hero .eyebrow{display:flex;align-items:center;gap:18px;margin-bottom:clamp(28px,4vw,48px)}
+.hero .eyebrow .pmark{font-size:clamp(44px,5vw,64px);color:var(--p-ink)}
+.hero .eyebrow .meta{font-family:var(--mono);font-size:var(--w-small);letter-spacing:.16em;text-transform:uppercase;color:var(--p-muted);line-height:1.5}
+.hero .eyebrow .meta b{color:var(--p-ink);font-weight:500}
+.hero h1{font-family:var(--mazius);font-weight:400;font-size:var(--w-display);line-height:.96;letter-spacing:-.03em;margin:0;max-width:14ch;text-wrap:balance}
+.hero .herometa{display:grid;grid-template-columns:repeat(4,1fr);gap:0;margin-top:clamp(40px,6vw,80px);border-top:1px solid var(--p-grid);padding-top:clamp(26px,3vw,40px)}
+.hero .herometa>div{padding-right:24px}
+.hero .herometa>div+div{border-left:1px solid var(--p-grid-2);padding-left:24px}
+.hero .herometa .k{font-family:var(--mono);font-size:12px;letter-spacing:.2em;text-transform:uppercase;color:var(--p-muted)}
+.hero .herometa .v{font-size:clamp(15px,1.4vw,20px);font-weight:600;color:var(--p-ink);margin-top:8px}
+@media(max-width:820px){.hero .herometa{grid-template-columns:1fr 1fr;row-gap:22px}.hero .herometa>div:nth-child(3){border-left:0;padding-left:0}}
+@media(max-width:480px){.hero .herometa{grid-template-columns:1fr}.hero .herometa>div{border-left:0!important;padding-left:0!important}}
+.hero .scrollcue{position:absolute;left:50%;bottom:26px;transform:translateX(-50%);z-index:2;display:flex;flex-direction:column;align-items:center;gap:10px;font-family:var(--mono);font-size:10px;letter-spacing:.24em;text-transform:uppercase;color:var(--p-muted)}
+.hero .scrollcue .ln{width:1px;height:38px;background:linear-gradient(var(--p-muted),transparent);animation:cue 2.2s var(--p-ease) infinite;transform-origin:top}
+@keyframes cue{0%{transform:scaleY(0);opacity:0}40%{transform:scaleY(1);opacity:1}100%{transform:scaleY(1);opacity:0}}
+
+/* ── org chart ── */
+.org{position:relative;display:flex;flex-direction:column;align-items:center;margin-top:clamp(8px,1vw,16px)}
+.org-humans{width:min(680px,100%);background:var(--p-ink);color:var(--p-paper);padding:clamp(20px,2.4vw,28px) clamp(24px,3vw,36px);text-align:center;position:relative;z-index:1}
+.org-humans .k{font-family:var(--mono);font-size:11px;letter-spacing:.26em;text-transform:uppercase;color:color-mix(in srgb,var(--p-paper) 60%,transparent)}
+.org-humans .t{font-family:var(--mazius);font-size:clamp(22px,2.6vw,32px);line-height:1.05;margin-top:8px}
+.org-conn{display:flex;flex-direction:column;align-items:center;padding:2px 0;position:relative;z-index:1}
+.org-conn .ln{width:1px;height:clamp(24px,3vh,34px);background:var(--p-ink-2)}
+.org-conn .tri{width:0;height:0;border-left:6px solid transparent;border-right:6px solid transparent;border-top:8px solid var(--p-ink-2)}
+.org-conn.acc .ln{background:var(--p-accent)}
+.org-conn.acc .tri{border-top-color:var(--p-accent)}
+.org-harness{position:relative;border:1px solid var(--p-grid);width:100%;padding:clamp(34px,4vw,44px) clamp(18px,2.4vw,30px) clamp(20px,2.6vw,28px);z-index:1;background:color-mix(in srgb,var(--p-paper) 55%,transparent)}
+.org-harness .hlabel{position:absolute;top:-9px;left:clamp(16px,2vw,26px);background:var(--p-paper);padding:0 12px;font-family:var(--mono);font-size:11px;letter-spacing:.2em;text-transform:uppercase;color:var(--p-muted);max-width:calc(100% - 32px);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sec.tint .org-harness .hlabel{background:var(--p-paper-2)}
+.org-agents{display:grid;grid-template-columns:repeat(3,1fr);gap:clamp(12px,1.6vw,22px)}
+.org-agent{background:var(--p-paper);border:1px solid var(--p-grid);padding:clamp(18px,2vw,26px) 14px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:7px;text-align:center;transition:border-color var(--p-dur) var(--p-ease)}
+.org-agent:hover{border-color:var(--p-ink-2)}
+.org-agent .k{font-family:var(--mono);font-size:9px;letter-spacing:.22em;text-transform:uppercase;color:var(--p-muted)}
+.org-agent .t{font-family:var(--mazius);font-size:clamp(18px,1.9vw,24px);line-height:1.1;color:var(--p-ink)}
+.org-conn3{display:grid;grid-template-columns:repeat(3,1fr);width:min(760px,88%);justify-items:center;position:relative;z-index:1}
+.org-conn3 .org-conn{padding:2px 0}
+.org-ctx{width:100%;background:color-mix(in srgb,var(--p-accent) 10%,var(--p-paper));border:1.5px solid var(--p-accent);padding:clamp(20px,2.4vw,28px) clamp(24px,3vw,36px);text-align:center;position:relative;z-index:1}
+.org-ctx .t{font-family:var(--mazius);font-size:clamp(20px,2.4vw,28px);line-height:1.05;color:var(--p-ink)}
+.org-ctx .k{font-family:var(--mono);font-size:clamp(11px,1.1vw,14px);letter-spacing:.08em;text-transform:uppercase;color:var(--p-ink-2);margin-top:10px;line-height:1.6}
+.org-db{width:100%;background:var(--p-rail);border:1px solid var(--p-grid);padding:14px clamp(24px,3vw,36px);display:flex;align-items:center;justify-content:center;gap:16px;flex-wrap:wrap;position:relative;z-index:1}
+.org-db .k{font-family:var(--mono);font-size:11px;letter-spacing:.22em;text-transform:uppercase;color:var(--p-muted)}
+.org-db .t{font-size:clamp(16px,1.6vw,21px);font-weight:600;color:var(--p-ink-2)}
+.org-fb{position:absolute;top:calc(clamp(20px,2.4vw,28px) + 20px);bottom:clamp(90px,10vw,120px);width:1px;border-left:2px dotted color-mix(in srgb,var(--p-ink-2) 45%,transparent);z-index:0}
+.org-fb.l{left:clamp(-10px,-1vw,-4px)}
+.org-fb.r{right:clamp(-10px,-1vw,-4px)}
+.org-fb .head{position:absolute;top:-7px;left:-6.5px;color:var(--p-accent);font-size:11px;line-height:1}
+.org-fb .lb{position:absolute;top:50%;left:-7px;transform:rotate(-90deg) translateX(50%);transform-origin:left center;font-family:var(--mono);font-size:10px;letter-spacing:.4em;text-transform:uppercase;color:var(--p-muted);white-space:nowrap}
+.org-fb.r .lb{left:auto;right:-7px;transform:rotate(90deg) translateX(-50%);transform-origin:right center}
+.org-fb .origin{position:absolute;bottom:-4px;left:-5px;width:9px;height:9px;border-radius:50%;background:var(--p-accent)}
+@media(max-width:860px){.org-agents{grid-template-columns:repeat(2,1fr)}.org-fb{display:none}}
+@media(max-width:520px){.org-agents{grid-template-columns:1fr}}
+
+/* ── stack pyramid ── */
+.stack{display:flex;flex-direction:column;align-items:center;gap:clamp(9px,1.2vh,13px);margin-top:clamp(8px,1vw,16px)}
+.stack-row{position:relative;border:1px solid var(--p-grid);background:var(--p-paper);padding:clamp(14px,1.8vw,20px) clamp(48px,5vw,64px);display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;gap:4px;width:100%;transition:border-color var(--p-dur) var(--p-ease)}
+.stack-row:hover{border-color:var(--p-ink-2)}
+.stack-row .n{position:absolute;left:14px;top:11px;font-family:var(--mono);font-size:11px;letter-spacing:.14em;color:var(--p-muted)}
+.stack-row .t{font-size:clamp(17px,1.8vw,24px);font-weight:600;color:var(--p-ink);line-height:1.15}
+.stack-row .s{font-family:var(--mono);font-size:clamp(10px,1vw,13px);letter-spacing:.1em;text-transform:uppercase;color:var(--p-muted);line-height:1.5}
+.stack-row.hot{background:color-mix(in srgb,var(--p-accent) 12%,var(--p-paper));border:1.5px solid var(--p-accent)}
+.stack-row.hot .n{color:var(--p-accent)}
+.stack-row.w6{max-width:min(420px,100%)}
+.stack-row.w5{max-width:min(530px,100%)}
+.stack-row.w4{max-width:min(640px,100%)}
+.stack-row.w3{max-width:min(750px,100%)}
+.stack-row.w2{max-width:min(860px,100%)}
+.stack-row.w1{max-width:min(970px,100%)}
+.stack-found{display:flex;gap:clamp(9px,1.2vw,13px);width:100%;max-width:min(1080px,100%)}
+.stack-found .cell{flex:1;background:var(--p-rail);border:1px solid var(--p-grid);padding:clamp(14px,1.8vw,20px) 16px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;text-align:center}
+.stack-found .cell .t{font-size:clamp(16px,1.6vw,22px);font-weight:600;color:var(--p-ink-2)}
+.stack-found .cell .s{font-family:var(--mono);font-size:clamp(9px,.95vw,12px);letter-spacing:.1em;text-transform:uppercase;color:var(--p-muted);line-height:1.5}
+@media(max-width:640px){.stack-found{flex-direction:column}.stack-row{padding-left:20px;padding-right:20px}.stack-row .n{position:static;margin-bottom:2px}}
+
+/* ── pillars ── */
+.pillars{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--p-grid);border:1px solid var(--p-grid)}
+.pillar{background:var(--p-paper);padding:clamp(28px,3vw,44px);display:flex;flex-direction:column}
+.pillar .picon{color:var(--p-muted);margin-bottom:20px}
+.pillar .pk{font-family:var(--mono);font-size:12px;letter-spacing:.2em;text-transform:uppercase;color:var(--p-muted)}
+.pillar .pt{font-family:var(--mazius);font-size:clamp(26px,2.6vw,34px);line-height:1;margin-top:8px;color:var(--p-ink)}
+.pillar .pcode{font-family:var(--mono);font-size:13px;letter-spacing:.06em;color:var(--p-muted);margin-top:10px}
+.pillar .pyou{display:flex;align-items:center;gap:14px;min-height:58px;padding:14px 0;margin-top:18px;border-top:1px solid var(--p-grid-2);border-bottom:1px solid var(--p-grid-2)}
+.pillar .pyou .k{flex:none;font-family:var(--mono);font-size:11px;letter-spacing:.2em;text-transform:uppercase;color:var(--p-muted)}
+.pillar .pyou .t{font-family:var(--mazius);font-size:clamp(18px,1.8vw,23px);line-height:1.2;color:var(--p-ink)}
+.pillar ul{list-style:none;margin:20px 0 0;padding:0;display:flex;flex-direction:column;gap:13px}
+.pillar li{display:flex;gap:14px;align-items:flex-start;font-size:var(--w-small);line-height:1.45;color:var(--p-ink-2)}
+.pillar li::before{content:"";flex:0 0 auto;width:14px;height:0;border-top:1.5px solid var(--p-accent);margin-top:11px}
+.pillar .pspace{flex:1 1 auto;min-height:24px}
+.pillar .pint{font-family:var(--mono);font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--p-muted);padding-top:18px;border-top:1px solid var(--p-grid-2);line-height:1.6}
+.pillar .ppills{display:flex;gap:10px;flex-wrap:wrap;margin-top:16px}
+.pillars-floor{grid-column:1 / -1;border-top:1px solid var(--p-grid);background:var(--p-rail);padding:20px clamp(28px,3vw,44px);display:flex;align-items:center;justify-content:space-between;gap:20px;flex-wrap:wrap}
+.pillars-floor .l{display:flex;align-items:baseline;gap:16px;flex-wrap:wrap}
+.pillars-floor .k{font-family:var(--mono);font-size:12px;letter-spacing:.2em;text-transform:uppercase;color:var(--p-muted)}
+.pillars-floor .t{font-family:var(--mazius);font-size:clamp(18px,1.9vw,22px);line-height:1;color:var(--p-ink)}
+.pillars-floor .r{font-family:var(--mono);font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--p-muted)}
+@media(max-width:1020px){.pillars{grid-template-columns:1fr}}
+
+/* ── deep-dive (lead + card grid) ── */
+.dive{display:grid;grid-template-columns:.9fr 1.35fr;gap:clamp(36px,5vw,64px);align-items:center}
+.dive .lead-col .lede strong{font-weight:600;color:var(--p-ink)}
+.dive .lead-col .pills{display:flex;gap:10px;flex-wrap:wrap;margin-top:28px}
+.dive-cards{display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--p-grid);border:1px solid var(--p-grid)}
+.dive-card{background:var(--p-paper);padding:clamp(22px,2.4vw,32px);display:flex;flex-direction:column;gap:9px}
+.dive-card .k{font-family:var(--mono);font-size:11px;letter-spacing:.2em;text-transform:uppercase;color:var(--p-muted)}
+.dive-card .t{font-family:var(--mazius);font-size:clamp(21px,2.1vw,27px);line-height:1.05;color:var(--p-ink)}
+.dive-card .d{font-size:var(--w-small);line-height:1.5;color:var(--p-ink-2)}
+.sec.tint .dive-card{background:var(--p-paper)}
+@media(max-width:960px){.dive{grid-template-columns:1fr}}
+@media(max-width:640px){.dive-cards{grid-template-columns:1fr}}
+
+/* ── ladder (foundation) ── */
+.ladder{display:flex;flex-direction:column;margin-top:clamp(8px,1vw,16px)}
+.ladder .tier-label{font-family:var(--mono);font-size:11px;letter-spacing:.2em;text-transform:uppercase;color:var(--p-muted);margin-bottom:8px}
+.ladder .tier{display:flex;gap:clamp(10px,1.4vw,16px)}
+.ladder .cell{flex:1;border:1px solid var(--p-grid);padding:clamp(18px,2.2vw,28px) 14px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;text-align:center;background:var(--p-paper)}
+.ladder .cell .t{font-size:clamp(15px,1.5vw,20px);font-weight:600;line-height:1.15;color:var(--p-ink)}
+.ladder .cell .s{font-family:var(--mono);font-size:clamp(9px,.95vw,11px);letter-spacing:.14em;text-transform:uppercase;color:var(--p-muted)}
+.ladder .tier.out .cell{background:color-mix(in srgb,var(--p-accent) 12%,var(--p-paper));border-color:color-mix(in srgb,var(--p-accent) 40%,var(--p-grid))}
+.ladder .tier.dept .cell{background:var(--p-rail)}
+.ladder .tier.dept .cell .t{color:var(--p-ink-2)}
+.ladder .rise{display:flex;justify-content:center;padding:6px 0}
+.ladder .rise>div{display:flex;flex-direction:column;align-items:center}
+.ladder .rise .tri{width:0;height:0;border-left:6px solid transparent;border-right:6px solid transparent;border-bottom:8px solid var(--p-accent)}
+.ladder .rise .ln{width:1.5px;height:20px;background:var(--p-accent)}
+@media(max-width:720px){.ladder .tier{flex-direction:column}}
+
+/* ── principles ── */
+.principles{display:grid;grid-template-columns:repeat(3,1fr);margin-top:clamp(8px,1vw,16px)}
+.principle{padding:0 clamp(24px,3vw,44px);display:flex;flex-direction:column}
+.principle+.principle{border-left:1px solid var(--p-grid-2)}
+.principle .n{font-family:var(--mono);font-size:clamp(32px,3.4vw,44px);font-weight:500;color:var(--p-accent);line-height:1}
+.principle .t{font-family:var(--mazius);font-size:clamp(22px,2.2vw,28px);line-height:1.1;color:var(--p-ink);margin-top:18px}
+.principle .d{font-size:var(--w-small);line-height:1.55;color:var(--p-ink-2);margin-top:14px}
+.principles-strip{font-family:var(--mono);font-size:12px;letter-spacing:.2em;text-transform:uppercase;color:var(--p-muted);text-align:center;margin-top:clamp(40px,5vw,64px);padding-top:22px;border-top:1px solid var(--p-grid)}
+@media(max-width:860px){.principles{grid-template-columns:1fr;row-gap:36px}.principle+.principle{border-left:0;padding-top:0}.principle{padding-left:0;padding-right:0}}
+
+/* ── close ── */
+.close-sec{padding-top:clamp(100px,14vh,180px);padding-bottom:clamp(80px,10vh,140px);text-align:center;border-top:1px solid var(--p-grid)}
+.close-sec .stitle{font-size:clamp(40px,6vw,88px);max-width:18ch;margin:0 auto}
+.close-sec .lede{margin:clamp(24px,3vw,36px) auto 0;max-width:52ch}
+.close-sec .cta-row{display:flex;justify-content:center;gap:18px;flex-wrap:wrap;margin-top:clamp(36px,4vw,56px)}
+.close-sec .signoff{margin-top:clamp(48px,6vw,72px);font-family:var(--mono);font-size:var(--w-small);letter-spacing:.12em;text-transform:uppercase;color:var(--p-muted)}
+.close-sec .signoff b{display:block;color:var(--p-ink);font-weight:500;margin-top:10px;letter-spacing:.16em}
+
+/* ── motion ── */
+.rv{opacity:0;transform:translateY(22px);transition:opacity .7s var(--p-ease),transform .7s var(--p-ease)}
+.rv.in{opacity:1;transform:none}
+@media(prefers-reduced-motion:reduce){.rv{opacity:1;transform:none;transition:none}.hero .scrollcue .ln{animation:none}}
+
+/* ── print ── */
+@media print{
+  .sitebar,.hero .scrollcue,.hero .ghostmark,.hero .grid-lines,.org-fb{display:none!important}
+  :root{--w-sec:26px;--w-display:44px;--w-h1:29px;--w-h2:22px;--w-h3:18px;--w-lede:14px;--w-body:12.5px;--w-small:11.5px;--w-pad:26px}
+  html,body{background:#fff!important}
+  .hero{min-height:0!important;padding-top:6px!important;padding-bottom:6px!important}
+  .hero h1{max-width:none!important}
+  .hero .herometa{margin-top:16px!important;padding-top:14px!important}
+  .sec{padding-top:20px!important;padding-bottom:20px!important}
+  .sec-rule{display:none!important}
+  .sec-head{margin-bottom:16px!important;gap:18px!important}
+  .close-sec{padding-top:26px!important;padding-bottom:26px!important;border-top:1px solid var(--p-grid)!important}
+  .rv{opacity:1!important;transform:none!important}
+  .tagline{margin-top:18px!important}
+  /* grids fragment in print — convert to flex with per-cell borders */
+  .pillars,.dive-cards{display:flex!important;flex-wrap:nowrap!important;gap:12px!important;background:transparent!important;border:0!important}
+  .pillars>.pillar,.dive-cards>*{flex:1 1 0!important;min-width:0!important;border:1px solid var(--p-grid)!important}
+  .pillars-floor{flex:1 1 100%!important;border:1px solid var(--p-grid)!important;margin-top:12px!important}
+  .pillars{flex-wrap:wrap!important}
+  .dive{display:flex!important;gap:26px!important;align-items:stretch!important}
+  .dive>*{flex:1 1 0!important;min-width:0!important}
+  .principles{gap:18px!important}
+  .stack-row,.stack-found .cell,.ladder .cell{padding:10px 14px!important}
+  .pillar,.dive-card{padding:16px!important}
+  /* pagination protection */
+  .sec-head{break-inside:avoid;break-after:avoid}
+  .org,.stack,.ladder,.pillars,.dive,.principles{break-inside:avoid}
+  .org-humans,.org-harness,.org-ctx,.org-db,.org-agent,.stack-row,.pillar,.dive-card,.ladder .cell,.principle{break-inside:avoid}
+  h1,h2,h3,.stitle{break-after:avoid}
+  @page{margin:11mm 10mm;size:letter}
+}
+</style>
 </head>
 <body>
-<p><a href="./plx-platform-vision/">PLX Platform Vision — team briefing deck</a></p>
+
+<header class="sitebar" id="sitebar">
+  <div class="left">
+    <span class="pmark" aria-hidden="true"><span class="n">14</span><span class="s">Px</span></span>
+    <div class="lab"><b>Petra Lab-X</b> · Platform Vision · Team Briefing</div>
+  </div>
+  <div class="right">
+    <nav aria-label="Sections">
+      <a href="#org">Org chart</a>
+      <a href="#stack">Stack</a>
+      <a href="#pillars">Pillars</a>
+      <a href="#mc">Mission Control</a>
+      <a href="#portal">Portal</a>
+      <a href="#floor">Foundation</a>
+      <a href="#principles">Principles</a>
+    </nav>
+  </div>
+</header>
+
+<!-- ═══════ HERO ═══════ -->
+<section class="hero" id="top">
+  <div class="grid-lines" aria-hidden="true"></div>
+  <div class="ghostmark" aria-hidden="true">Px</div>
+  <div class="wrap">
+    <div class="eyebrow rv">
+      <span class="pmark" aria-hidden="true"><span class="n">14</span><span class="s">Px</span></span>
+      <div class="meta"><b>Petra Lab-X</b><br>Platform vision · Team briefing · Confidential</div>
+    </div>
+    <h1 class="rv">Where we're <em>going</em> — and how you get involved</h1>
+    <div class="herometa rv">
+      <div><div class="k">Repos</div><div class="v">MC · Portal · Infra</div></div>
+      <div><div class="k">Method</div><div class="v">Spec → build → verify</div></div>
+      <div><div class="k">Audience</div><div class="v">PLX engineering &amp; ops</div></div>
+      <div><div class="k">Issued</div><div class="v">Rev 1 · July 2026</div></div>
+    </div>
+  </div>
+  <div class="scrollcue" aria-hidden="true"><span>Scroll</span><span class="ln"></span></div>
+</section>
+
+<hr class="sec-rule">
+
+<!-- ═══════ 01 · THE NEW ORG CHART ═══════ -->
+<section class="sec" id="org">
+  <div class="wrap">
+    <div class="sec-head rv">
+      <div>
+        <span class="kick">/ 01 · AI operating model</span>
+        <h2 class="stitle">The new <em>org chart</em></h2>
+      </div>
+      <p class="aside">Humans hold strategy, taste, judgment and trust. Function agents do the work. Everything sits on one shared context layer — and context feeds back up.</p>
+    </div>
+
+    <div class="org rv">
+      <div class="org-fb l" aria-hidden="true"><span class="head">▲</span><span class="lb">Feedback</span><span class="origin"></span></div>
+      <div class="org-fb r" aria-hidden="true"><span class="head">▲</span><span class="lb">Feedback</span><span class="origin"></span></div>
+
+      <div class="org-humans">
+        <div class="k">Humans</div>
+        <div class="t">Strategy · Taste · Judgment · Trust</div>
+      </div>
+
+      <div class="org-conn" aria-hidden="true"><span class="ln"></span><span class="tri"></span></div>
+
+      <div class="org-harness">
+        <span class="hlabel">Agent harness · tools · memory · guardrails · evals · logs</span>
+        <div class="org-agents">
+          <div class="org-agent"><span class="k">Agents</span><span class="t">Customer support</span></div>
+          <div class="org-agent"><span class="k">Agents</span><span class="t">Sales</span></div>
+          <div class="org-agent"><span class="k">Agents</span><span class="t">Formulation &amp; R&amp;D</span></div>
+          <div class="org-agent"><span class="k">Agents</span><span class="t">Finance</span></div>
+          <div class="org-agent"><span class="k">Agents</span><span class="t">Operations</span></div>
+          <div class="org-agent"><span class="k">Agents</span><span class="t">Quality &amp; compliance</span></div>
+        </div>
+      </div>
+
+      <div class="org-conn3" aria-hidden="true">
+        <div class="org-conn acc"><span class="ln"></span><span class="tri"></span></div>
+        <div class="org-conn acc"><span class="ln"></span><span class="tri"></span></div>
+        <div class="org-conn acc"><span class="ln"></span><span class="tri"></span></div>
+      </div>
+
+      <div class="org-ctx">
+        <div class="t">Shared context layer</div>
+        <div class="k">MCPs · PLX Portal · Company SOPs &amp; repos · Knowledge graph / second brain</div>
+      </div>
+
+      <div class="org-conn acc" aria-hidden="true"><span class="ln" style="height:14px"></span></div>
+
+      <div class="org-db">
+        <span class="k">Data store</span>
+        <span class="t">Vectorized Postgres DB</span>
+      </div>
+    </div>
+
+    <p class="tagline rv">The future org chart has fewer routers and more <em>reviewers</em>.</p>
+  </div>
+</section>
+
+<hr class="sec-rule">
+
+<!-- ═══════ 02 · AI-NATIVE STACK ═══════ -->
+<section class="sec tint" id="stack">
+  <div class="wrap">
+    <div class="sec-head rv">
+      <div>
+        <span class="kick">/ 02 · The AI-native stack</span>
+        <h2 class="stitle">Accountability flows down, context flows <em>up</em></h2>
+      </div>
+      <p class="aside">Each layer stands on the one below it. Skip a layer and agents hallucinate context, bypass gates, or fork the record.</p>
+    </div>
+
+    <div class="stack rv">
+      <div class="stack-row hot w6"><span class="n">06</span><span class="t">Continual learning</span></div>
+      <div class="stack-row w5"><span class="n">05</span><span class="t">Human review</span><span class="s">Gates &amp; approvals</span></div>
+      <div class="stack-row w4"><span class="n">04</span><span class="t">Agent workflows</span><span class="s">Explicitly defined process layer</span></div>
+      <div class="stack-row w3"><span class="n">03</span><span class="t">Permissions &amp; policies</span><span class="s">Azure — ERP (BC) &amp; Portal · Gov-contracts (repos) · MCPs</span></div>
+      <div class="stack-row w2"><span class="n">02</span><span class="t">Structured knowledge</span><span class="s">Wikis · Skills · SOPs · Brand voice &amp; design systems · Repos · SharePoint · APIs</span></div>
+      <div class="stack-row w1"><span class="n">01</span><span class="t">Clean data</span><span class="s">Operational plane&nbsp;&nbsp;|&nbsp;&nbsp;Financial plane</span></div>
+      <div class="stack-found">
+        <div class="cell"><span class="t">PLX Portal</span><span class="s">Incl. EQMS · CMMS · LIMMS · E-comm · WMS</span></div>
+        <div class="cell"><span class="t">ERP</span><span class="s">Business Central</span></div>
+      </div>
+    </div>
+
+    <p class="tagline rv">You don't get agent leverage by buying a tool. You get it by making the business <em>readable</em>.</p>
+  </div>
+</section>
+
+<hr class="sec-rule">
+
+<!-- ═══════ 03 · THE PILLARS ═══════ -->
+<section class="sec" id="pillars">
+  <div class="wrap">
+    <div class="sec-head rv">
+      <div>
+        <span class="kick">/ 03 · Three pillars · one platform</span>
+        <h2 class="stitle">The <em>pillars</em> we're building on</h2>
+      </div>
+      <p class="aside">Three ways you engage — work <b>on</b> your function in Mission Control, work <b>in</b> your function in the Portal, and interact <b>with</b> colleagues, partners and agents through Shared Context.</p>
+    </div>
+
+    <div class="pillars rv">
+      <!-- Mission Control -->
+      <article class="pillar">
+        <svg class="picon" width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m12 14 4-4"></path><path d="M3.34 19a10 10 0 1 1 17.32 0"></path></svg>
+        <div class="pk">Cockpit · directs work</div>
+        <h3 class="pt">Mission <em>Control</em></h3>
+        <div class="pcode">PLX_MC · mc.plxcustomer.io</div>
+        <div class="pyou"><span class="k">You</span><span class="t">Work <em>on</em> your function</span></div>
+        <ul>
+          <li>Two-way SharePoint mirror with full audit trail</li>
+          <li>Task board, insights &amp; saved views</li>
+          <li>PLX-MC MCP with optional swarm dispatch</li>
+          <li>Every PR traces back to a requirement</li>
+        </ul>
+        <div class="pspace"></div>
+        <div class="pint">You interact: checkout tasks · review PRs · resolve conflicts</div>
+        <div class="ppills">
+          <span class="pill"><span class="dot" style="background:var(--p-ok)"></span>Live app</span>
+          <span class="pill"><span class="dot" style="background:var(--p-accent)"></span>Cycle 2 active</span>
+        </div>
+      </article>
+
+      <!-- PLX Portal -->
+      <article class="pillar">
+        <svg class="picon" width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 21.73a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73z"></path><path d="M12 22V12"></path><polyline points="3.29 7 12 12 20.71 7"></polyline><path d="m7.5 4.27 9 5.15"></path></svg>
+        <div class="pk">Product · customer value</div>
+        <h3 class="pt">PLX <em>Portal</em></h3>
+        <div class="pcode">plx-customer-portal · staging</div>
+        <div class="pyou"><span class="k">You</span><span class="t">Work <em>in</em> your function</span></div>
+        <ul>
+          <li>Onboarding, DocuSign &amp; the manufacturing suite</li>
+          <li>Source of truth for PLX brand tokens</li>
+          <li>SharePoint-backed workflows with UAT feedback</li>
+          <li>Where most Mission Control work ships</li>
+        </ul>
+        <div class="pspace"></div>
+        <div class="pint">You interact: feature work · SOP updates · staging deploy</div>
+        <div class="ppills">
+          <span class="pill"><span class="dot" style="background:var(--p-info)"></span>Brand SoT</span>
+          <span class="pill"><span class="dot" style="background:var(--p-ok)"></span>Staging deploy</span>
+        </div>
+      </article>
+
+      <!-- Shared Context -->
+      <article class="pillar">
+        <svg class="picon" width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="16" y="16" width="6" height="6" rx="1"></rect><rect x="2" y="16" width="6" height="6" rx="1"></rect><rect x="9" y="2" width="6" height="6" rx="1"></rect><path d="M5 16v-3a1 1 0 0 1 1-1h12a1 1 0 0 1 1 1v3"></path><path d="M12 12V8"></path></svg>
+        <div class="pk">Connective · one record</div>
+        <h3 class="pt">Shared <em>Context</em></h3>
+        <div class="pcode">governance-contract · SharePoint SoR</div>
+        <div class="pyou"><span class="k">You</span><span class="t">Interact <em>with</em> colleagues, partners &amp; agents</span></div>
+        <ul>
+          <li>One SharePoint system of record — no forks</li>
+          <li>Shared brand voice, tokens &amp; design system</li>
+          <li>QMS, SOPs &amp; permissions everyone reads from</li>
+          <li>Agent doctrine — AGENTS.md · SOUL.md · evidence</li>
+        </ul>
+        <div class="pspace"></div>
+        <div class="pint">You interact: handoffs · approvals · shared docs</div>
+        <div class="ppills">
+          <span class="pill"><span class="dot" style="background:var(--p-ok)"></span>One record</span>
+          <span class="pill"><span class="dot" style="background:var(--p-info)"></span>Governed</span>
+        </div>
+      </article>
+
+      <!-- Infra floor -->
+      <div class="pillars-floor">
+        <div class="l">
+          <span class="k">Shared Infra · PLX_Infra</span>
+          <span class="t">Three surfaces, one <em>floor</em></span>
+        </div>
+        <span class="r">Secrets Manager · preflight gates · staging Postgres · MCP kill switches</span>
+      </div>
+    </div>
+
+    <p class="tagline rv">Same brand, same record, same floor — however you <em>engage</em>.</p>
+  </div>
+</section>
+
+<hr class="sec-rule">
+
+<!-- ═══════ 04 · MISSION CONTROL ═══════ -->
+<section class="sec tint" id="mc">
+  <div class="wrap">
+    <div class="sec-head rv">
+      <div>
+        <span class="kick">/ 04 · Mission Control · PLX_MC</span>
+        <h2 class="stitle">Mission Control — the <em>cockpit</em></h2>
+      </div>
+      <p class="aside">mc.plxcustomer.io — the agent-operated work hub where staff review, approve, assign and resolve.</p>
+    </div>
+
+    <div class="dive rv">
+      <div class="lead-col">
+        <p class="lede">Agents write code, draft PRDs and run QA. Mission Control is where people <strong>review, approve, assign and resolve</strong> — every change mirrored to SharePoint and fully audited.</p>
+        <div class="pills">
+          <span class="pill"><span class="dot" style="background:var(--p-ok)"></span>Live app</span>
+          <span class="pill"><span class="dot" style="background:var(--p-accent)"></span>Cycle 2 active</span>
+        </div>
+      </div>
+      <div class="dive-cards">
+        <div class="dive-card">
+          <div class="k">System of record</div>
+          <div class="t">SharePoint <em>mirror</em></div>
+          <p class="d">Site /sites/plx-mission-control — five lists &amp; libraries, delta sync + webhooks, manual conflict resolution, full audit trail.</p>
+        </div>
+        <div class="dive-card">
+          <div class="k">Agent surface</div>
+          <div class="t">PLX-MC <em>MCP</em></div>
+          <p class="d">Task checkout, lifecycle tools, swarm dispatch (opt-in). Every tool call appends to mc_events; disabled by default in committed config.</p>
+        </div>
+        <div class="dive-card">
+          <div class="k">Now shipping</div>
+          <div class="t">Cycle 2 <em>workspace</em></div>
+          <p class="d">Saved filter views, native-SVG insights with click-to-filter, timeline due-range, command-palette task actions, 5-minute sync cadence.</p>
+        </div>
+        <div class="dive-card">
+          <div class="k">Design</div>
+          <div class="t">Fourth brand <em>surface</em></div>
+          <p class="d">Mazius / ledger aesthetic — warm paper, mono data, forest accent. Tokens come from the Portal; MC owns layout and chrome only (ADR-003).</p>
+        </div>
+      </div>
+    </div>
+
+    <p class="tagline rv">Agents produce; people <em>decide</em> — and the record never forks.</p>
+  </div>
+</section>
+
+<hr class="sec-rule">
+
+<!-- ═══════ 05 · THE PORTAL ═══════ -->
+<section class="sec" id="portal">
+  <div class="wrap">
+    <div class="sec-head rv">
+      <div>
+        <span class="kick">/ 05 · PLX Portal · plx-customer-portal</span>
+        <h2 class="stitle">Where customers and colleagues <em>live</em></h2>
+      </div>
+      <p class="aside">The operational plane for PLX — onboarding, manufacturing, quality evidence and operations on one product.</p>
+    </div>
+
+    <div class="dive rv">
+      <div class="lead-col">
+        <p class="lede">The Portal is the <strong>operational plane</strong> for PLX — the customer and colleague interface for everything we do.</p>
+        <div class="pills">
+          <span class="pill"><span class="dot" style="background:var(--p-ok)"></span>Live</span>
+          <span class="pill"><span class="dot" style="background:var(--p-info)"></span>Fully traceable</span>
+        </div>
+      </div>
+      <div class="dive-cards">
+        <div class="dive-card">
+          <div class="k">Briefs → approvals</div>
+          <div class="t">Onboarding <em>suite</em></div>
+          <p class="d">Briefs, tech-transfers, artwork, contracts and approvals.</p>
+        </div>
+        <div class="dive-card">
+          <div class="k">Orders → output</div>
+          <div class="t">Manufacturing <em>suite</em></div>
+          <p class="d">Customer orders, manufacturing orders, purchase orders, work orders and more.</p>
+        </div>
+        <div class="dive-card">
+          <div class="k">EQMS · digital</div>
+          <div class="t">SOPs &amp; <em>evidence</em></div>
+          <p class="d">EQMS, finally digital — fully traceable, full transparency.</p>
+        </div>
+        <div class="dive-card">
+          <div class="k">Plan → ship</div>
+          <div class="t">Operations <em>suite</em></div>
+          <p class="d">Planning, reporting, receiving, warehousing and more.</p>
+        </div>
+      </div>
+    </div>
+
+    <p class="tagline rv">Customers and colleagues meet on one product — and one <em>brand</em>.</p>
+  </div>
+</section>
+
+<hr class="sec-rule">
+
+<!-- ═══════ 06 · THE FLOOR ═══════ -->
+<section class="sec tint" id="floor">
+  <div class="wrap">
+    <div class="sec-head rv">
+      <div>
+        <span class="kick">/ 06 · Shared Context &amp; Infra</span>
+        <h2 class="stitle">The floor we <em>stand</em> on</h2>
+      </div>
+      <p class="aside">Department nodes and their MCPs ladder up to cross-functional MCPs and central compute — which power our cloud production code and agentic layer.</p>
+    </div>
+
+    <div class="ladder rv">
+      <div class="tier-label">Powered output</div>
+      <div class="tier out">
+        <div class="cell"><span class="t">Cloud production code</span></div>
+        <div class="cell"><span class="t">Agentic layer</span></div>
+      </div>
+      <div class="rise" aria-hidden="true"><div><span class="tri"></span><span class="ln"></span></div></div>
+      <div class="tier-label">Cross-functional</div>
+      <div class="tier">
+        <div class="cell"><span class="t">Cross-functional MCPs</span></div>
+        <div class="cell"><span class="t">Central compute</span><span class="s">Postgres + vector</span></div>
+      </div>
+      <div class="rise" aria-hidden="true"><div><span class="tri"></span><span class="ln"></span></div></div>
+      <div class="tier-label">Department nodes &amp; MCPs</div>
+      <div class="tier dept">
+        <div class="cell"><span class="t">Product &amp; R&amp;D</span><span class="s">Dept MCP</span></div>
+        <div class="cell"><span class="t">Customer &amp; Sales</span><span class="s">Dept MCP</span></div>
+        <div class="cell"><span class="t">Engineering</span><span class="s">Dept MCP</span></div>
+        <div class="cell"><span class="t">Ops &amp; Finance</span><span class="s">Dept MCP</span></div>
+      </div>
+    </div>
+
+    <p class="tagline rv">Every node ladders up to one compute core — on one shared <em>floor</em>.</p>
+  </div>
+</section>
+
+<hr class="sec-rule">
+
+<!-- ═══════ 07 · OPERATING PRINCIPLES ═══════ -->
+<section class="sec" id="principles">
+  <div class="wrap">
+    <div class="sec-head rv">
+      <div>
+        <span class="kick">/ 07 · Operating principles</span>
+        <h2 class="stitle">Agents do the work. Humans <em>direct</em> the work.</h2>
+      </div>
+      <p class="aside">Three active surfaces — Mission Control, the Portal, and Shared Context — sharing one brand, one governance model, one traceable record. Speed with accountability, not without it.</p>
+    </div>
+
+    <div class="principles rv">
+      <div class="principle">
+        <div class="n">01</div>
+        <div class="t">Everything resolves to a <em>Task</em></div>
+        <p class="d">PRD → task → PR → evidence → merge. No orphan work — every change traces to a stated requirement.</p>
+      </div>
+      <div class="principle">
+        <div class="n">02</div>
+        <div class="t">One record, one <em>mirror</em></div>
+        <p class="d">Postgres is the database of record, the Portal is the system of record, and SharePoint is the mirror. The app is a fast lens; conflicts are resolved by a human, never auto-merged.</p>
+      </div>
+      <div class="principle">
+        <div class="n">03</div>
+        <div class="t">One definition of <em>green</em></div>
+        <p class="d">./scripts/preflight.sh locally and in CI. No bypassing the gate — the same bar applies to every agent and every human.</p>
+      </div>
+    </div>
+
+    <div class="principles-strip rv">One brand · one governance model · one traceable record</div>
+  </div>
+</section>
+
+<!-- ═══════ CLOSE ═══════ -->
+<section class="close-sec tint" id="close">
+  <div class="wrap">
+    <span class="kick rv">/ Close</span>
+    <h2 class="stitle rv">One platform. One record. <em>You</em> own the outcome.</h2>
+    <p class="lede rv">Mission Control gives us visibility. The Portal gives customers value. Infra gives us safety. Agents execute; skills encode how; humans stay accountable.</p>
+    <div class="cta-row rv">
+      <a class="btn" href="https://mc.plxcustomer.io/">Open Mission Control<span class="sq"></span></a>
+      <a class="btn ghost" href="#top">Back to top<span class="sq"></span></a>
+    </div>
+    <div class="signoff rv">
+      Petra Lab-X · Platform Engineering
+      <b>mc.plxcustomer.io</b>
+    </div>
+  </div>
+</section>
+
+<script>
+(function(){
+  var bar=document.getElementById('sitebar');
+  window.addEventListener('scroll',function(){bar.classList.toggle('scrolled',window.scrollY>24);},{passive:true});
+  if(window.matchMedia('(prefers-reduced-motion: reduce)').matches){
+    document.querySelectorAll('.rv').forEach(function(el){el.classList.add('in');});
+    return;
+  }
+  var io=new IntersectionObserver(function(entries){
+    entries.forEach(function(e){if(e.isIntersecting){e.target.classList.add('in');io.unobserve(e.target);}});
+  },{threshold:0.12,rootMargin:'0px 0px -6% 0px'});
+  document.querySelectorAll('.rv').forEach(function(el){io.observe(el);});
+})();
+</script>
 </body>
 </html>

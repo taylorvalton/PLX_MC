@@ -22,7 +22,7 @@ export function InboxView({ nav, openNewTask }: ScreenProps & { openNewTask?: ()
           <h1>
             Mission <em>control</em>
           </h1>
-          <a className="vision-link" href="/presentations/plx-platform-vision/">
+          <a className="vision-link" href="/presentations/plx-platform-vision.html">
             Platform vision · team briefing ↗
           </a>
           <p className="sub">

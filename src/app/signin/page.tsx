@@ -59,7 +59,7 @@ export default async function SignInPage({
         />
         <div>
           <Kicker className="mc-auth-kicker">Mission Control</Kicker>
-          <a className="mc-auth-vision-link" href="/presentations/plx-platform-vision/">
+          <a className="mc-auth-vision-link" href="/presentations/plx-platform-vision.html">
             Platform vision · team briefing ↗
           </a>
           <h1>Sign in</h1>
