@@ -13,6 +13,17 @@
       "source": { "repo_path": "docs/COLLABORATOR-SOP.md" }
     },
     {
+      "slug": "mc-sop-repo-onboarding",
+      "title": "Repo onboarding (fleet)",
+      "description": "Add a repository to the PLX-tracked fleet: register it in config/tracked-repos-registry.json, scaffold the thin governance layer (GOVERNANCE.md pointer, CONTRIBUTING stub, generated compliance + drift workflows) via scripts/scaffold-tracked-repo.sh, wire secrets/branch protection, then flip status to active.",
+      "audience": "Maintainers and org admins enrolling a new repo into PLX governance",
+      "owner": "Vince",
+      "effective_date": "2026-07-06",
+      "status": "active",
+      "tags": ["Onboarding", "Fleet registry", "Compliance gate"],
+      "source": { "repo_path": "docs/runbooks/REPO-ONBOARDING.md" }
+    },
+    {
       "slug": "mc-sop-skills",
       "title": "Company Skills SOP",
       "description": "Install company-approved Cursor/Claude skills on your machine, refresh when the catalog changes, create personal skills, and propose new skills for the team via plx-cursor-skills.",
