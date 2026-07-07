@@ -1,0 +1,453 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://api.fontshare.com/v2/css?f[]=mazius-display@400,401&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="_ds/plx-design-system-1bf47fe1-5630-4129-9785-73c202815eec/colors_and_type.css">
+<link rel="stylesheet" href="_ds/plx-design-system-1bf47fe1-5630-4129-9785-73c202815eec/styles.css">
+<script src="_ds/plx-design-system-1bf47fe1-5630-4129-9785-73c202815eec/_ds_bundle.js"></script>
+<style>
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: var(--p-canvas); }
+  a { color: var(--p-accent); text-decoration: none; }
+  a:hover { color: var(--p-accent); text-decoration: underline; text-underline-offset: 2px; }
+</style>
+</helmet>
+
+<x-import component-from-global-scope="deck-stage" from="./deck-stage.js" width="1920" height="1080" hint-size="100%,100%">
+
+  <section class="plx" data-label="Title" data-speaker-notes="Platform vision briefing. Where we're going and how you get involved. Three surfaces, one record, humans accountable." style="width:1920px; height:1080px; background:var(--p-paper); padding:104px 130px; display:flex; flex-direction:column; justify-content:space-between;">
+    <div style="display:flex; align-items:flex-start; justify-content:space-between;">
+      <div class="mono" style="font-size:14px; letter-spacing:0.26em; text-transform:uppercase; color:var(--p-muted);">Petra Lab-X · Platform vision · team briefing</div>
+      <img src="assets/logo-mark.svg" alt="Petra Lab-X" style="width:76px; height:76px;">
+    </div>
+    <h1 style="font-size:92px; line-height:0.99; margin:0; letter-spacing:-0.03em; max-width:1480px;">Where we're <em style="font-style:italic; color:var(--p-accent);">going</em> — and how you get involved</h1>
+    <div style="display:grid; grid-template-columns:repeat(4,1fr); border-top:1px solid var(--p-grid); padding-top:26px;">
+      <div style="padding-right:28px;"><div class="mono" style="font-size:12px; letter-spacing:0.2em; text-transform:uppercase; color:var(--p-muted);">Repos</div><div style="font-size:22px; font-weight:600; color:var(--p-ink); margin-top:8px;">MC · Portal · Infra</div></div>
+      <div style="padding-right:28px; border-left:1px solid var(--p-grid-2); padding-left:28px;"><div class="mono" style="font-size:12px; letter-spacing:0.2em; text-transform:uppercase; color:var(--p-muted);">Method</div><div style="font-size:22px; font-weight:600; color:var(--p-ink); margin-top:8px;">Spec → build → verify</div></div>
+      <div style="padding-right:28px; border-left:1px solid var(--p-grid-2); padding-left:28px;"><div class="mono" style="font-size:12px; letter-spacing:0.2em; text-transform:uppercase; color:var(--p-muted);">Audience</div><div style="font-size:22px; font-weight:600; color:var(--p-ink); margin-top:8px;">PLX engineering & ops</div></div>
+      <div style="border-left:1px solid var(--p-grid-2); padding-left:28px;"><div class="mono" style="font-size:12px; letter-spacing:0.2em; text-transform:uppercase; color:var(--p-muted);">Issued</div><div style="font-size:22px; font-weight:600; color:var(--p-ink); margin-top:8px;">Rev 1 · July 2026</div></div>
+    </div>
+  </section>
+
+<section class="plx" data-label="New org chart" data-speaker-notes="Humans hold strategy, taste, judgment and trust. Function agents do the routing. Everything sits on one shared context layer — fewer routers, more reviewers." style="width:1920px; height:1080px; background:var(--p-paper); padding:76px 110px; display:flex; flex-direction:column;">
+
+    <div style="text-align:center; flex:0 0 auto;">
+      <div class="mono" style="font-size:13px; letter-spacing:0.24em; text-transform:uppercase; color:var(--p-muted);">Petra Lab-X · AI operating model</div>
+      <h1 style="font-size:66px; line-height:1; margin:16px 0 0; letter-spacing:-0.02em;">The new <em>org chart</em></h1>
+    </div>
+
+    <div style="flex:1 1 auto; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:2px; position:relative;">
+      <!-- feedback loop: shared context feeds back up to humans -->
+      <svg viewBox="0 0 1700 783" preserveAspectRatio="none" style="position:absolute; inset:0; width:100%; height:100%; overflow:visible; pointer-events:none; z-index:5;">
+        <defs>
+          <marker id="plx-fb-head" markerWidth="11" markerHeight="11" refX="7" refY="5.5" orient="auto" markerUnits="userSpaceOnUse">
+            <path d="M1,1 L9,5.5 L1,10" fill="none" stroke="var(--p-accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path>
+          </marker>
+        </defs>
+        <!-- left loop -->
+        <circle cx="156" cy="618" r="4.5" fill="var(--p-accent)"></circle>
+        <path d="M156,618 C70,598 62,468 64,360 C66,236 96,138 210,110 C252,100 296,98 326,100" fill="none" stroke="var(--p-ink-2)" stroke-opacity="0.5" stroke-width="2" stroke-dasharray="0.5 10" stroke-linecap="round" marker-end="url(#plx-fb-head)"></path>
+        <!-- right loop -->
+        <circle cx="1544" cy="618" r="4.5" fill="var(--p-accent)"></circle>
+        <path d="M1544,618 C1630,598 1638,468 1636,360 C1634,236 1604,138 1490,110 C1448,100 1404,98 1374,100" fill="none" stroke="var(--p-ink-2)" stroke-opacity="0.5" stroke-width="2" stroke-dasharray="0.5 10" stroke-linecap="round" marker-end="url(#plx-fb-head)"></path>
+        <text x="46" y="404" transform="rotate(-90 46 404)" font-family="'JetBrains Mono', monospace" font-size="12" letter-spacing="4" fill="var(--p-muted)">FEEDBACK</text>
+        <text x="1654" y="360" transform="rotate(90 1654 360)" font-family="'JetBrains Mono', monospace" font-size="12" letter-spacing="4" fill="var(--p-muted)">FEEDBACK</text>
+      </svg>
+
+      <!-- humans band -->
+      <div style="width:1040px; background:var(--p-ink); color:var(--p-paper); border-radius:4px; padding:22px 34px; text-align:center;">
+        <div class="mono" style="font-size:11px; letter-spacing:0.26em; text-transform:uppercase; color:rgba(251,249,245,0.6);">Humans</div>
+        <div style="font-family:var(--mazius); font-size:32px; line-height:1.05; margin-top:6px;">Strategy · Taste · Judgment · Trust</div>
+      </div>
+
+      <!-- central connector -->
+      <div style="display:flex; flex-direction:column; align-items:center;">
+        <div style="width:1px; height:34px; background:var(--p-ink-2);"></div>
+        <div style="width:0; height:0; border-left:6px solid transparent; border-right:6px solid transparent; border-top:8px solid var(--p-ink-2);"></div>
+      </div>
+
+      <!-- agent harness (chassis around the function agents) -->
+      <div style="position:relative; border:1px solid var(--p-grid); border-radius:6px; padding:40px 30px 28px;">
+        <span class="mono" style="position:absolute; top:-10px; left:26px; background:var(--p-paper); padding:0 12px; font-size:11px; letter-spacing:0.2em; text-transform:uppercase; color:var(--p-muted);">Agent harness · tools · memory · guardrails · evals · logs</span>
+
+      <!-- agent grid -->
+      <div style="display:grid; grid-template-columns:repeat(3,440px); gap:24px 36px;">
+        <div style="background:var(--p-paper); border:1px solid var(--p-grid); border-radius:4px; height:114px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:6px;">
+          <span class="mono" style="font-size:9px; letter-spacing:0.22em; text-transform:uppercase; color:var(--p-muted);">Agents</span>
+          <span style="font-size:26px; font-weight:600; color:var(--p-ink);">Customer support</span>
+        </div>
+        <div style="background:var(--p-paper); border:1px solid var(--p-grid); border-radius:4px; height:114px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:6px;">
+          <span class="mono" style="font-size:9px; letter-spacing:0.22em; text-transform:uppercase; color:var(--p-muted);">Agents</span>
+          <span style="font-size:26px; font-weight:600; color:var(--p-ink);">Sales</span>
+        </div>
+        <div style="background:var(--p-paper); border:1px solid var(--p-grid); border-radius:4px; height:114px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:6px;">
+          <span class="mono" style="font-size:9px; letter-spacing:0.22em; text-transform:uppercase; color:var(--p-muted);">Agents</span>
+          <span style="font-size:26px; font-weight:600; color:var(--p-ink);">Formulation &amp; R&amp;D</span>
+        </div>
+        <div style="background:var(--p-paper); border:1px solid var(--p-grid); border-radius:4px; height:114px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:6px;">
+          <span class="mono" style="font-size:9px; letter-spacing:0.22em; text-transform:uppercase; color:var(--p-muted);">Agents</span>
+          <span style="font-size:26px; font-weight:600; color:var(--p-ink);">Finance</span>
+        </div>
+        <div style="background:var(--p-paper); border:1px solid var(--p-grid); border-radius:4px; height:114px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:6px;">
+          <span class="mono" style="font-size:9px; letter-spacing:0.22em; text-transform:uppercase; color:var(--p-muted);">Agents</span>
+          <span style="font-size:26px; font-weight:600; color:var(--p-ink);">Operations</span>
+        </div>
+        <div style="background:var(--p-paper); border:1px solid var(--p-grid); border-radius:4px; height:114px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:6px;">
+          <span class="mono" style="font-size:9px; letter-spacing:0.22em; text-transform:uppercase; color:var(--p-muted);">Agents</span>
+          <span style="font-size:26px; font-weight:600; color:var(--p-ink);">Quality &amp; compliance</span>
+        </div>
+      </div>
+      </div><!-- /agent harness -->
+
+      <!-- three connectors -->
+      <div style="display:grid; grid-template-columns:repeat(3,440px); gap:36px; justify-items:center; margin-top:2px;">
+        <div style="display:flex; flex-direction:column; align-items:center;">
+          <div style="width:1px; height:32px; background:var(--p-accent);"></div>
+          <div style="width:0; height:0; border-left:6px solid transparent; border-right:6px solid transparent; border-top:8px solid var(--p-accent);"></div>
+        </div>
+        <div style="display:flex; flex-direction:column; align-items:center;">
+          <div style="width:1px; height:32px; background:var(--p-accent);"></div>
+          <div style="width:0; height:0; border-left:6px solid transparent; border-right:6px solid transparent; border-top:8px solid var(--p-accent);"></div>
+        </div>
+        <div style="display:flex; flex-direction:column; align-items:center;">
+          <div style="width:1px; height:32px; background:var(--p-accent);"></div>
+          <div style="width:0; height:0; border-left:6px solid transparent; border-right:6px solid transparent; border-top:8px solid var(--p-accent);"></div>
+        </div>
+      </div>
+
+      <!-- shared context layer -->
+      <div style="width:1392px; background:var(--p-accent-soft); border:1.5px solid var(--p-accent); border-radius:6px; padding:22px 34px; text-align:center; margin-top:6px;">
+        <div style="font-family:var(--mazius); font-size:28px; color:var(--p-ink); line-height:1;">Shared context layer</div>
+        <div class="mono" style="font-size:15px; letter-spacing:0.06em; text-transform:uppercase; color:var(--p-ink-2); margin-top:12px;">MCPs · PLX Portal · Company SOPs &amp; repos · Knowledge graph / second brain</div>
+      </div>
+
+      <!-- foundation connector -->
+      <div style="width:1px; height:14px; background:var(--p-accent);"></div>
+
+      <!-- foundation: vectorized postgres db -->
+      <div style="width:1392px; background:var(--p-rail); border:1px solid var(--p-grid); border-radius:4px; padding:13px 34px; display:flex; align-items:center; justify-content:center; gap:18px;">
+        <span class="mono" style="font-size:11px; letter-spacing:0.22em; text-transform:uppercase; color:var(--p-muted);">Data store</span>
+        <span style="font-size:23px; font-weight:600; color:var(--p-ink-2); white-space:nowrap;">Vectorized Postgres DB</span>
+      </div>
+    </div>
+
+    <div style="text-align:center; flex:0 0 auto;">
+      <p style="font-family:var(--mazius); font-size:33px; line-height:1.3; color:var(--p-ink-2); margin:0; max-width:none;">The future org chart has fewer routers and more <em style="font-style:italic; color:var(--p-accent);">reviewers</em>.</p>
+    </div>
+  </section>
+
+<section class="plx" data-label="AI-native stack" data-speaker-notes="Agent leverage is not bought, it is earned by making the business legible from the data up. Each layer sits on the one below it." style="width:1920px; height:1080px; background:var(--p-paper); padding:76px 110px; display:flex; flex-direction:column;">
+
+    <div style="text-align:center; flex:0 0 auto;">
+      <div class="mono" style="font-size:13px; letter-spacing:0.24em; text-transform:uppercase; color:var(--p-muted);">Petra Lab-X · AI operating model</div>
+      <h1 style="font-size:54px; line-height:1.05; margin:16px 0 0; letter-spacing:-0.02em;">Accountability flows down, context flows <em style="font-style:italic; color:var(--p-accent);">up</em></h1>
+    </div>
+
+    <div style="flex:1 1 auto; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:12px;">
+      <!-- 06 -->
+      <div style="position:relative; width:560px; height:84px; background:var(--p-accent-soft); border:1.5px solid var(--p-accent); border-radius:4px; display:flex; align-items:center; justify-content:center;">
+        <span class="mono" style="position:absolute; left:16px; top:12px; font-size:11px; letter-spacing:0.14em; color:var(--p-accent);">06</span>
+        <span style="font-size:26px; font-weight:600; color:var(--p-ink);">Continual learning</span>
+      </div>
+      <!-- 05 -->
+      <div style="position:relative; width:704px; height:84px; background:var(--p-paper); border:1px solid var(--p-grid); border-radius:4px; display:flex; flex-direction:column; align-items:center; justify-content:center;">
+        <span class="mono" style="position:absolute; left:16px; top:12px; font-size:11px; letter-spacing:0.14em; color:var(--p-muted);">05</span>
+        <span style="font-size:26px; font-weight:600; color:var(--p-ink);">Human review</span>
+        <span class="mono" style="font-size:14px; letter-spacing:0.1em; text-transform:uppercase; color:var(--p-muted); margin-top:4px;">Gates &amp; approvals</span>
+      </div>
+      <!-- 04 -->
+      <div style="position:relative; width:848px; height:84px; background:var(--p-paper); border:1px solid var(--p-grid); border-radius:4px; display:flex; flex-direction:column; align-items:center; justify-content:center;">
+        <span class="mono" style="position:absolute; left:16px; top:12px; font-size:11px; letter-spacing:0.14em; color:var(--p-muted);">04</span>
+        <span style="font-size:26px; font-weight:600; color:var(--p-ink);">Agent workflows</span>
+        <span class="mono" style="font-size:14px; letter-spacing:0.1em; text-transform:uppercase; color:var(--p-muted); margin-top:4px;">Agent explicitly defined process layer</span>
+      </div>
+      <!-- 03 -->
+      <div style="position:relative; width:992px; height:84px; background:var(--p-paper); border:1px solid var(--p-grid); border-radius:4px; display:flex; flex-direction:column; align-items:center; justify-content:center;">
+        <span class="mono" style="position:absolute; left:16px; top:12px; font-size:11px; letter-spacing:0.14em; color:var(--p-muted);">03</span>
+        <span style="font-size:26px; font-weight:600; color:var(--p-ink);">Permissions &amp; policies</span>
+        <span class="mono" style="font-size:14px; letter-spacing:0.1em; text-transform:uppercase; color:var(--p-muted); margin-top:4px;">Azure — ERP (BC) &amp; Portal · Gov-contracts (repos) · MCPs</span>
+      </div>
+      <!-- 02 -->
+      <div style="position:relative; width:1136px; height:84px; background:var(--p-paper); border:1px solid var(--p-grid); border-radius:4px; display:flex; flex-direction:column; align-items:center; justify-content:center;">
+        <span class="mono" style="position:absolute; left:16px; top:12px; font-size:11px; letter-spacing:0.14em; color:var(--p-muted);">02</span>
+        <span style="font-size:26px; font-weight:600; color:var(--p-ink);">Structured knowledge</span>
+        <span class="mono" style="font-size:14px; letter-spacing:0.1em; text-transform:uppercase; color:var(--p-muted); margin-top:4px;">Wikis · Skills · SOPs · Brand voice &amp; design systems · Repos · SharePoint · APIs</span>
+      </div>
+      <!-- 01 -->
+      <div style="position:relative; width:1280px; height:84px; background:var(--p-paper); border:1px solid var(--p-grid); border-radius:4px; display:flex; flex-direction:column; align-items:center; justify-content:center;">
+        <span class="mono" style="position:absolute; left:16px; top:12px; font-size:11px; letter-spacing:0.14em; color:var(--p-muted);">01</span>
+        <span style="font-size:26px; font-weight:600; color:var(--p-ink);">Clean data</span>
+        <span class="mono" style="font-size:14px; letter-spacing:0.1em; text-transform:uppercase; color:var(--p-muted); margin-top:4px;">Operational plane &nbsp;|&nbsp; Financial plane</span>
+      </div>
+      <!-- foundation: systems of record -->
+      <div style="width:1424px; display:flex; gap:12px;">
+        <div style="flex:1; height:84px; background:var(--p-rail); border:1px solid var(--p-grid); border-radius:4px; display:flex; flex-direction:column; align-items:center; justify-content:center;">
+          <span style="font-size:24px; font-weight:600; color:var(--p-ink-2);">PLX Portal</span>
+          <span class="mono" style="font-size:13px; letter-spacing:0.12em; text-transform:uppercase; color:var(--p-muted); margin-top:4px; white-space:nowrap;">Incl. EQMS · CMMS · LIMMS · E-comm · WMS</span>
+        </div>
+        <div style="flex:1; height:84px; background:var(--p-rail); border:1px solid var(--p-grid); border-radius:4px; display:flex; flex-direction:column; align-items:center; justify-content:center;">
+          <span style="font-size:24px; font-weight:600; color:var(--p-ink-2);">ERP</span>
+          <span class="mono" style="font-size:13px; letter-spacing:0.12em; text-transform:uppercase; color:var(--p-muted); margin-top:4px; white-space:nowrap;">Business Central</span>
+        </div>
+      </div>
+    </div>
+
+    <div style="text-align:center; flex:0 0 auto;">
+      <p style="font-family:var(--mazius); font-size:33px; line-height:1.3; color:var(--p-ink-2); margin:0; max-width:none;">You do not get agent leverage by buying a tool. You get it by making the business <em style="font-style:italic; color:var(--p-accent);">readable</em>.</p>
+    </div>
+  </section>
+
+<section class="plx" data-label="The pillars" data-speaker-notes="Three ways you engage: work ON your function in Mission Control, work IN your function in the Portal, and interact WITH colleagues, partners and agents through Shared Context — one record, one brand, one governance model. All three stand on one Shared Infra floor: secrets, preflight gates, staging, kill switches." style="width:1920px; height:1080px; background:var(--p-paper); padding:70px 110px; display:flex; flex-direction:column;">
+
+    <div style="text-align:center; flex:0 0 auto;">
+      <div class="mono" style="font-size:13px; letter-spacing:0.24em; text-transform:uppercase; color:var(--p-muted);">Three pillars · one platform · Rev A</div>
+      <h1 style="font-size:60px; line-height:1; margin:14px 0 0; letter-spacing:-0.02em;">The <em>pillars</em> we're building on</h1>
+      <div class="mono" style="font-size:12px; letter-spacing:0.2em; text-transform:uppercase; color:var(--p-muted); margin-top:16px;">Three ways you engage — work on · work in · interact with</div>
+    </div>
+
+    <div style="flex:1 1 auto; display:flex; align-items:center;">
+      <div style="width:100%; display:grid; grid-template-columns:1fr 1fr 1fr; border:1px solid var(--p-grid); border-radius:6px; background:var(--p-paper); overflow:hidden;">
+
+        <!-- ── PILLAR 1 · MISSION CONTROL ── -->
+        <div style="display:flex; flex-direction:column; padding:40px 44px; border-right:1px solid var(--p-grid-2);">
+          <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="var(--p-muted)" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" style="margin-bottom:20px;"><path d="m12 14 4-4"></path><path d="M3.34 19a10 10 0 1 1 17.32 0"></path></svg>
+          <div class="mono" style="font-size:12px; letter-spacing:0.2em; text-transform:uppercase; color:var(--p-muted);">Cockpit · directs work</div>
+          <div style="font-family:var(--mazius); font-size:34px; line-height:1; margin-top:8px; color:var(--p-ink);">Mission <em style="font-style:italic; color:var(--p-accent);">Control</em></div>
+          <div class="mono" style="font-size:13px; letter-spacing:0.06em; color:var(--p-muted); margin-top:10px;">PLX_MC · mc.plxcustomer.io</div>
+
+          <div style="display:flex; align-items:center; gap:14px; min-height:58px; padding:14px 0; margin-top:18px; border-top:1px solid var(--p-grid-2); border-bottom:1px solid var(--p-grid-2);">
+            <span class="mono" style="flex:0 0 auto; font-size:11px; letter-spacing:0.2em; color:var(--p-muted);">You</span>
+            <span style="font-family:var(--mazius); font-size:23px; line-height:1.2; color:var(--p-ink);">Work <em style="font-style:italic; color:var(--p-accent);">on</em> your function</span>
+          </div>
+
+          <div style="display:flex; flex-direction:column; gap:13px; margin-top:20px;">
+            <div style="display:flex; gap:14px; align-items:flex-start;"><span style="flex:0 0 auto; width:14px; height:0; border-top:1.5px solid var(--p-accent); margin-top:14px;"></span><span style="font-size:18px; line-height:1.45; color:var(--p-ink-2);">Two-way SharePoint mirror with full audit trail</span></div>
+            <div style="display:flex; gap:14px; align-items:flex-start;"><span style="flex:0 0 auto; width:14px; height:0; border-top:1.5px solid var(--p-accent); margin-top:14px;"></span><span style="font-size:18px; line-height:1.45; color:var(--p-ink-2);">Task board, insights &amp; saved views</span></div>
+            <div style="display:flex; gap:14px; align-items:flex-start;"><span style="flex:0 0 auto; width:14px; height:0; border-top:1.5px solid var(--p-accent); margin-top:14px;"></span><span style="font-size:18px; line-height:1.45; color:var(--p-ink-2);">PLX-MC MCP with optional swarm dispatch</span></div>
+            <div style="display:flex; gap:14px; align-items:flex-start;"><span style="flex:0 0 auto; width:14px; height:0; border-top:1.5px solid var(--p-accent); margin-top:14px;"></span><span style="font-size:18px; line-height:1.45; color:var(--p-ink-2);">Every PR traces back to a requirement</span></div>
+          </div>
+
+          <div style="flex:1 1 auto; min-height:24px;"></div>
+          <div class="mono" style="font-size:11px; letter-spacing:0.16em; text-transform:uppercase; color:var(--p-muted); padding-top:18px; border-top:1px solid var(--p-grid-2); line-height:1.6;">You interact: checkout tasks · review PRs · resolve conflicts</div>
+          <div style="display:flex; gap:10px; flex-wrap:wrap; margin-top:16px;">
+            <span style="display:inline-flex; align-items:center; gap:8px; border:1px solid var(--p-grid); padding:7px 12px; font-family:'JetBrains Mono',monospace; font-size:12px; letter-spacing:0.12em; text-transform:uppercase; color:var(--p-ink-2); white-space:nowrap;"><span style="width:7px; height:7px; border-radius:50%; background:var(--p-ok);"></span>Live app</span>
+            <span style="display:inline-flex; align-items:center; gap:8px; border:1px solid var(--p-grid); padding:7px 12px; font-family:'JetBrains Mono',monospace; font-size:12px; letter-spacing:0.12em; text-transform:uppercase; color:var(--p-ink-2); white-space:nowrap;"><span style="width:7px; height:7px; border-radius:50%; background:var(--p-accent);"></span>Cycle 2 active</span>
+          </div>
+        </div>
+
+        <!-- ── PILLAR 2 · CUSTOMER PORTAL ── -->
+        <div style="display:flex; flex-direction:column; padding:40px 44px; border-right:1px solid var(--p-grid-2);">
+          <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="var(--p-muted)" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" style="margin-bottom:20px;"><path d="M11 21.73a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73z"></path><path d="M12 22V12"></path><polyline points="3.29 7 12 12 20.71 7"></polyline><path d="m7.5 4.27 9 5.15"></path></svg>
+          <div class="mono" style="font-size:12px; letter-spacing:0.2em; text-transform:uppercase; color:var(--p-muted);">Product · customer value</div>
+          <div style="font-family:var(--mazius); font-size:34px; line-height:1; margin-top:8px; color:var(--p-ink);">PLX <em style="font-style:italic; color:var(--p-accent);">Portal</em></div>
+          <div class="mono" style="font-size:13px; letter-spacing:0.06em; color:var(--p-muted); margin-top:10px;">plx-customer-portal · staging</div>
+
+          <div style="display:flex; align-items:center; gap:14px; min-height:58px; padding:14px 0; margin-top:18px; border-top:1px solid var(--p-grid-2); border-bottom:1px solid var(--p-grid-2);">
+            <span class="mono" style="flex:0 0 auto; font-size:11px; letter-spacing:0.2em; color:var(--p-muted);">You</span>
+            <span style="font-family:var(--mazius); font-size:23px; line-height:1.2; color:var(--p-ink);">Work <em style="font-style:italic; color:var(--p-accent);">in</em> your function</span>
+          </div>
+
+          <div style="display:flex; flex-direction:column; gap:13px; margin-top:20px;">
+            <div style="display:flex; gap:14px; align-items:flex-start;"><span style="flex:0 0 auto; width:14px; height:0; border-top:1.5px solid var(--p-accent); margin-top:14px;"></span><span style="font-size:18px; line-height:1.45; color:var(--p-ink-2);">Onboarding, DocuSign &amp; the manufacturing suite</span></div>
+            <div style="display:flex; gap:14px; align-items:flex-start;"><span style="flex:0 0 auto; width:14px; height:0; border-top:1.5px solid var(--p-accent); margin-top:14px;"></span><span style="font-size:18px; line-height:1.45; color:var(--p-ink-2);">Source of truth for PLX brand tokens</span></div>
+            <div style="display:flex; gap:14px; align-items:flex-start;"><span style="flex:0 0 auto; width:14px; height:0; border-top:1.5px solid var(--p-accent); margin-top:14px;"></span><span style="font-size:18px; line-height:1.45; color:var(--p-ink-2);">SharePoint-backed workflows with UAT feedback</span></div>
+            <div style="display:flex; gap:14px; align-items:flex-start;"><span style="flex:0 0 auto; width:14px; height:0; border-top:1.5px solid var(--p-accent); margin-top:14px;"></span><span style="font-size:18px; line-height:1.45; color:var(--p-ink-2);">Where most Mission Control work ships</span></div>
+          </div>
+
+          <div style="flex:1 1 auto; min-height:24px;"></div>
+          <div class="mono" style="font-size:11px; letter-spacing:0.16em; text-transform:uppercase; color:var(--p-muted); padding-top:18px; border-top:1px solid var(--p-grid-2); line-height:1.6;">You interact: feature work · SOP updates · staging deploy</div>
+          <div style="display:flex; gap:10px; flex-wrap:wrap; margin-top:16px;">
+            <span style="display:inline-flex; align-items:center; gap:8px; border:1px solid var(--p-grid); padding:7px 12px; font-family:'JetBrains Mono',monospace; font-size:12px; letter-spacing:0.12em; text-transform:uppercase; color:var(--p-ink-2); white-space:nowrap;"><span style="width:7px; height:7px; border-radius:50%; background:var(--p-info);"></span>Brand SoT</span>
+            <span style="display:inline-flex; align-items:center; gap:8px; border:1px solid var(--p-grid); padding:7px 12px; font-family:'JetBrains Mono',monospace; font-size:12px; letter-spacing:0.12em; text-transform:uppercase; color:var(--p-ink-2); white-space:nowrap;"><span style="width:7px; height:7px; border-radius:50%; background:var(--p-ok);"></span>Staging deploy</span>
+          </div>
+        </div>
+
+        <!-- ── PILLAR 3 · SHARED INFRA ── -->
+        <div style="display:flex; flex-direction:column; padding:40px 44px;">
+          <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="var(--p-muted)" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" style="margin-bottom:20px;"><rect x="16" y="16" width="6" height="6" rx="1"></rect><rect x="2" y="16" width="6" height="6" rx="1"></rect><rect x="9" y="2" width="6" height="6" rx="1"></rect><path d="M5 16v-3a1 1 0 0 1 1-1h12a1 1 0 0 1 1 1v3"></path><path d="M12 12V8"></path></svg>
+          <div class="mono" style="font-size:12px; letter-spacing:0.2em; text-transform:uppercase; color:var(--p-muted);">Connective · one record</div>
+          <div style="font-family:var(--mazius); font-size:34px; line-height:1; margin-top:8px; color:var(--p-ink);">Shared <em style="font-style:italic; color:var(--p-accent);">Context</em></div>
+          <div class="mono" style="font-size:13px; letter-spacing:0.06em; color:var(--p-muted); margin-top:10px;">governance-contract · SharePoint SoR</div>
+
+          <div style="display:flex; align-items:center; gap:14px; min-height:58px; padding:14px 0; margin-top:18px; border-top:1px solid var(--p-grid-2); border-bottom:1px solid var(--p-grid-2);">
+            <span class="mono" style="flex:0 0 auto; font-size:11px; letter-spacing:0.2em; color:var(--p-muted);">You</span>
+            <span style="font-family:var(--mazius); font-size:23px; line-height:1.2; color:var(--p-ink);">Interact <em style="font-style:italic; color:var(--p-accent);">with</em> colleagues, partners &amp; agents</span>
+          </div>
+
+          <div style="display:flex; flex-direction:column; gap:13px; margin-top:20px;">
+            <div style="display:flex; gap:14px; align-items:flex-start;"><span style="flex:0 0 auto; width:14px; height:0; border-top:1.5px solid var(--p-accent); margin-top:14px;"></span><span style="font-size:18px; line-height:1.45; color:var(--p-ink-2);">One SharePoint system of record — no forks</span></div>
+            <div style="display:flex; gap:14px; align-items:flex-start;"><span style="flex:0 0 auto; width:14px; height:0; border-top:1.5px solid var(--p-accent); margin-top:14px;"></span><span style="font-size:18px; line-height:1.45; color:var(--p-ink-2);">Shared brand voice, tokens &amp; design system</span></div>
+            <div style="display:flex; gap:14px; align-items:flex-start;"><span style="flex:0 0 auto; width:14px; height:0; border-top:1.5px solid var(--p-accent); margin-top:14px;"></span><span style="font-size:18px; line-height:1.45; color:var(--p-ink-2);">QMS, SOPs &amp; permissions everyone reads from</span></div>
+            <div style="display:flex; gap:14px; align-items:flex-start;"><span style="flex:0 0 auto; width:14px; height:0; border-top:1.5px solid var(--p-accent); margin-top:14px;"></span><span style="font-size:18px; line-height:1.45; color:var(--p-ink-2);">Agent doctrine — AGENTS.md · SOUL.md · evidence</span></div>
+          </div>
+
+          <div style="flex:1 1 auto; min-height:24px;"></div>
+          <div class="mono" style="font-size:11px; letter-spacing:0.16em; text-transform:uppercase; color:var(--p-muted); padding-top:18px; border-top:1px solid var(--p-grid-2); line-height:1.6;">You interact: handoffs · approvals · shared docs</div>
+          <div style="display:flex; gap:10px; flex-wrap:wrap; margin-top:16px;">
+            <span style="display:inline-flex; align-items:center; gap:8px; border:1px solid var(--p-grid); padding:7px 12px; font-family:'JetBrains Mono',monospace; font-size:12px; letter-spacing:0.12em; text-transform:uppercase; color:var(--p-ink-2); white-space:nowrap;"><span style="width:7px; height:7px; border-radius:50%; background:var(--p-ok);"></span>One record</span>
+            <span style="display:inline-flex; align-items:center; gap:8px; border:1px solid var(--p-grid); padding:7px 12px; font-family:'JetBrains Mono',monospace; font-size:12px; letter-spacing:0.12em; text-transform:uppercase; color:var(--p-ink-2); white-space:nowrap;"><span style="width:7px; height:7px; border-radius:50%; background:var(--p-info);"></span>Governed</span>
+          </div>
+        </div>
+
+        <!-- ── SHARED INFRA FLOOR ── -->
+        <div style="grid-column:1 / -1; border-top:1px solid var(--p-grid); background:var(--p-rail); padding:20px 44px; display:flex; align-items:center; justify-content:space-between; gap:20px; flex-wrap:wrap;">
+          <div style="display:flex; align-items:baseline; gap:16px;">
+            <span class="mono" style="font-size:12px; letter-spacing:0.2em; text-transform:uppercase; color:var(--p-muted);">Shared Infra · PLX_Infra</span>
+            <span style="font-family:var(--mazius); font-size:22px; line-height:1; color:var(--p-ink);">Three surfaces, one <em style="font-style:italic; color:var(--p-accent);">floor</em></span>
+          </div>
+          <span class="mono" style="font-size:12px; letter-spacing:0.14em; text-transform:uppercase; color:var(--p-muted);">Secrets Manager · preflight gates · staging Postgres · MCP kill switches</span>
+        </div>
+
+      </div>
+    </div>
+
+    <div style="text-align:center; flex:0 0 auto;">
+      <p style="font-family:var(--mazius); font-size:31px; line-height:1.3; color:var(--p-ink-2); margin:0;">Same brand, same record, same floor — however you <em style="font-style:italic; color:var(--p-accent);">engage</em>.</p>
+    </div>
+  </section>
+
+
+  <section class="plx" data-label="Mission Control" data-speaker-notes="Mission Control is the cockpit. Agents produce; people review, approve, assign and resolve. Every change mirrors to SharePoint and is audited." style="width:1920px; height:1080px; background:var(--p-paper); padding:76px 110px; display:flex; flex-direction:column;">
+    <div style="text-align:center; flex:0 0 auto;">
+      <div class="mono" style="font-size:13px; letter-spacing:0.24em; text-transform:uppercase; color:var(--p-muted);">Mission Control · PLX_MC · mc.plxcustomer.io</div>
+      <h1 style="font-size:60px; line-height:1; margin:14px 0 0; letter-spacing:-0.02em;">Mission Control — the <em style="font-style:italic; color:var(--p-accent);">cockpit</em></h1>
+    </div>
+    <div style="flex:1 1 auto; display:flex; align-items:center; gap:60px;">
+      <div style="width:480px; flex:0 0 auto;">
+        <p style="font-size:23px; line-height:1.5; color:var(--p-ink-2); margin:0;">Agents write code, draft PRDs and run QA. Mission Control is where people <strong style="font-weight:600; color:var(--p-ink);">review, approve, assign and resolve</strong> — every change mirrored to SharePoint and fully audited.</p>
+        <div style="display:flex; gap:10px; flex-wrap:wrap; margin-top:28px;"><span style="display:inline-flex; align-items:center; gap:8px; border:1px solid var(--p-grid); padding:7px 12px; font-family:'JetBrains Mono',monospace; font-size:12px; letter-spacing:0.12em; text-transform:uppercase; color:var(--p-ink-2); white-space:nowrap;"><span style="width:7px; height:7px; border-radius:50%; background:var(--p-ok);"></span>Live app</span><span style="display:inline-flex; align-items:center; gap:8px; border:1px solid var(--p-grid); padding:7px 12px; font-family:'JetBrains Mono',monospace; font-size:12px; letter-spacing:0.12em; text-transform:uppercase; color:var(--p-ink-2); white-space:nowrap;"><span style="width:7px; height:7px; border-radius:50%; background:var(--p-accent);"></span>Cycle 2 active</span></div>
+      </div>
+      <div style="flex:1 1 auto; display:grid; grid-template-columns:1fr 1fr; gap:20px;">
+        <div style="border:1px solid var(--p-grid); border-radius:4px; background:var(--p-paper); padding:26px 30px; display:flex; flex-direction:column; gap:9px;">
+        <div class="mono" style="font-size:11px; letter-spacing:0.2em; text-transform:uppercase; color:var(--p-muted);">System of record</div>
+        <div style="font-family:var(--mazius); font-size:26px; line-height:1; color:var(--p-ink);">SharePoint <em style="font-style:italic; color:var(--p-accent);">mirror</em></div>
+        <div style="font-size:17px; line-height:1.5; color:var(--p-ink-2);">Site /sites/plx-mission-control — five lists &amp; libraries, delta sync + webhooks, manual conflict resolution, full audit trail.</div>
+      </div>
+        <div style="border:1px solid var(--p-grid); border-radius:4px; background:var(--p-paper); padding:26px 30px; display:flex; flex-direction:column; gap:9px;">
+        <div class="mono" style="font-size:11px; letter-spacing:0.2em; text-transform:uppercase; color:var(--p-muted);">Agent surface</div>
+        <div style="font-family:var(--mazius); font-size:26px; line-height:1; color:var(--p-ink);">PLX-MC <em style="font-style:italic; color:var(--p-accent);">MCP</em></div>
+        <div style="font-size:17px; line-height:1.5; color:var(--p-ink-2);">Task checkout, lifecycle tools, swarm dispatch (opt-in). Every tool call appends to mc_events; disabled by default in committed config.</div>
+      </div>
+        <div style="border:1px solid var(--p-grid); border-radius:4px; background:var(--p-paper); padding:26px 30px; display:flex; flex-direction:column; gap:9px;">
+        <div class="mono" style="font-size:11px; letter-spacing:0.2em; text-transform:uppercase; color:var(--p-muted);">Now shipping</div>
+        <div style="font-family:var(--mazius); font-size:26px; line-height:1; color:var(--p-ink);">Cycle 2 <em style="font-style:italic; color:var(--p-accent);">workspace</em></div>
+        <div style="font-size:17px; line-height:1.5; color:var(--p-ink-2);">Saved filter views, native-SVG insights with click-to-filter, timeline due-range, command-palette task actions, 5-minute sync cadence.</div>
+      </div>
+        <div style="border:1px solid var(--p-grid); border-radius:4px; background:var(--p-paper); padding:26px 30px; display:flex; flex-direction:column; gap:9px;">
+        <div class="mono" style="font-size:11px; letter-spacing:0.2em; text-transform:uppercase; color:var(--p-muted);">Design</div>
+        <div style="font-family:var(--mazius); font-size:26px; line-height:1; color:var(--p-ink);">Fourth brand <em style="font-style:italic; color:var(--p-accent);">surface</em></div>
+        <div style="font-size:17px; line-height:1.5; color:var(--p-ink-2);">Mazius / ledger aesthetic — warm paper, mono data, forest accent. Tokens come from the Portal; MC owns layout and chrome only (ADR-003).</div>
+      </div>
+      </div>
+    </div>
+    <div style="text-align:center; flex:0 0 auto;">
+      <p style="font-family:var(--mazius); font-size:31px; line-height:1.3; color:var(--p-ink-2); margin:0;">Agents produce; people <em style="font-style:italic; color:var(--p-accent);">decide</em> — and the record never forks.</p>
+    </div>
+  </section>
+
+
+  <section class="plx" data-label="The Portal" data-speaker-notes="The Portal is the operational plane for PLX — the customer and colleague interface for everything we do: onboarding, manufacturing, EQMS evidence, and operations suites." style="width:1920px; height:1080px; background:var(--p-paper); padding:76px 110px; display:flex; flex-direction:column;">
+    <div style="text-align:center; flex:0 0 auto;">
+      <div class="mono" style="font-size:13px; letter-spacing:0.24em; text-transform:uppercase; color:var(--p-muted);">PLX Portal · plx-customer-portal</div>
+      <h1 style="font-size:54px; line-height:1.04; margin:14px 0 0; letter-spacing:-0.02em;">The Portal — where customers and colleagues <em style="font-style:italic; color:var(--p-accent);">live</em></h1>
+    </div>
+    <div style="flex:1 1 auto; display:flex; align-items:center; gap:60px;">
+      <div style="width:480px; flex:0 0 auto;">
+        <p style="font-size:23px; line-height:1.5; color:var(--p-ink-2); margin:0;">The Portal is the <strong style="font-weight:600; color:var(--p-ink);">operational plane</strong> for PLX — the customer and colleague interface for everything we do.</p>
+        <div style="display:flex; gap:10px; flex-wrap:wrap; margin-top:28px;"><span style="display:inline-flex; align-items:center; gap:8px; border:1px solid var(--p-grid); padding:7px 12px; font-family:'JetBrains Mono',monospace; font-size:12px; letter-spacing:0.12em; text-transform:uppercase; color:var(--p-ink-2); white-space:nowrap;"><span style="width:7px; height:7px; border-radius:50%; background:var(--p-ok);"></span>Live</span><span style="display:inline-flex; align-items:center; gap:8px; border:1px solid var(--p-grid); padding:7px 12px; font-family:'JetBrains Mono',monospace; font-size:12px; letter-spacing:0.12em; text-transform:uppercase; color:var(--p-ink-2); white-space:nowrap;"><span style="width:7px; height:7px; border-radius:50%; background:var(--p-info);"></span>Fully traceable</span></div>
+      </div>
+      <div style="flex:1 1 auto; display:grid; grid-template-columns:1fr 1fr; gap:20px;">
+        <div style="border:1px solid var(--p-grid); border-radius:4px; background:var(--p-paper); padding:26px 30px; display:flex; flex-direction:column; gap:9px;">
+        <div class="mono" style="font-size:11px; letter-spacing:0.2em; text-transform:uppercase; color:var(--p-muted);">Briefs → approvals</div>
+        <div style="font-family:var(--mazius); font-size:26px; line-height:1; color:var(--p-ink);">Onboarding <em style="font-style:italic; color:var(--p-accent);">suite</em></div>
+        <div style="font-size:17px; line-height:1.5; color:var(--p-ink-2);">Briefs, tech-transfers, artwork, contracts and approvals.</div>
+      </div>
+        <div style="border:1px solid var(--p-grid); border-radius:4px; background:var(--p-paper); padding:26px 30px; display:flex; flex-direction:column; gap:9px;">
+        <div class="mono" style="font-size:11px; letter-spacing:0.2em; text-transform:uppercase; color:var(--p-muted);">Orders → output</div>
+        <div style="font-family:var(--mazius); font-size:26px; line-height:1; color:var(--p-ink);">Manufacturing <em style="font-style:italic; color:var(--p-accent);">suite</em></div>
+        <div style="font-size:17px; line-height:1.5; color:var(--p-ink-2);">Customer orders, manufacturing orders, purchase orders, work orders and more.</div>
+      </div>
+        <div style="border:1px solid var(--p-grid); border-radius:4px; background:var(--p-paper); padding:26px 30px; display:flex; flex-direction:column; gap:9px;">
+        <div class="mono" style="font-size:11px; letter-spacing:0.2em; text-transform:uppercase; color:var(--p-muted);">EQMS · digital</div>
+        <div style="font-family:var(--mazius); font-size:26px; line-height:1; color:var(--p-ink);">SOPs &amp; <em style="font-style:italic; color:var(--p-accent);">evidence</em></div>
+        <div style="font-size:17px; line-height:1.5; color:var(--p-ink-2);">EQMS, finally digital — fully traceable, full transparency.</div>
+      </div>
+        <div style="border:1px solid var(--p-grid); border-radius:4px; background:var(--p-paper); padding:26px 30px; display:flex; flex-direction:column; gap:9px;">
+        <div class="mono" style="font-size:11px; letter-spacing:0.2em; text-transform:uppercase; color:var(--p-muted);">Plan → ship</div>
+        <div style="font-family:var(--mazius); font-size:26px; line-height:1; color:var(--p-ink);">Operations <em style="font-style:italic; color:var(--p-accent);">suite</em></div>
+        <div style="font-size:17px; line-height:1.5; color:var(--p-ink-2);">Planning, reporting, receiving, warehousing and more.</div>
+      </div>
+      </div>
+    </div>
+    <div style="text-align:center; flex:0 0 auto;">
+      <p style="font-family:var(--mazius); font-size:31px; line-height:1.3; color:var(--p-ink-2); margin:0;">Customers and colleagues meet on one product — and one <em style="font-style:italic; color:var(--p-accent);">brand</em>.</p>
+    </div>
+  </section>
+
+
+  <section class="plx" data-label="Shared Context & Infra" data-speaker-notes="The floor we stand on. Department nodes and their MCPs ladder up to cross-functional MCPs and central compute, which power our cloud production code and agentic layer." style="width:1920px; height:1080px; background:var(--p-paper); padding:76px 110px; display:flex; flex-direction:column;">
+    <div style="text-align:center; flex:0 0 auto;">
+      <div class="mono" style="font-size:13px; letter-spacing:0.24em; text-transform:uppercase; color:var(--p-muted);">Shared Context &amp; Infra · the foundation</div>
+      <h1 style="font-size:60px; line-height:1; margin:14px 0 0; letter-spacing:-0.02em;">The floor we <em style="font-style:italic; color:var(--p-accent);">stand</em> on</h1>
+      <p style="font-size:21px; line-height:1.45; color:var(--p-ink-2); margin:16px auto 0; max-width:1180px;">Department nodes and their MCPs ladder up to cross-functional MCPs and central compute — which power our cloud production code and agentic layer.</p>
+    </div>
+    <div style="flex:1 1 auto; display:flex; flex-direction:column; align-items:center; justify-content:center;">
+      <div style="width:1360px;">
+        <div class="mono" style="font-size:11px; letter-spacing:0.2em; text-transform:uppercase; color:var(--p-muted); margin-bottom:8px;">Powered output</div>
+        <div style="display:flex; gap:16px;"><div style="flex:1; background:var(--p-accent-soft); border:1px solid var(--p-grid); border-radius:4px; height:112px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:6px; padding:0 14px; text-align:center;"><span style="font-size:19px; font-weight:600; line-height:1.15; color:var(--p-ink);">Cloud production code</span></div><div style="flex:1; background:var(--p-accent-soft); border:1px solid var(--p-grid); border-radius:4px; height:112px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:6px; padding:0 14px; text-align:center;"><span style="font-size:19px; font-weight:600; line-height:1.15; color:var(--p-ink);">Agentic layer</span></div></div>
+        <div style="display:flex; justify-content:center; padding:2px 0;"><div style="display:flex; flex-direction:column; align-items:center;"><div style="width:0; height:0; border-left:6px solid transparent; border-right:6px solid transparent; border-bottom:8px solid var(--p-accent);"></div><div style="width:1.5px; height:20px; background:var(--p-accent);"></div></div></div>
+        <div class="mono" style="font-size:11px; letter-spacing:0.2em; text-transform:uppercase; color:var(--p-muted); margin-bottom:8px;">Cross-functional</div>
+        <div style="display:flex; gap:16px;"><div style="flex:1; background:var(--p-paper); border:1px solid var(--p-grid); border-radius:4px; height:112px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:6px; padding:0 14px; text-align:center;"><span style="font-size:19px; font-weight:600; line-height:1.15; color:var(--p-ink);">Cross-functional MCPs</span></div><div style="flex:1; background:var(--p-paper); border:1px solid var(--p-grid); border-radius:4px; height:112px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:6px; padding:0 14px; text-align:center;"><span style="font-size:19px; font-weight:600; line-height:1.15; color:var(--p-ink);">Central compute</span><span class="mono" style="font-size:11px; letter-spacing:0.14em; text-transform:uppercase; color:var(--p-muted);">Postgres + vector</span></div></div>
+        <div style="display:flex; justify-content:center; padding:2px 0;"><div style="display:flex; flex-direction:column; align-items:center;"><div style="width:0; height:0; border-left:6px solid transparent; border-right:6px solid transparent; border-bottom:8px solid var(--p-accent);"></div><div style="width:1.5px; height:20px; background:var(--p-accent);"></div></div></div>
+        <div class="mono" style="font-size:11px; letter-spacing:0.2em; text-transform:uppercase; color:var(--p-muted); margin-bottom:8px;">Department nodes &amp; MCPs</div>
+        <div style="display:flex; gap:16px;"><div style="flex:1; background:var(--p-rail); border:1px solid var(--p-grid); border-radius:4px; height:112px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:6px; padding:0 14px; text-align:center;"><span style="font-size:19px; font-weight:600; line-height:1.15; color:var(--p-ink-2);">Product &amp; R&amp;D</span><span class="mono" style="font-size:11px; letter-spacing:0.14em; text-transform:uppercase; color:var(--p-muted);">Dept MCP</span></div><div style="flex:1; background:var(--p-rail); border:1px solid var(--p-grid); border-radius:4px; height:112px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:6px; padding:0 14px; text-align:center;"><span style="font-size:19px; font-weight:600; line-height:1.15; color:var(--p-ink-2);">Customer &amp; Sales</span><span class="mono" style="font-size:11px; letter-spacing:0.14em; text-transform:uppercase; color:var(--p-muted);">Dept MCP</span></div><div style="flex:1; background:var(--p-rail); border:1px solid var(--p-grid); border-radius:4px; height:112px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:6px; padding:0 14px; text-align:center;"><span style="font-size:19px; font-weight:600; line-height:1.15; color:var(--p-ink-2);">Engineering</span><span class="mono" style="font-size:11px; letter-spacing:0.14em; text-transform:uppercase; color:var(--p-muted);">Dept MCP</span></div><div style="flex:1; background:var(--p-rail); border:1px solid var(--p-grid); border-radius:4px; height:112px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:6px; padding:0 14px; text-align:center;"><span style="font-size:19px; font-weight:600; line-height:1.15; color:var(--p-ink-2);">Ops &amp; Finance</span><span class="mono" style="font-size:11px; letter-spacing:0.14em; text-transform:uppercase; color:var(--p-muted);">Dept MCP</span></div></div>
+      </div>
+    </div>
+    <div style="text-align:center; flex:0 0 auto;">
+      <p style="font-family:var(--mazius); font-size:31px; line-height:1.3; color:var(--p-ink-2); margin:0;">Every node ladders up to one compute core — on one shared <em style="font-style:italic; color:var(--p-accent);">floor</em>.</p>
+    </div>
+  </section>
+
+
+  <section class="plx" data-label="Operating principles" data-speaker-notes="Agents do the work; humans direct it. Three surfaces must share one brand, one governance model, one traceable record. Speed with accountability, not without it." style="width:1920px; height:1080px; background:var(--p-paper); padding:76px 110px; display:flex; flex-direction:column;">
+    <div style="flex:0 0 auto; text-align:center;">
+      <div class="mono" style="font-size:13px; letter-spacing:0.24em; text-transform:uppercase; color:var(--p-muted);">Operating principles · Rev A</div>
+      <h1 style="font-size:60px; line-height:1.02; margin:14px 0 0; letter-spacing:-0.02em;">Agents do the work. Humans <em style="font-style:italic; color:var(--p-accent);">direct</em> the work.</h1>
+      <p style="font-size:22px; line-height:1.5; color:var(--p-ink-2); margin:22px auto 0; max-width:1280px;">We have three active engineering surfaces — Mission Control, the Portal, and the Shared Context Layer — that must share one brand, one governance model, and one traceable record. The opportunity is speed with accountability, not speed without it.</p>
+    </div>
+    <div style="flex:1 1 auto; display:flex; align-items:center;">
+      <div style="width:100%; display:grid; grid-template-columns:1fr 1fr 1fr;">
+        <div style="padding:0 44px;  display:flex; flex-direction:column;">
+        <div style="font-family:'JetBrains Mono',monospace; font-size:44px; font-weight:500; color:var(--p-accent); line-height:1;">01</div>
+        <div style="font-family:var(--mazius); font-size:28px; line-height:1.1; color:var(--p-ink); margin-top:18px;">Everything resolves to a <em style="font-style:italic; color:var(--p-accent);">Task</em></div>
+        <div style="font-size:18px; line-height:1.55; color:var(--p-ink-2); margin-top:14px;">PRD → task → PR → evidence → merge. No orphan work — every change traces to a stated requirement.</div>
+      </div>
+        <div style="padding:0 44px; border-left:1px solid var(--p-grid-2); display:flex; flex-direction:column;">
+        <div style="font-family:'JetBrains Mono',monospace; font-size:44px; font-weight:500; color:var(--p-accent); line-height:1;">02</div>
+        <div style="font-family:var(--mazius); font-size:28px; line-height:1.1; color:var(--p-ink); margin-top:18px;">One record, one <em style="font-style:italic; color:var(--p-accent);">mirror</em></div>
+        <div style="font-size:18px; line-height:1.55; color:var(--p-ink-2); margin-top:14px;">Postgres is the database of record, the Portal is the system of record, and SharePoint is the mirror. The app is a fast lens; conflicts are resolved by a human, never auto-merged.</div>
+      </div>
+        <div style="padding:0 44px; border-left:1px solid var(--p-grid-2); display:flex; flex-direction:column;">
+        <div style="font-family:'JetBrains Mono',monospace; font-size:44px; font-weight:500; color:var(--p-accent); line-height:1;">03</div>
+        <div style="font-family:var(--mazius); font-size:28px; line-height:1.1; color:var(--p-ink); margin-top:18px;">One definition of <em style="font-style:italic; color:var(--p-accent);">green</em></div>
+        <div style="font-size:18px; line-height:1.55; color:var(--p-ink-2); margin-top:14px;">./scripts/preflight.sh locally and in CI. No bypassing the gate — the same bar applies to every agent and every human.</div>
+      </div>
+      </div>
+    </div>
+    <div style="flex:0 0 auto; text-align:center;">
+      <div class="mono" style="font-size:12px; letter-spacing:0.2em; text-transform:uppercase; color:var(--p-muted); padding-top:22px; border-top:1px solid var(--p-grid);">One brand · one governance model · one traceable record</div>
+    </div>
+  </section>
+
+</x-import>
+</x-dc>
+</body>
+</html>

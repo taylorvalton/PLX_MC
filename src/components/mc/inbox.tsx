@@ -22,6 +22,9 @@ export function InboxView({ nav, openNewTask }: ScreenProps & { openNewTask?: ()
           <h1>
             Mission <em>control</em>
           </h1>
+          <a className="vision-link" href="/presentations/plx-platform-vision/">
+            Platform vision · team briefing ↗
+          </a>
           <p className="sub">
             Your inbox and what&apos;s assigned to you. Agents work in the background — you review
             and approve. Everything resolves to a task, and every change mirrors to the record.

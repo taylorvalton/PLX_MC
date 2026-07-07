@@ -1,0 +1,156 @@
+{
+  "plugins": [
+    "react",
+    "import"
+  ],
+  "rules": {
+    "react/forbid-elements": [
+      "warn",
+      {
+        "forbid": []
+      }
+    ],
+    "no-restricted-imports": [
+      "warn",
+      {
+        "patterns": [
+          {
+            "group": [
+              "ui_kits/customer-portal/**"
+            ],
+            "message": "Import design-system components from 'index.js', not component internals."
+          }
+        ]
+      }
+    ],
+    "no-restricted-syntax": [
+      "warn",
+      {
+        "selector": "Literal[value=/#[0-9a-fA-F]{3,8}\\b/]",
+        "message": "Raw hex color — use a design-system color token via var()."
+      },
+      {
+        "selector": "Literal[value=/\\b\\d+px\\b/]",
+        "message": "Raw px value — use a design-system spacing token via var()."
+      },
+      {
+        "selector": "Literal[value=/font-family\\s*:\\s*(?!['\\\"]?(?:Mazius Display|Inter|JetBrains Mono))/i]",
+        "message": "Font not provided by the design system. Available: Mazius Display, Inter, JetBrains Mono."
+      }
+    ]
+  },
+  "overrides": [
+    {
+      "files": [
+        "**/index.js"
+      ],
+      "rules": {
+        "no-restricted-imports": "off"
+      }
+    }
+  ],
+  "x-omelette": {
+    "components": {},
+    "tokens": [
+      "--mazius",
+      "--mono",
+      "--p-accent",
+      "--p-accent-soft",
+      "--p-canvas",
+      "--p-dur",
+      "--p-dur-fast",
+      "--p-dur-slow",
+      "--p-ease",
+      "--p-font-mono",
+      "--p-font-sans",
+      "--p-font-serif",
+      "--p-grid",
+      "--p-grid-2",
+      "--p-hot",
+      "--p-info",
+      "--p-ink",
+      "--p-ink-2",
+      "--p-muted",
+      "--p-ok",
+      "--p-paper",
+      "--p-paper-2",
+      "--p-radius",
+      "--p-radius-lg",
+      "--p-radius-sm",
+      "--p-rail",
+      "--p-space-1",
+      "--p-space-2",
+      "--p-space-3",
+      "--p-space-4",
+      "--p-space-5",
+      "--p-space-6",
+      "--p-space-7",
+      "--p-text-body",
+      "--p-text-display",
+      "--p-text-h1",
+      "--p-text-h2",
+      "--p-text-h3",
+      "--p-text-mono",
+      "--p-text-small",
+      "--p-text-tick",
+      "--p-track-data",
+      "--p-track-meta",
+      "--p-track-tick",
+      "--p-warn",
+      "--sans"
+    ],
+    "tokenKinds": {
+      "--p-paper": "color",
+      "--p-paper-2": "color",
+      "--p-rail": "color",
+      "--p-canvas": "color",
+      "--p-ink": "color",
+      "--p-ink-2": "color",
+      "--p-muted": "color",
+      "--p-grid": "color",
+      "--p-grid-2": "color",
+      "--p-accent": "color",
+      "--p-accent-soft": "color",
+      "--p-ok": "color",
+      "--p-warn": "color",
+      "--p-info": "color",
+      "--p-hot": "color",
+      "--p-font-serif": "font",
+      "--p-font-sans": "font",
+      "--p-font-mono": "font",
+      "--mazius": "color",
+      "--sans": "color",
+      "--mono": "color",
+      "--p-text-display": "font",
+      "--p-text-h1": "font",
+      "--p-text-h2": "font",
+      "--p-text-h3": "font",
+      "--p-text-body": "font",
+      "--p-text-small": "font",
+      "--p-text-mono": "font",
+      "--p-text-tick": "font",
+      "--p-track-tick": "spacing",
+      "--p-track-meta": "spacing",
+      "--p-track-data": "spacing",
+      "--p-radius": "radius",
+      "--p-radius-sm": "radius",
+      "--p-radius-lg": "radius",
+      "--p-space-1": "spacing",
+      "--p-space-2": "spacing",
+      "--p-space-3": "spacing",
+      "--p-space-4": "spacing",
+      "--p-space-5": "spacing",
+      "--p-space-6": "spacing",
+      "--p-space-7": "spacing",
+      "--p-ease": "other",
+      "--p-dur-fast": "other",
+      "--p-dur": "other",
+      "--p-dur-slow": "other"
+    },
+    "fontFamilies": [
+      "Inter",
+      "JetBrains Mono",
+      "Mazius Display"
+    ]
+  }
+}
