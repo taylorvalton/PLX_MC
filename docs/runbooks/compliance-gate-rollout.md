@@ -143,3 +143,20 @@ code-level findings are already fixed on the branch):
 | **Health check** | `GET {MC}/api/events` (DB reachable); webhook returns 401 on bad signature, 503 when unconfigured |
 | **Fallback** | Fail-closed: checks hold (non-pass) + `mc_reconcile_queue` replays on recovery; never silent-pass |
 | **Data/audit boundary** | Only PR metadata is ingested (no repo source); every action appends to the `mc_events` audit log |
+
+## Step 8 — Dogfood: prove PR→task projection (EN-007 P5)
+
+After projection code ships, **redeploy Production** before merging dogfood PRs. Webhook
+ingestion appends `pr.merged` + `task.promotion.requested` on every deploy; **`task.promoted`
+and DB stage flips require the projection module on the live deployment**. A stale
+Production build records events but leaves tasks at `planned`.
+
+1. Confirm Vercel Production tracks `main` at or past the projection merge (see
+   `artifacts/compliance/2026-07-08-pr-lifecycle-dogfood/REPORT.md` for a deploy-window incident).
+2. Open agent dogfood PRs with `MC-Checkout` on `PLX_MC` + `plx-customer-portal`; pass
+   hard-mode compliance; merge.
+3. Verify in DB: `entities.data->>'stage' = 'merged'`, `prs[]` populated,
+   `mc_events.kind = 'task.promoted'`, `sync_audit_log` shows outbound push after sweep.
+
+If merges land before deploy, operator replay: call `projectPullRequest` for the stored
+PR events against the production DB, then `runSweep` (or wait for the 5-min cron).
