@@ -12,6 +12,7 @@ import type {
   Bucket,
   Comment,
   FileEntry,
+  Project,
   Repo,
   RepoRequest,
   Risk,
@@ -41,6 +42,8 @@ export interface StateSnapshot {
   bucketComments: Record<string, Comment[]>;
   // EN-005 — persisted buckets/initiatives, so user-created ones survive reload.
   buckets: Bucket[];
+  // P2 — persisted projects (parent above buckets), so user-created ones survive reload.
+  projects: Project[];
 }
 
 export async function snapshot(): Promise<StateSnapshot> {
@@ -48,7 +51,7 @@ export async function snapshot(): Promise<StateSnapshot> {
   await ensureReposSeeded();
   await ensureProjectsSeeded();
   await ensureBucketsSeeded();
-  const [tasks, risks, files, conflicts, errors, audit, counts, repos, repoRequests, bucketComments, buckets, lastSweptAt] = await Promise.all([
+  const [tasks, risks, files, conflicts, errors, audit, counts, repos, repoRequests, bucketComments, buckets, projects, lastSweptAt] = await Promise.all([
     repo.getEntities("task"),
     repo.getEntities("risk"),
     repo.getEntities("file"),
@@ -60,6 +63,7 @@ export async function snapshot(): Promise<StateSnapshot> {
     repo.getRepoRequests(),
     repo.bucketCommentsByBucket(),
     repo.getBuckets(),
+    repo.getProjects(),
     repo.lastSweepAt(),
   ]);
   return {
@@ -83,6 +87,7 @@ export async function snapshot(): Promise<StateSnapshot> {
     repoRequests,
     bucketComments,
     buckets,
+    projects,
     // Lists not yet mirrored (roadmap, milestones) keep their fixture counts;
     // mirrored lists report live counts. The store merges via SP_LISTS keys.
     // Heartbeat from delta_links (advances every sweep, incl. no-op ones),
@@ -121,6 +126,21 @@ function nextBucketId(name: string, existing: Set<string>): string {
 const definedEntries = <T extends object>(patch: T): Partial<T> =>
   Object.fromEntries(Object.entries(patch).filter(([, v]) => v !== undefined)) as Partial<T>;
 
+async function assertProjectExists(projectId: string): Promise<void> {
+  await ensureProjectsSeeded();
+  const known = new Set((await repo.getProjects()).map((p) => p.id));
+  if (!known.has(projectId)) {
+    throw new ApiError("not_found", `unknown project ${projectId}`, 404);
+  }
+}
+
+async function defaultProjectId(): Promise<string | null> {
+  await ensureProjectsSeeded();
+  const projects = await repo.getProjects();
+  const portal = projects.find((p) => p.id === "PRJ-PORTAL-GOLIVE");
+  return portal?.id ?? projects[0]?.id ?? null;
+}
+
 export interface CreateBucketInput {
   name: string;
   owner?: string;
@@ -130,6 +150,7 @@ export interface CreateBucketInput {
   desc?: string;
   repos?: string[];
   prd?: string | null;
+  project?: string | null;
 }
 
 export async function createBucket(input: CreateBucketInput): Promise<Bucket> {
@@ -153,6 +174,14 @@ export async function createBucket(input: CreateBucketInput): Promise<Bucket> {
   const existing = await repo.getBuckets();
   const id = nextBucketId(name, new Set(existing.map((b) => b.id)));
   const today = new Date().toISOString().slice(0, 10).replace(/-/g, ".");
+  let projectId: string | null;
+  if (input.project === null) projectId = null;
+  else if (input.project) {
+    await assertProjectExists(input.project);
+    projectId = input.project;
+  } else {
+    projectId = await defaultProjectId();
+  }
   const bucket: Bucket = {
     id,
     name,
@@ -164,6 +193,7 @@ export async function createBucket(input: CreateBucketInput): Promise<Bucket> {
     repos: input.repos ?? [],
     sync: { state: "pending", ts: repo.stamp(), sp: "Roadmap · unprovisioned" },
     prd: input.prd ?? null,
+    project: projectId,
   };
   await repo.upsertBucket(bucket);
   await repo.appendAudit(bucket.owner, `Created initiative ${id} (${name}) — pending Roadmap mirror.`, "pending");
@@ -179,6 +209,7 @@ export interface PatchBucketInput {
   desc?: string;
   repos?: string[];
   prd?: string | null;
+  project?: string | null;
 }
 
 export async function patchBucket(id: string, patch: PatchBucketInput, actor: string): Promise<Bucket | null> {
@@ -194,9 +225,103 @@ export async function patchBucket(id: string, patch: PatchBucketInput, actor: st
       throw new ApiError("repo_not_allowed", `These repos are not in the registry: ${offlist.join(", ")}.`, 422);
     }
   }
+  if (patch.project) await assertProjectExists(patch.project);
   const next: Bucket = { ...existing, ...definedEntries(patch) };
   await repo.upsertBucket(next);
   await repo.appendAudit(actor, `Edited initiative ${id} — pending Roadmap mirror.`, "pending");
+  return next;
+}
+
+// ─── Projects (P2 — parent above buckets) ────────────────────────────────────
+
+function nextProjectId(name: string, existing: Set<string>): string {
+  const slug = name
+    .trim()
+    .toUpperCase()
+    .replace(/[^A-Z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 24);
+  const base = `PRJ-${slug || "NEW"}`;
+  if (!existing.has(base)) return base;
+  let n = 2;
+  while (existing.has(`${base}-${n}`)) n += 1;
+  return `${base}-${n}`;
+}
+
+export interface CreateProjectInput {
+  name: string;
+  owner?: string;
+  health?: Project["health"];
+  target?: string;
+  started?: string;
+  desc?: string;
+  repos?: string[];
+  prd?: string | null;
+}
+
+export async function createProject(input: CreateProjectInput): Promise<Project> {
+  await ensureSeeded();
+  await ensureReposSeeded();
+  await ensureProjectsSeeded();
+  const name = input.name.trim();
+  if (!name) throw new ApiError("invalid_request", "A project needs a name.", 422);
+  const registry = await repo.getRepos();
+  const registryMap = Object.fromEntries(registry.map((r) => [r.id, r]));
+  const offlist = disallowedRepos(input.repos ?? [], registryMap);
+  if (offlist.length > 0) {
+    throw new ApiError(
+      "repo_not_allowed",
+      `These repos are not in the registry: ${offlist.join(", ")}. Request and get them approved first.`,
+      422
+    );
+  }
+  const existing = await repo.getProjects();
+  const id = nextProjectId(name, new Set(existing.map((p) => p.id)));
+  const today = new Date().toISOString().slice(0, 10).replace(/-/g, ".");
+  const project: Project = {
+    id,
+    name,
+    owner: input.owner || CURRENT_USER,
+    health: input.health ?? "track",
+    target: input.target?.trim() || "—",
+    started: input.started?.trim() || today,
+    desc: (input.desc ?? "").trim(),
+    repos: input.repos ?? [],
+    sync: { state: "pending", ts: repo.stamp(), sp: "Projects · unprovisioned" },
+    prd: input.prd ?? null,
+  };
+  await repo.upsertProject(project);
+  await repo.appendAudit(project.owner, `Created project ${id} (${name}) — pending Projects mirror.`, "pending");
+  return project;
+}
+
+export interface PatchProjectInput {
+  name?: string;
+  owner?: string;
+  health?: Project["health"];
+  target?: string;
+  started?: string;
+  desc?: string;
+  repos?: string[];
+  prd?: string | null;
+}
+
+export async function patchProject(id: string, patch: PatchProjectInput, actor: string): Promise<Project | null> {
+  await ensureProjectsSeeded();
+  const existing = (await repo.getProjects()).find((p) => p.id === id);
+  if (!existing) return null;
+  if (patch.repos) {
+    await ensureReposSeeded();
+    const registry = await repo.getRepos();
+    const registryMap = Object.fromEntries(registry.map((r) => [r.id, r]));
+    const offlist = disallowedRepos(patch.repos, registryMap);
+    if (offlist.length > 0) {
+      throw new ApiError("repo_not_allowed", `These repos are not in the registry: ${offlist.join(", ")}.`, 422);
+    }
+  }
+  const next: Project = { ...existing, ...definedEntries(patch) };
+  await repo.upsertProject(next);
+  await repo.appendAudit(actor, `Edited project ${id} — pending Projects mirror.`, "pending");
   return next;
 }
 

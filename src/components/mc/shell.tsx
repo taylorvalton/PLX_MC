@@ -13,6 +13,7 @@ import { NoticeHost, Sidebar, Topbar } from "./chrome";
 import { CommandPalette } from "./command-palette";
 import { InboxView } from "./inbox";
 import { NewInitiativeModal } from "./new-initiative-modal";
+import { NewProjectModal } from "./new-project-modal";
 import { NewTaskModal } from "./new-task-modal";
 import type { Nav, Route, Screen } from "./route";
 import { SCREENS } from "./screens";
@@ -24,6 +25,7 @@ export function MissionControlShell() {
   const [newTaskOpen, setNewTaskOpen] = useState(false);
   const [newTaskCtx, setNewTaskCtx] = useState<{ bucketId?: string } | undefined>(undefined);
   const [newInitiativeOpen, setNewInitiativeOpen] = useState(false);
+  const [newProjectOpen, setNewProjectOpen] = useState(false);
   // Post-hydration readiness flag (see the effect below): surfaced as
   // data-mc-ready on the shell root so automation can wait for genuine
   // interactivity, not the SSR-present-but-not-hydrated DOM.
@@ -57,6 +59,15 @@ export function MissionControlShell() {
   const closeNewTask = useCallback(() => {
     setNewTaskOpen(false);
     setNewTaskCtx(undefined);
+  }, []);
+
+  const openNewProject = useCallback(() => {
+    setPaletteOpen(false);
+    setNewProjectOpen(true);
+  }, []);
+
+  const closeNewProject = useCallback(() => {
+    setNewProjectOpen(false);
   }, []);
 
   const openNewInitiative = useCallback(() => {
@@ -152,7 +163,7 @@ export function MissionControlShell() {
     <BrandBoundary className={`mc${dark ? " dark" : ""}`} data-mc-ready={ready ? "true" : undefined}>
       <Topbar nav={nav} dark={dark} setDark={setDark} onOpenPalette={openPalette} />
       <div className="mc-shell">
-        <Sidebar route={route} nav={nav} onNewInitiative={openNewInitiative} />
+        <Sidebar route={route} nav={nav} onNewProject={openNewProject} onNewInitiative={openNewInitiative} />
         {route.screen === "home" ? (
           <InboxView route={route} nav={nav} openNewTask={() => openNewTask()} />
         ) : (
@@ -165,10 +176,12 @@ export function MissionControlShell() {
           nav={nav}
           onOpenNewTask={() => openNewTask({ bucketId: route.bucketId })}
           onOpenNewInitiative={openNewInitiative}
+          onOpenNewProject={openNewProject}
         />
       ) : null}
       {newTaskOpen ? <NewTaskModal ctx={newTaskCtx} onClose={closeNewTask} nav={nav} /> : null}
-      {newInitiativeOpen ? <NewInitiativeModal onClose={closeNewInitiative} nav={nav} /> : null}
+      {newProjectOpen ? <NewProjectModal onClose={closeNewProject} nav={nav} /> : null}
+      {newInitiativeOpen ? <NewInitiativeModal onClose={closeNewInitiative} nav={nav} projectId={route.projectId} /> : null}
       <NoticeHost />
     </BrandBoundary>
   );

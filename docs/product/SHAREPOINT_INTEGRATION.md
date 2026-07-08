@@ -20,12 +20,13 @@ Provision with PnP PowerShell or the Graph API: create the site, then the lists/
 
 ---
 
-## 2. Entities ↔ Lists (the 5 registers)
+## 2. Entities ↔ Lists (the 6 registers)
 
 | MC entity | SharePoint object | Kind | Default direction |
 |---|---|---|---|
+| **Project** | `Projects` | List | push → |
 | **Task** | `ToDos` | List | two‑way |
-| **Initiative** (+ Gantt) | `Roadmap` | List | two‑way |
+| **Initiative** (+ Gantt) | `Roadmap` | List | push → |
 | **Milestone** | `Milestone Register` | List | two‑way |
 | **Risk** | `Risk Register` | List | two‑way |
 | **File / folder** | `Project Documents` | Document library | two‑way |
@@ -60,19 +61,33 @@ Per‑field direction overrides the list default. Direction semantics:
 | Evidence Complete | Yes/No | `evidence` | → | derived: all evidence items done |
 | Description | Multi line of text | `description` | ↔ | |
 
-### 3.2 `Roadmap` — Initiative + Gantt  (two‑way, 5 items)
+### 3.2 `Projects` — Project umbrella  (push-only)
+
 | SharePoint column | Type | MC field | Dir | Notes |
 |---|---|---|---|---|
-| Title | Single line of text | `name` | ↔ | required |
-| Initiative ID | Single line of text | `id` | ← | required, unique |
-| Owner | Person | `owner` | ↔ | |
-| Health | Choice | `health` | ↔ | On track / At risk / Off track |
-| Start Date | Date and time | `started` | ↔ | **Gantt bar start** |
-| Target Date | Date and time | `target` | ↔ | **Gantt bar end** |
+| Title | Single line of text | `name` | → | required |
+| Project ID | Single line of text | `id` | → | required, unique |
+| Owner | Person | `owner` | → | |
+| Health | Choice | `health` | → | On track / At risk / Off track |
+| Start Date | Date and time | `started` | → | |
+| Target Date | Date and time | `target` | → | |
+| Description | Multi line of text | `desc` | → | |
+| PRD Link | Hyperlink | `prd` | → | |
+
+### 3.3 `Roadmap` — Initiative + Gantt  (push-only until inbound increment)
+| SharePoint column | Type | MC field | Dir | Notes |
+|---|---|---|---|---|
+| Title | Single line of text | `name` | → | required |
+| Initiative ID | Single line of text | `id` | → | required, unique |
+| Project | Lookup → Projects | `project` | → | parent umbrella |
+| Owner | Person | `owner` | → | |
+| Health | Choice | `health` | → | On track / At risk / Off track |
+| Start Date | Date and time | `started` | → | **Gantt bar start** |
+| Target Date | Date and time | `target` | → | **Gantt bar end** |
 | % Complete | Number | `progress` | → | 0–100 |
 | PRD Link | Hyperlink | `prd` | → | |
 
-### 3.3 `Milestone Register` — Milestone  (two‑way, 5 items)
+### 3.4 `Milestone Register` — Milestone  (two‑way, 5 items)
 | SharePoint column | Type | MC field | Dir | Notes |
 |---|---|---|---|---|
 | Title | Single line of text | `name` | ↔ | required |
@@ -81,7 +96,7 @@ Per‑field direction overrides the list default. Direction semantics:
 | Due Date | Date and time | `col` | ↔ | timeline column position |
 | Register Ref | Single line of text | `sp` | ← | |
 
-### 3.4 `Risk Register` — Risk  (two‑way, 4 items)
+### 3.5 `Risk Register` — Risk  (two‑way, 4 items)
 | SharePoint column | Type | MC field | Dir | Notes |
 |---|---|---|---|---|
 | Title | Single line of text | `title` | ↔ | required |
@@ -92,7 +107,7 @@ Per‑field direction overrides the list default. Direction semantics:
 | Status | Choice | `status` | ↔ | Open / Mitigating / Closed |
 | Mitigation | Multi line of text | `mit` | ↔ | |
 
-### 3.5 `Project Documents` — File  (document library, two‑way, ~12 items)
+### 3.6 `Project Documents` — File  (document library, two‑way, ~12 items)
 **Folder structure:** `/{Initiative}/PRD`, `/{Initiative}/Evidence`, `/{Initiative}/Deeds`, `/{Initiative}/Reports`, plus a top‑level `/Shared`.
 
 | SharePoint column | Type | MC field | Dir | Notes |
@@ -188,7 +203,7 @@ GET /users?$filter=endsWith(mail,'@petralabx.com') or endsWith(mail,'@petrasoap.
 ## 8. Provisioning quick‑reference
 
 1. Create site `/sites/plx-mission-control`.
-2. Create 4 lists (`ToDos`, `Roadmap`, `Milestone Register`, `Risk Register`) + 1 library (`Project Documents`).
+2. Create 5 lists (`Projects`, `ToDos`, `Roadmap`, `Milestone Register`, `Risk Register`) + 1 library (`Project Documents`).
 3. Add columns exactly per §3 (display + internal names, types, choice sets). Index `Task ID`, `Initiative ID`.
 4. Create the library folder tree per §3.5.
 5. Set up the sync service: app registration (Graph app perms: `Sites.ReadWrite.All`, `User.Read.All`, `Mail.Send`, `ChannelMessage.Send` as needed), delta queries, webhooks, the mapping layer (§3 directions + the Likelihood normalization §5.2), conflict queue, and audit log.

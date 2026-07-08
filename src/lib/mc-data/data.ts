@@ -141,7 +141,7 @@ export const REPOS: Record<string, Repo> = {
 // Projects (P2) — the parent layer above buckets. All current go-live buckets
 // roll up to one umbrella project; the FK is optional so this stays additive.
 export const PROJECTS: Project[] = [
-  { id: "PRJ-PORTAL-GOLIVE", name: "PLX Portal Go-Live", owner: "vince", health: "track", target: "Oct 01", started: "2026.06.11", desc: "Umbrella project for all PLX Portal go-live initiatives.", repos: ["portal-web"], sync: { state: "pending", ts: "—", sp: "Roadmap · unprovisioned" }, prd: null },
+  { id: "PRJ-PORTAL-GOLIVE", name: "PLX Portal Go-Live", owner: "vince", health: "track", target: "Oct 01", started: "2026.06.11", desc: "Umbrella project for all PLX Portal go-live initiatives.", repos: ["portal-web"], sync: { state: "pending", ts: "—", sp: "Projects · unprovisioned" }, prd: null },
 ];
 
 export const BUCKETS: Bucket[] = [
@@ -402,16 +402,32 @@ export const SP_LISTS: SpListDef[] = [
     ],
   },
   {
+    key: "projects", title: "Projects", kind: "list", entity: "Project", icon: "◫",
+    maps: "Projects / umbrellas", itemCount: 1, direction: "push",
+    lastSync: "—", counts: { synced: 0, pending: 1, conflict: 0, error: 0 },
+    columns: [
+      { name: "Title", type: "Single line of text", mc: "name", dir: "push", required: true },
+      { name: "Project ID", type: "Single line of text", mc: "id", dir: "push", required: true, note: "indexed · unique key" },
+      { name: "Owner", type: "Person", mc: "owner", dir: "push" },
+      { name: "Health", type: "Choice", mc: "health", dir: "push", note: "On track/At risk/Off track" },
+      { name: "Start Date", type: "Date and time", mc: "started", dir: "push" },
+      { name: "Target Date", type: "Date and time", mc: "target", dir: "push" },
+      { name: "Description", type: "Multi line of text", mc: "desc", dir: "push" },
+      { name: "PRD Link", type: "Hyperlink", mc: "prd", dir: "push" },
+    ],
+  },
+  {
     key: "roadmap", title: "Roadmap", kind: "list", entity: "Initiative", icon: "◷",
-    maps: "Buckets / Initiatives + Gantt", itemCount: 8, direction: "two-way",
+    maps: "Buckets / Initiatives + Gantt", itemCount: 8, direction: "push",
     lastSync: "—", counts: { synced: 0, pending: 8, conflict: 0, error: 0 },
     columns: [
-      { name: "Title", type: "Single line of text", mc: "name", dir: "two-way", required: true },
-      { name: "Initiative ID", type: "Single line of text", mc: "id", dir: "pull", required: true },
-      { name: "Owner", type: "Person", mc: "owner", dir: "two-way" },
-      { name: "Health", type: "Choice", mc: "health", dir: "two-way", note: "On track/At risk/Off track" },
-      { name: "Start Date", type: "Date and time", mc: "started", dir: "two-way", note: "Gantt bar start" },
-      { name: "Target Date", type: "Date and time", mc: "target", dir: "two-way", note: "Gantt bar end" },
+      { name: "Title", type: "Single line of text", mc: "name", dir: "push", required: true },
+      { name: "Initiative ID", type: "Single line of text", mc: "id", dir: "push", required: true },
+      { name: "Project", type: "Lookup → Projects", mc: "project", dir: "push" },
+      { name: "Owner", type: "Person", mc: "owner", dir: "push" },
+      { name: "Health", type: "Choice", mc: "health", dir: "push", note: "On track/At risk/Off track" },
+      { name: "Start Date", type: "Date and time", mc: "started", dir: "push", note: "Gantt bar start" },
+      { name: "Target Date", type: "Date and time", mc: "target", dir: "push", note: "Gantt bar end" },
       { name: "% Complete", type: "Number", mc: "progress", dir: "push" },
       { name: "PRD Link", type: "Hyperlink", mc: "prd", dir: "push" },
     ],

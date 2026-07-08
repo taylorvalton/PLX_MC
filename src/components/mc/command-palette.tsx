@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 
 import { AGENTS, CURRENT_USER } from "@/lib/mc-data";
 import { useMcVersion } from "@/lib/mc-data/hooks";
-import { allBuckets, allTasks, pushNotice, reassignTask, setTaskStage } from "@/lib/mc-data/store";
+import { allBuckets, allProjects, allTasks, pushNotice, reassignTask, setTaskStage } from "@/lib/mc-data/store";
 
 import type { Nav } from "./route";
 
@@ -46,11 +46,13 @@ export function CommandPalette({
   nav,
   onOpenNewTask,
   onOpenNewInitiative,
+  onOpenNewProject,
 }: {
   onClose: () => void;
   nav: Nav;
   onOpenNewTask: () => void;
   onOpenNewInitiative: () => void;
+  onOpenNewProject: () => void;
 }) {
   const version = useMcVersion();
   const [query, setQuery] = useState("");
@@ -64,8 +66,10 @@ export function CommandPalette({
     const tasks = allTasks();
     const firstBucket = allBuckets()[0]?.id;
     const firstTask = tasks[0]?.id;
+    const firstProject = allProjects()[0]?.id;
     const create: PaletteCommand[] = [
       { key: "create:new-task", icon: "+", label: "New task", hint: "create", run: onOpenNewTask },
+      { key: "create:new-project", icon: "+", label: "New project", hint: "create", run: onOpenNewProject },
       { key: "create:new-bucket", icon: "+", label: "New initiative", hint: "create", run: onOpenNewInitiative },
     ];
 
@@ -78,6 +82,15 @@ export function CommandPalette({
       { key: "nav:insights", icon: "◔", label: "Go to Insights", run: () => nav("insights") },
       { key: "nav:matrix", icon: "⊞", label: "Go to Traceability", run: () => nav("matrix") },
       { key: "nav:feed", icon: "◉", label: "Go to Agent activity", run: () => nav("feed") },
+      {
+        key: "nav:project",
+        icon: "◫",
+        label: "Go to Project detail",
+        hint: firstProject ?? "no projects",
+        run: () => {
+          if (firstProject) nav("project", { projectId: firstProject });
+        },
+      },
       {
         key: "nav:bucket",
         icon: "●",
@@ -104,6 +117,14 @@ export function CommandPalette({
         },
       },
     ];
+
+    const projects: PaletteCommand[] = allProjects().map((project) => ({
+      key: `project:${project.id}`,
+      icon: "◫",
+      label: `Project · ${project.name}`,
+      hint: project.id,
+      run: () => nav("project", { projectId: project.id }),
+    }));
 
     const buckets: PaletteCommand[] = allBuckets().map((bucket) => ({
       key: `bucket:${bucket.id}`,
@@ -174,6 +195,7 @@ export function CommandPalette({
     return [
       { title: "Create", items: create },
       { title: "Navigate", items: navigate },
+      { title: "Projects", items: projects },
       { title: "Buckets", items: buckets },
       { title: "Tasks", items: taskCommands },
       { title: "Assign agents", items: assignAgents },

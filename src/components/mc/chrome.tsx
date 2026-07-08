@@ -7,7 +7,7 @@ import Image from "next/image";
 
 import { ACTORS, CURRENT_USER, liveAgentCount } from "@/lib/mc-data";
 import { useMcNotices, useMcVersion } from "@/lib/mc-data/hooks";
-import { allBuckets, allTasks, dismissNotice, storeSyncCounts, unreadCount } from "@/lib/mc-data/store";
+import { allBuckets, allProjects, allTasks, dismissNotice, storeSyncCounts, unreadCount } from "@/lib/mc-data/store";
 import { meetingIntakeEnabled } from "@/lib/meeting-intake";
 
 import { Avatar, PMark } from "./atoms";
@@ -88,10 +88,12 @@ export function Topbar({
 export function Sidebar({
   route,
   nav,
+  onNewProject,
   onNewInitiative,
 }: {
   route: Route;
   nav: Nav;
+  onNewProject: () => void;
   onNewInitiative: () => void;
 }) {
   useMcVersion();
@@ -133,6 +135,24 @@ export function Sidebar({
         {item("insights", "◔", "Insights")}
         {item("matrix", "⊞", "Traceability")}
         {item("feed", "◉", "Agent activity", <span className="badge acc">{live} live</span>)}
+      </div>
+      <div className="grp">
+        <div className="h">Projects</div>
+        {allProjects().map((p) => (
+          <button
+            type="button"
+            key={p.id}
+            className={`item${route.screen === "project" && route.projectId === p.id ? " active" : ""}`}
+            onClick={() => nav("project", { projectId: p.id })}
+          >
+            <span className={`hl ${p.health}`} />
+            <span className="nm">{p.name}</span>
+          </button>
+        ))}
+        <button type="button" className="item side-new-initiative" onClick={onNewProject}>
+          <span className="ic">+</span>
+          <span className="nm">New project</span>
+        </button>
       </div>
       <div className="grp">
         <div className="h">Buckets</div>

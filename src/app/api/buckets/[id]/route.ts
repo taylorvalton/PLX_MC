@@ -16,6 +16,7 @@ const patchBucketSchema = z.object({
   desc: z.string().optional(),
   repos: z.array(z.string()).optional(),
   prd: z.string().nullable().optional(),
+  project: z.string().nullable().optional(),
 });
 
 export const PATCH = route(async (req, ctx) => {

@@ -16,7 +16,7 @@
 
 import { ACTORS, HUMANS, PRIORITY, STAGES } from "@/lib/mc-data/data";
 import { evidenceComplete } from "@/lib/mc-data/helpers";
-import type { Repo, Risk, StageKey, Subtask, Task } from "@/lib/mc-data/types";
+import type { Bucket, Project, Repo, Risk, StageKey, Subtask, Task } from "@/lib/mc-data/types";
 
 export type EntityType = "task" | "risk" | "file";
 export type EntityData = Record<string, unknown>;
@@ -196,6 +196,59 @@ export function repoOutboundFields(repo: Repo, opts: { creating?: boolean } = {}
     Scope: repo.scope,
   };
   if (opts.creating) out.RepoID = repo.id;
+  return out;
+}
+
+const HEALTH_TO_SP: Record<string, string> = {
+  track: "On track",
+  risk: "At risk",
+  off: "Off track",
+};
+
+// MC display dates: "Mon DD" (dueToIso) or "YYYY.MM.DD" (fixture started dates).
+export function mcDateToIso(value: string | undefined): string | null {
+  const iso = dueToIso(value);
+  if (iso) return iso;
+  const dotted = /^(\d{4})\.(\d{2})\.(\d{2})$/.exec(String(value ?? "").trim());
+  if (!dotted) return null;
+  return new Date(Date.UTC(Number(dotted[1]), Number(dotted[2]) - 1, Number(dotted[3]))).toISOString();
+}
+
+// ─── Projects list (P2 — push-only mirror) ───────────────────────────────────
+
+export function projectOutboundFields(project: Project, opts: { creating?: boolean } = {}): Record<string, unknown> {
+  const out: Record<string, unknown> = {
+    Title: project.name,
+    Health: HEALTH_TO_SP[project.health] ?? "On track",
+    Description: project.desc || undefined,
+    PRDLink: project.prd || undefined,
+  };
+  const started = mcDateToIso(project.started);
+  const target = mcDateToIso(project.target);
+  if (started) out.StartDate = started;
+  if (target) out.TargetDate = target;
+  if (opts.creating) out.ProjectID = project.id;
+  return out;
+}
+
+// ─── Roadmap / buckets list (EN-005 — push-only mirror) ──────────────────────
+
+export function bucketOutboundFields(
+  bucket: Bucket,
+  opts: { creating?: boolean; ownerLookupId?: number | null; projectLookupId?: number | null } = {}
+): Record<string, unknown> {
+  const out: Record<string, unknown> = {
+    Title: bucket.name,
+    Health: HEALTH_TO_SP[bucket.health] ?? "On track",
+    PRDLink: bucket.prd || undefined,
+  };
+  const started = mcDateToIso(bucket.started);
+  const target = mcDateToIso(bucket.target);
+  if (started) out.StartDate = started;
+  if (target) out.TargetDate = target;
+  if (opts.creating) out.InitiativeID = bucket.id;
+  if (opts.ownerLookupId) out.OwnerLookupId = opts.ownerLookupId;
+  if (opts.projectLookupId) out.ProjectLookupId = opts.projectLookupId;
   return out;
 }
 
