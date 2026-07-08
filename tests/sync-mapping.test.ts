@@ -6,11 +6,14 @@
 import { describe, expect, it } from "vitest";
 import type { Risk, Task } from "@/lib/mc-data";
 import {
+  bucketOutboundFields,
   dueToIso,
   inboundPatches,
   isoToDue,
+  mcDateToIso,
   outboundFields,
   parseFieldValue,
+  projectOutboundFields,
   reconcileInbound,
   serializeSubtasks,
 } from "@/lib/sync/mapping";
@@ -242,5 +245,51 @@ describe("parseFieldValue (keep-SharePoint resolution)", () => {
     expect(parseFieldValue("task", "stage", "Blocked · due Jun 20")).toBeUndefined();
     expect(parseFieldValue("risk", "like", "Med")).toBe("Medium");
     expect(parseFieldValue("risk", "like", "Catastrophic")).toBeUndefined();
+  });
+});
+
+describe("project + bucket outbound (P2 / EN-005 push mirrors)", () => {
+  it("maps project health + dates and sets ProjectID on create", () => {
+    const fields = projectOutboundFields(
+      {
+        id: "PRJ-X",
+        name: "Portal",
+        owner: "vince",
+        health: "risk",
+        target: "Oct 01",
+        started: "2026.06.11",
+        desc: "Umbrella",
+        repos: [],
+        sync: { state: "pending", ts: "—", sp: "Projects · unprovisioned" },
+        prd: null,
+      },
+      { creating: true }
+    );
+    expect(fields.ProjectID).toBe("PRJ-X");
+    expect(fields.Health).toBe("At risk");
+    expect(fields.StartDate).toBeTruthy();
+  });
+
+  it("maps bucket fields and optional lookup ids", () => {
+    const fields = bucketOutboundFields(
+      {
+        id: "BKT-X",
+        name: "Sync",
+        owner: "vince",
+        health: "track",
+        target: "Jul 20",
+        started: "2026.06.11",
+        desc: "",
+        repos: [],
+        sync: { state: "pending", ts: "—", sp: "Roadmap · unprovisioned" },
+        prd: null,
+        project: "PRJ-X",
+      },
+      { creating: true, ownerLookupId: 42, projectLookupId: 7 }
+    );
+    expect(fields.InitiativeID).toBe("BKT-X");
+    expect(fields.OwnerLookupId).toBe(42);
+    expect(fields.ProjectLookupId).toBe(7);
+    expect(mcDateToIso("Jul 20")).toBeTruthy();
   });
 });

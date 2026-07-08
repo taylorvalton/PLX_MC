@@ -14,12 +14,28 @@
   },
   "lists": [
     {
+      "key": "projects",
+      "displayName": "Projects",
+      "template": "genericList",
+      "description": "Umbrella projects above initiatives (P2). Push-only mirror — Mission Control is authoritative.",
+      "columns": [
+        { "name": "ProjectID", "displayName": "Project ID", "type": "text", "required": true, "indexed": true, "unique": true },
+        { "name": "Owner", "displayName": "Owner", "type": "person" },
+        { "name": "Health", "displayName": "Health", "type": "choice", "choices": ["On track", "At risk", "Off track"] },
+        { "name": "StartDate", "displayName": "Start Date", "type": "dateTime" },
+        { "name": "TargetDate", "displayName": "Target Date", "type": "dateTime" },
+        { "name": "Description", "displayName": "Description", "type": "multiline" },
+        { "name": "PRDLink", "displayName": "PRD Link", "type": "text", "$comment": "Push-only URL stored as text (same constraint as Roadmap PRDLink)." }
+      ]
+    },
+    {
       "key": "roadmap",
       "displayName": "Roadmap",
       "template": "genericList",
-      "description": "Initiatives / buckets + Gantt source (two-way).",
+      "description": "Initiatives / buckets + Gantt source (push-only until inbound increment).",
       "columns": [
         { "name": "InitiativeID", "displayName": "Initiative ID", "type": "text", "required": true, "indexed": true, "unique": true },
+        { "name": "Project", "displayName": "Project", "type": "lookup", "lookupList": "projects" },
         { "name": "Owner", "displayName": "Owner", "type": "person" },
         { "name": "Health", "displayName": "Health", "type": "choice", "choices": ["On track", "At risk", "Off track"] },
         { "name": "StartDate", "displayName": "Start Date", "type": "dateTime" },

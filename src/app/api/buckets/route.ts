@@ -15,6 +15,7 @@ const createBucketSchema = z.object({
   desc: z.string().optional(),
   repos: z.array(z.string()).optional(),
   prd: z.string().nullable().optional(),
+  project: z.string().nullable().optional(),
 });
 
 export const POST = route(async (req) => createBucket(await parseBody(req, createBucketSchema)));

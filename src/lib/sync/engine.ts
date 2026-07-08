@@ -9,7 +9,7 @@
 // site-user lookup ids. Documents (driveItem content) and the Initiative lookup
 // column land with a later increment (see docs/modules/sync/README.md).
 
-import { ACTORS, BUCKETS, FILES, PROJECTS, REPOS, RISKS, SP_CONFLICTS, SP_ERRORS, TASKS } from "@/lib/mc-data/data";
+import { ACTORS, BUCKETS, FILES, HUMANS, PROJECTS, REPOS, RISKS, SP_CONFLICTS, SP_ERRORS, TASKS } from "@/lib/mc-data/data";
 import type { SyncState, Task } from "@/lib/mc-data/types";
 import {
   createListItem,
@@ -17,7 +17,9 @@ import {
   GraphError,
   listDelta,
   patchListItemFields,
+  PROJECTS_KEY,
   REPO_REGISTRY_KEY,
+  ROADMAP_KEY,
   resolveEmailByLookupId,
   resolveSiteUserLookupId,
   siteContext,
@@ -25,6 +27,7 @@ import {
 } from "./graph";
 import {
   actorIdByEmail,
+  bucketOutboundFields,
   displayFieldFor,
   displayValue,
   inboundPatches,
@@ -32,6 +35,7 @@ import {
   outboundFields,
   parseFieldValue,
   planTaskPersons,
+  projectOutboundFields,
   reconcileInbound,
   repoOutboundFields,
   TASK_PERSON_FIELDS,
@@ -287,6 +291,96 @@ async function pushRepoRegistry(ctx: SiteContext): Promise<number> {
   return pushed;
 }
 
+// Push-only mirror of projects to the "Projects" list (P2). Mission Control is
+// authoritative; the list is never read back. Projects must land before buckets
+// so Roadmap can resolve the Project lookup column.
+async function pushProjectsMirror(ctx: SiteContext): Promise<number> {
+  const pending = (await repo.getProjectRows()).filter((r) => r.syncState === "pending");
+  if (pending.length === 0) return 0;
+  if (!ctx.listIds[PROJECTS_KEY]) {
+    await repo.appendAudit(
+      SYNC_ACTOR,
+      "Projects list not provisioned — projects mirror skipped (run scripts/provision-sharepoint.py).",
+      "pending"
+    );
+    return 0;
+  }
+  let pushed = 0;
+  for (const { project, spItemId } of pending) {
+    try {
+      if (spItemId) {
+        await patchListItemFields(ctx, PROJECTS_KEY, spItemId, projectOutboundFields(project));
+        await repo.setProjectSync(project.id, "synced", { spRef: "Projects" });
+      } else {
+        const existing = await findItemByField(ctx, PROJECTS_KEY, "ProjectID", project.id);
+        const itemId = existing
+          ? existing.id
+          : await createListItem(ctx, PROJECTS_KEY, projectOutboundFields(project, { creating: true }));
+        if (existing) await patchListItemFields(ctx, PROJECTS_KEY, itemId, projectOutboundFields(project));
+        await repo.setProjectSync(project.id, "synced", { spItemId: itemId, spRef: "Projects" });
+      }
+      pushed += 1;
+    } catch (err) {
+      if (err instanceof GraphError && err.status < 500) {
+        await repo.setProjectSync(project.id, "error");
+        await repo.appendAudit(SYNC_ACTOR, `Projects push failed for ${project.id} — ${err.body.slice(0, 120)}`, "error");
+      } else {
+        throw err;
+      }
+    }
+  }
+  return pushed;
+}
+
+// Push-only mirror of buckets/initiatives to the "Roadmap" list (EN-005). MC is
+// authoritative; inbound Gantt edits land in a later increment.
+async function pushBucketRoadmap(ctx: SiteContext): Promise<number> {
+  const pending = (await repo.getBucketRows()).filter((r) => r.syncState === "pending");
+  if (pending.length === 0) return 0;
+  if (!ctx.listIds[ROADMAP_KEY]) {
+    await repo.appendAudit(
+      SYNC_ACTOR,
+      "Roadmap list not provisioned — initiatives mirror skipped (run scripts/provision-sharepoint.py).",
+      "pending"
+    );
+    return 0;
+  }
+  const projectSpIds = new Map(
+    (await repo.getProjectRows())
+      .filter((r) => r.spItemId)
+      .map((r) => [r.project.id, Number(r.spItemId)])
+  );
+  let pushed = 0;
+  for (const { bucket, spItemId } of pending) {
+    try {
+      const ownerEmail = ACTORS[bucket.owner]?.kind === "human" ? HUMANS[bucket.owner]?.email : undefined;
+      const ownerLookupId = ownerEmail ? await resolveSiteUserLookupId(ctx, ownerEmail) : null;
+      const projectLookupId = bucket.project ? projectSpIds.get(bucket.project) ?? null : null;
+      const fields = bucketOutboundFields(bucket, { ownerLookupId, projectLookupId: projectLookupId ?? undefined });
+      if (spItemId) {
+        await patchListItemFields(ctx, ROADMAP_KEY, spItemId, fields);
+        await repo.setBucketSync(bucket.id, "synced", { spRef: "Roadmap" });
+      } else {
+        const existing = await findItemByField(ctx, ROADMAP_KEY, "InitiativeID", bucket.id);
+        const itemId = existing
+          ? existing.id
+          : await createListItem(ctx, ROADMAP_KEY, bucketOutboundFields(bucket, { creating: true, ownerLookupId, projectLookupId: projectLookupId ?? undefined }));
+        if (existing) await patchListItemFields(ctx, ROADMAP_KEY, itemId, fields);
+        await repo.setBucketSync(bucket.id, "synced", { spItemId: itemId, spRef: "Roadmap" });
+      }
+      pushed += 1;
+    } catch (err) {
+      if (err instanceof GraphError && err.status < 500) {
+        await repo.setBucketSync(bucket.id, "error");
+        await repo.appendAudit(SYNC_ACTOR, `Roadmap push failed for ${bucket.id} — ${err.body.slice(0, 120)}`, "error");
+      } else {
+        throw err;
+      }
+    }
+  }
+  return pushed;
+}
+
 // ─── Inbound (delta pull) ────────────────────────────────────────────────────
 
 const DELTA_LISTS: { listKey: string; type: EntityType }[] = [
@@ -423,6 +517,10 @@ export async function runSweep(actor: string = SYNC_ACTOR): Promise<SweepResult>
   }
   // Push-only repo-registry mirror (Item 2) — counted with the outbound pushes.
   pushed += await pushRepoRegistry(ctx);
+  // Push-only projects mirror (P2) — must run before Roadmap (Project lookup).
+  pushed += await pushProjectsMirror(ctx);
+  // Push-only Roadmap / initiatives mirror (EN-005).
+  pushed += await pushBucketRoadmap(ctx);
 
   const lastSweep = repo.stamp();
   // Only audit a sweep that actually changed something. Under the scheduled

@@ -14,6 +14,7 @@ export type Screen =
   | "matrix"
   | "feed"
   | "bucket"
+  | "project"
   | "repos"
   | "files"
   | "sync"
@@ -26,6 +27,7 @@ export type Screen =
 
 export interface Route {
   screen: Screen;
+  projectId?: string;
   bucketId?: string;
   taskId?: string;
   // Module E (SPEC §3.B.3): an Insights chart segment click navigates to the

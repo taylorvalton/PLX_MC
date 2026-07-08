@@ -26,6 +26,9 @@ vi.mock("@/lib/sync/repo", () => ({
   async getBuckets() {
     return store.buckets;
   },
+  async getProjects() {
+    return [];
+  },
   async upsertBucket(b: Bucket) {
     store.upserts.push(b);
   },

@@ -3,41 +3,29 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { CURRENT_USER } from "@/lib/mc-data";
-import type { Bucket } from "@/lib/mc-data";
+import type { Project } from "@/lib/mc-data";
 import { useMcVersion } from "@/lib/mc-data/hooks";
-import { actorById, addBucket, allProjects, allRepos } from "@/lib/mc-data/store";
+import { actorById, addProject, allRepos } from "@/lib/mc-data/store";
 
 import { Avatar } from "./atoms";
 import { PeoplePicker } from "./people-picker";
 import type { Nav } from "./route";
 
-const HEALTH_OPTIONS: Array<{ value: Bucket["health"]; label: string }> = [
+const HEALTH_OPTIONS: Array<{ value: Project["health"]; label: string }> = [
   { value: "track", label: "On track" },
   { value: "risk", label: "At risk" },
   { value: "off", label: "Off track" },
 ];
 
-export function NewInitiativeModal({
-  onClose,
-  nav,
-  projectId,
-}: {
-  onClose: () => void;
-  nav: Nav;
-  projectId?: string;
-}) {
+export function NewProjectModal({ onClose, nav }: { onClose: () => void; nav: Nav }) {
   useMcVersion();
-  const projects = allProjects();
-  const defaultProjectId = projectId ?? projects.find((p) => p.id === "PRJ-PORTAL-GOLIVE")?.id ?? projects[0]?.id ?? null;
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
-  // A bucket is always human-accountable (EN-003); default to the operator.
   const [ownerId, setOwnerId] = useState<string | null>(CURRENT_USER);
   const [ownerPickerOpen, setOwnerPickerOpen] = useState(false);
-  const [health, setHealth] = useState<Bucket["health"]>("track");
+  const [health, setHealth] = useState<Project["health"]>("track");
   const [target, setTarget] = useState("");
   const [repos, setRepos] = useState<string[]>([]);
-  const [selectedProjectId, setSelectedProjectId] = useState<string | null>(defaultProjectId);
   const nameRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
@@ -55,18 +43,17 @@ export function NewInitiativeModal({
 
   const submit = useCallback(() => {
     if (!canCreate) return;
-    const created = addBucket({
+    const created = addProject({
       name,
       owner: ownerId ?? undefined,
       health,
       target,
       desc: description,
       repos,
-      project: selectedProjectId,
     });
     onClose();
-    nav("bucket", { bucketId: created.id, projectId: selectedProjectId ?? undefined });
-  }, [canCreate, name, ownerId, health, target, description, repos, selectedProjectId, onClose, nav]);
+    nav("project", { projectId: created.id });
+  }, [canCreate, name, ownerId, health, target, description, repos, onClose, nav]);
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -90,13 +77,13 @@ export function NewInitiativeModal({
         className="ntm"
         onClick={(event) => event.stopPropagation()}
         role="dialog"
-        aria-label="Create a new initiative"
+        aria-label="Create a new project"
       >
         <div className="ntm-head">
           <div>
-            <span className="kk">New initiative</span>
+            <span className="kk">New project</span>
             <h2>
-              Create an <em>initiative</em>
+              Create a <em>project</em>
             </h2>
           </div>
           <button type="button" className="ntm-x" onClick={onClose} title="Close (Esc)">
@@ -110,13 +97,13 @@ export function NewInitiativeModal({
             className="ntm-title"
             value={name}
             onChange={(event) => setName(event.target.value)}
-            placeholder="Name this initiative…"
+            placeholder="Name this project…"
           />
           <textarea
             className="ntm-desc"
             value={description}
             onChange={(event) => setDescription(event.target.value)}
-            placeholder="What is this initiative about? (optional)"
+            placeholder="What is this project about? (optional)"
             rows={3}
           />
 
@@ -168,29 +155,12 @@ export function NewInitiativeModal({
             </div>
 
             <label className="ntm-fact">
-              <span className="k">Project</span>
-              <div className="ntm-select-wrap">
-                <select
-                  value={selectedProjectId ?? ""}
-                  onChange={(event) => setSelectedProjectId(event.target.value || null)}
-                >
-                  <option value="">No project</option>
-                  {projects.map((project) => (
-                    <option key={project.id} value={project.id}>
-                      {project.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            </label>
-
-            <label className="ntm-fact">
               <span className="k">Target</span>
               <div className="ntm-select-wrap">
                 <input
                   value={target}
                   onChange={(event) => setTarget(event.target.value)}
-                  placeholder="e.g. Aug 01"
+                  placeholder="e.g. Oct 01"
                 />
               </div>
             </label>
@@ -220,14 +190,14 @@ export function NewInitiativeModal({
               <span className="d" />
               Pending
             </span>{" "}
-            to the Roadmap list (deferred)
+            to the Projects list
           </span>
           <div className="ntm-acts">
             <button type="button" className="btn ghost" onClick={onClose}>
               Cancel
             </button>
             <button type="button" className="btn acc" disabled={!canCreate} onClick={submit}>
-              Create initiative →
+              Create project →
             </button>
           </div>
         </div>
