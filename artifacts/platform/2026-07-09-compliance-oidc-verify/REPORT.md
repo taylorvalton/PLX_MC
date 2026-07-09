@@ -2,74 +2,76 @@
 
 ## Mission
 
-Make `POST /api/compliance/verify` safe for PLX_MC dogfood by documenting
-GitHub Actions OIDC as the preferred CI authentication path while retaining the
-existing bearer token as a temporary fallback/break-glass control.
+Replace bearer-only auth on `POST /api/compliance/verify` with GitHub Actions
+OIDC as first-class auth, dual-auth cutover, dogfood on `petralabx/PLX_MC`, and
+a mergeable PR. Bearer (`COMPLIANCE_CI_TOKEN`) remains as fallback/break-glass
+until OIDC dogfood proves green.
 
 ## Work Context
 
-- Task: `TASK-297`
+- Task: [TASK-297](https://mc.plxcustomer.io/tasks/TASK-297)
 - Checkout: `MC-Checkout: dsp_mrdittqo7fml8s`
-- Phase branch: `proj/compliance-verify-oidc-phase-4-docs-evidence`
-- Scope: P4 docs and evidence only. No source, test, workflow, or package files
-  are changed in this phase.
+- Bucket: `BKT-MISSION-CONTROL-OPS`
+- Owner: Vince (`vince@petrasoap.com`)
+- Delivery branch: `feat/compliance-verify-oidc`
+- Base: `origin/main` @ `bdf98f5`
 
-## What Changed Before P4
+## What Changed
 
-- P1 established the compliance gate service and persisted verification/audit
-  records.
-- P2 added agent checkout/capture surfaces so PRs can carry `MC-Checkout`
-  attribution.
-- P3 updated the compliance workflow and verify path for OIDC-first auth with
-  bearer fallback, including `id-token: write` in
-  `.github/workflows/compliance-gate.yml`.
+### P1 — OIDC module + secrets + jose
+- `src/lib/compliance/github-oidc.ts` — JWKS-validated GitHub Actions OIDC JWT
+  verify (`iss`, `aud`, repo allowlist; fail-closed when misconfigured)
+- `src/lib/secrets.ts` — `complianceOidcEnabled/Audience/RepoAllowlist/Configured`
+- `jose` promoted to direct dependency
+- `tests/compliance-github-oidc.test.ts` — 9 contract tests
 
-## What Changed In P4
+### P2 — Dual-auth verify route
+- `src/app/api/compliance/verify/route.ts` — OIDC first when enabled+configured,
+  constant-time bearer fallback; 503 when neither configured; uniform 401
+- `tests/compliance-verify-route.test.ts` — 10 contract tests (19 with OIDC module)
 
-- Updated `docs/runbooks/compliance-gate-rollout.md` to make OIDC the
-  first-class `POST /api/compliance/verify` auth path.
-- Documented required OIDC env vars:
-  `COMPLIANCE_OIDC_ENABLED=1`,
-  `COMPLIANCE_OIDC_AUDIENCE=plx-mc-compliance-verify`, and
-  `COMPLIANCE_OIDC_REPO_ALLOWLIST=petralabx/PLX_MC`.
-- Documented the dual-auth cutover order: merge dual-auth, deploy MC with OIDC
-  env, dogfood under OIDC, and retire bearer only in a follow-up.
-- Updated `docs/modules/compliance/README.md` to mention
-  `src/lib/compliance/github-oidc.ts` and the dual-auth verify route.
+### P3 — Workflow OIDC + bearer fallback
+- `.github/workflows/compliance-gate.yml` — `id-token: write`, audience
+  `plx-mc-compliance-verify`, `auth=oidc` / `auth=bearer-fallback` logging
+- `scripts/generate-compliance-gate.py` — generator BODY aligned (preflight drift gate)
 
-## Verification Commands
+### P4 — Docs + evidence
+- `docs/runbooks/compliance-gate-rollout.md` — OIDC first-class, cutover, kill switch
+- `docs/modules/compliance/README.md` — OIDC module + dual-auth key files
+- This bundle
 
-```bash
-test -f artifacts/platform/2026-07-09-compliance-oidc-verify/REPORT.md && test -f artifacts/platform/2026-07-09-compliance-oidc-verify/index.md && rg -q 'OIDC' docs/runbooks/compliance-gate-rollout.md
+## Verification (local, exit 0)
+
+```text
+npx vitest run tests/compliance-github-oidc.test.ts tests/compliance-verify-route.test.ts
+→ 19 passed
+
+./scripts/preflight.sh --mode pre-commit
+→ All pre-commit checks passed
+
+./scripts/preflight.sh --mode pre-push
+→ All pre-push checks passed (833 vitest + python suite + next build + e2e)
 ```
-
-Result: exit 0 locally.
-
-```bash
-git diff --check
-```
-
-Result: exit 0 locally.
 
 ## Deploy And Dogfood Evidence
 
-- SC 7 deploy evidence: TODO — deploy MC with OIDC env and attach deployment
-  URL/build evidence here. Do not claim deployment before it exists.
-- SC 8 dogfood evidence: TODO — open a PLX_MC PR under OIDC, capture
-  `auth=oidc` workflow output and verify response evidence here. Do not retire
-  bearer before this passes.
+- SC 7 deploy evidence: **TODO** — after merge, set on Vercel/SM (booleans only):
+  `COMPLIANCE_OIDC_ENABLED=1`, `COMPLIANCE_OIDC_AUDIENCE=plx-mc-compliance-verify`,
+  `COMPLIANCE_OIDC_REPO_ALLOWLIST=petralabx/PLX_MC`; keep `COMPLIANCE_CI_TOKEN`
+  present. Confirm READY on `mc.plxcustomer.io` and record deploy SHA here.
+- SC 8 dogfood evidence: **TODO** — re-run compliance on this PR (or a follow-up
+  sync) after deploy; workflow log must show `auth=oidc` and check PASS.
+  Do not retire bearer before this passes.
 
 ## Rollback Plan
 
-- Set `COMPLIANCE_OIDC_ENABLED=0` on MC to disable OIDC and use bearer-only while
-  `COMPLIANCE_CI_TOKEN` remains configured.
-- Unset `PLX_MC_BASE_URL` in the repo to make the workflow skip the gate.
-- Set `COMPLIANCE_MODE=soft` or remove the required check from branch
-  protection to stop blocking PRs while preserving audit visibility.
+1. Runtime: `COMPLIANCE_OIDC_ENABLED=0` → bearer-only (token still configured).
+2. Per-repo: unset `PLX_MC_BASE_URL` → gate skips (exit 0).
+3. Code: revert this PR (no migrations / schema / secret rotations).
 
 ## Follow-Up
 
-- Bearer is **not retired** in this phase. Keep `COMPLIANCE_CI_TOKEN` through
-  dogfood and remove it only in a follow-up with evidence.
-- Fleet rollout for `agentic-swarm` and `plx-customer-portal` is Phase 2 /
-  follow-up after PLX_MC OIDC dogfood succeeds.
+- Bearer is **not retired** in this PR.
+- Fleet (`agentic-swarm`, `plx-customer-portal`) = Phase 2 after PLX_MC OIDC dogfood.
+- Downstream copies of the gate must be regenerated from
+  `python scripts/generate-compliance-gate.py --emit downstream`.
