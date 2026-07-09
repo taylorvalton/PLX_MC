@@ -76,8 +76,8 @@ integrations:
       vercel.json cron entry) to stop scheduled refreshes entirely.
     auth_source:
       - AWS Cost Explorer — standard AWS credential chain via awsCostExplorerCredentials() (AWS_ACCESS_KEY_ID/AWS_SECRET_ACCESS_KEY, or ambient role with AWS_COST_EXPLORER_USE_AMBIENT=1)
-      - Anthropic Admin API — ANTHROPIC_ADMIN_API_KEY via anthropicAdminApiKey() (admin key, sk-ant-admin01-…)
-      - Cursor Enterprise Admin API — CURSOR_ADMIN_API_KEY via cursorAdminApiKey()
+      - Anthropic Admin API — ANTHROPIC_ADMIN_API_KEY via anthropicAdminApiKey() (admin key, sk-ant-admin01-…; alias ANTHROPIC_ADMIN_KEY)
+      - Cursor Enterprise Admin API — CURSOR_ADMIN_API_KEY via cursorAdminApiKey() (alias CURSOR_ADMIN_KEY)
     health_check: >-
       Every pull writes a vendor_cost_refresh_log row (ok/degraded/error) and
       the UI renders per-vendor source status (API · LIVE / API · DEGRADED /

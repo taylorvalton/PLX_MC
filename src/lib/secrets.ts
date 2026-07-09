@@ -12,6 +12,15 @@ function requireSecret(name: string): string {
   return value;
 }
 
+/** First non-empty env value among `names` (canonical first, then aliases). */
+function firstSecret(...names: string[]): string | undefined {
+  for (const name of names) {
+    const value = process.env[name];
+    if (value) return value;
+  }
+  return undefined;
+}
+
 export function databaseUrl(): string {
   return requireSecret("PLX_MC_DATABASE_URL");
 }
@@ -215,19 +224,34 @@ export function awsCostExplorerCredentials(): AwsCostExplorerCredentials | null 
 
 // Anthropic org cost report needs an ADMIN key (sk-ant-admin01-…); the
 // standard ANTHROPIC_API_KEY cannot read /v1/organizations/cost_report.
+// Canonical env: ANTHROPIC_ADMIN_API_KEY. Alias accepted: ANTHROPIC_ADMIN_KEY
+// (name used in prod/ec2-secrets / staging/ec2-secrets).
 export function anthropicAdminConfigured(): boolean {
-  return !!process.env.ANTHROPIC_ADMIN_API_KEY;
+  return !!firstSecret("ANTHROPIC_ADMIN_API_KEY", "ANTHROPIC_ADMIN_KEY");
 }
 
 export function anthropicAdminApiKey(): string {
-  return requireSecret("ANTHROPIC_ADMIN_API_KEY");
+  const value = firstSecret("ANTHROPIC_ADMIN_API_KEY", "ANTHROPIC_ADMIN_KEY");
+  if (!value) {
+    throw new Error(
+      "missing secret ANTHROPIC_ADMIN_API_KEY (or alias ANTHROPIC_ADMIN_KEY) — run the secrets loader (see TOOLS.md)"
+    );
+  }
+  return value;
 }
 
 // Cursor team spend needs an Enterprise Admin API key (/teams/spend).
+// Canonical env: CURSOR_ADMIN_API_KEY. Alias accepted: CURSOR_ADMIN_KEY.
 export function cursorAdminConfigured(): boolean {
-  return !!process.env.CURSOR_ADMIN_API_KEY;
+  return !!firstSecret("CURSOR_ADMIN_API_KEY", "CURSOR_ADMIN_KEY");
 }
 
 export function cursorAdminApiKey(): string {
-  return requireSecret("CURSOR_ADMIN_API_KEY");
+  const value = firstSecret("CURSOR_ADMIN_API_KEY", "CURSOR_ADMIN_KEY");
+  if (!value) {
+    throw new Error(
+      "missing secret CURSOR_ADMIN_API_KEY (or alias CURSOR_ADMIN_KEY) — run the secrets loader (see TOOLS.md)"
+    );
+  }
+  return value;
 }

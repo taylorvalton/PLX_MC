@@ -52,20 +52,20 @@ See `staging-migrate.txt`.
 | `CRON_SECRET` | yes |
 | AWS STS / Cost Explorer IAM (ambient instance role) | yes (live CE call succeeded) |
 | `AWS_COST_EXPLORER_USE_AMBIENT` in Secrets Manager | no — set `=1` in local smoke env |
-| `ANTHROPIC_ADMIN_API_KEY` (staging + prod/ec2-secrets) | **no** |
-| `CURSOR_ADMIN_API_KEY` (staging + prod/ec2-secrets) | **no** |
-| Standard `ANTHROPIC_API_KEY` | yes (cannot read cost report) |
+| `ANTHROPIC_ADMIN_KEY` in staging+prod/ec2-secrets | **yes** (alias; app also accepts `ANTHROPIC_ADMIN_API_KEY`) |
+| `CURSOR_ADMIN_KEY` in staging+prod/ec2-secrets | **yes** (alias; app also accepts `CURSOR_ADMIN_API_KEY`) |
+| Standard `ANTHROPIC_API_KEY` | yes (cannot read cost report alone) |
 
 ## Live adapter smoke (local Next → staging DB)
 
 Env: Basic gate (OIDC unset for local), `AWS_COST_EXPLORER_USE_AMBIENT=1`,
-admin keys unset.
+admin keys loaded via SM aliases `ANTHROPIC_ADMIN_KEY` / `CURSOR_ADMIN_KEY`.
 
 | Vendor | Outcome | Evidence |
 |---|---|---|
-| **AWS** | **LIVE** — `status: ok`, 9 daily snapshots, MTD spend **49946¢ ($499.46)** | `api/post-refresh-mtd.json`, `api/cron-refresh-mtd.json`, `api/get-index-mtd.json` |
-| **Anthropic** | **DEGRADED** `key_missing` — names `ANTHROPIC_ADMIN_API_KEY` | same |
-| **Cursor** | **DEGRADED** `key_missing` — names `CURSOR_ADMIN_API_KEY` | same |
+| **AWS** | **LIVE** — `status: ok`, 9 daily snapshots, MTD spend **49946¢ ($499.46)** | `api/post-refresh-mtd.json`, `api/post-refresh-with-aliases.json` |
+| **Anthropic** | **LIVE** — `status: ok`, 8 daily snapshots (via `ANTHROPIC_ADMIN_KEY` alias) | `api/post-refresh-with-aliases.json`, `api/get-index-with-aliases.json` |
+| **Cursor** | **DEGRADED** `unauthorized` HTTP 401 — key present (`CURSOR_ADMIN_KEY`) but Admin API rejected it (not Enterprise admin / wrong key type) | same |
 
 Mutations:
 
@@ -76,17 +76,20 @@ Mutations:
   via `screens.tsx` → `AiSpendView`)
 
 No fabricated $0 for automated vendors: degraded rows carry `sourceStatus:
-degraded` + `degradedReason: key_missing` and the refresh log message names
-the missing secret.
+degraded` + reason, and refresh log messages name the failure mode.
 
 ## Operator follow-ups (out of this PR)
 
-1. Add `ANTHROPIC_ADMIN_API_KEY` (`sk-ant-admin01-…`) to Secrets Manager /
-   app env so Anthropic goes LIVE.
-2. Add `CURSOR_ADMIN_API_KEY` (Enterprise Admin) similarly for Cursor.
-3. Set `AWS_COST_EXPLORER_USE_AMBIENT=1` (or explicit AWS keys) on the
+1. Fix `CURSOR_ADMIN_KEY` — current value is rejected with HTTP 401 by
+   `POST https://api.cursor.com/teams/spend`. Needs a Cursor **Enterprise
+   team admin** API key (Basic auth username). Until then Cursor stays
+   DEGRADED (manual snapshots still work).
+2. Set `AWS_COST_EXPLORER_USE_AMBIENT=1` (or explicit AWS keys) on the
    deployed Vercel/runtime env so production refresh uses the ambient role
    path without requiring static keys.
+3. Optional hygiene: rename SM keys to the canonical
+   `ANTHROPIC_ADMIN_API_KEY` / `CURSOR_ADMIN_API_KEY` names (aliases already
+   accepted by `src/lib/secrets.ts`).
 4. Email / Teams alert delivery remains v2 —
    `artifacts/platform/2026-06-30-vendor-spend-alerts-followup/`.
 

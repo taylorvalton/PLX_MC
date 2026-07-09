@@ -29,7 +29,9 @@ const ENV_KEYS = [
   "AWS_SESSION_TOKEN",
   "AWS_COST_EXPLORER_USE_AMBIENT",
   "ANTHROPIC_ADMIN_API_KEY",
+  "ANTHROPIC_ADMIN_KEY",
   "CURSOR_ADMIN_API_KEY",
+  "CURSOR_ADMIN_KEY",
 ];
 const saved: Record<string, string | undefined> = {};
 
@@ -114,6 +116,34 @@ describe("anthropic adapter", () => {
     }
   });
 
+  it("accepts ANTHROPIC_ADMIN_KEY alias when canonical env is unset", async () => {
+    process.env.ANTHROPIC_ADMIN_KEY = "sk-ant-admin01-alias";
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () =>
+        new Response(
+          JSON.stringify({
+            data: [
+              {
+                starting_at: "2026-07-01T00:00:00Z",
+                ending_at: "2026-07-02T00:00:00Z",
+                results: [{ currency: "USD", amount: "1.00" }],
+              },
+            ],
+            has_more: false,
+            next_page: null,
+          }),
+          { status: 200 }
+        )
+      )
+    );
+    const result = await anthropicAdapter.pull(RANGE);
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.observations[0]?.amountCents).toBe(1);
+    }
+  });
+
   it("sums daily cost buckets (amounts are decimal cent strings)", async () => {
     process.env.ANTHROPIC_ADMIN_API_KEY = "sk-ant-admin01-test";
     vi.stubGlobal(
@@ -170,6 +200,29 @@ describe("cursor adapter", () => {
     if (!result.ok) {
       expect(result.reason).toBe("key_missing");
       expect(result.note).toContain("CURSOR_ADMIN_API_KEY");
+    }
+  });
+
+  it("accepts CURSOR_ADMIN_KEY alias when canonical env is unset", async () => {
+    process.env.CURSOR_ADMIN_KEY = "key_alias";
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () =>
+        new Response(
+          JSON.stringify({
+            teamMemberSpend: [{ spendCents: 100, includedSpendCents: 50 }],
+            subscriptionCycleStart: Date.UTC(2026, 6, 1),
+            totalMembers: 1,
+            totalPages: 1,
+          }),
+          { status: 200 }
+        )
+      )
+    );
+    const result = await cursorAdapter.pull(RANGE);
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.observations[0]?.amountCents).toBe(150);
     }
   });
 

@@ -40,8 +40,9 @@ engineering ops and finance the true cost posture at a glance.
    keys, auth failures, and bad payloads return visible degraded results.
    Credentials come only from the shared secrets accessor (`src/lib/secrets.ts`):
    `awsCostExplorerConfigured/awsCostExplorerCredentials`,
-   `anthropicAdminConfigured/anthropicAdminApiKey` (`ANTHROPIC_ADMIN_API_KEY`),
-   `cursorAdminConfigured/cursorAdminApiKey` (`CURSOR_ADMIN_API_KEY`).
+   `anthropicAdminConfigured/anthropicAdminApiKey` (`ANTHROPIC_ADMIN_API_KEY`,
+   alias `ANTHROPIC_ADMIN_KEY`), `cursorAdminConfigured/cursorAdminApiKey`
+   (`CURSOR_ADMIN_API_KEY`, alias `CURSOR_ADMIN_KEY`).
 4. **Loader** — `buildVendorSpendIndex(period)` merges registry + snapshots +
    budgets + refresh audit into overview rows (scariest-first: over → critical
    → warn → degraded), and `buildVendorSpendDetail(vendorId, period)` adds the
