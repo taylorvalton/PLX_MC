@@ -1,0 +1,21 @@
+{
+  "data": {
+    "outcomes": [
+      {
+        "vendorId": "aws",
+        "status": "ok",
+        "snapshotCount": 9
+      },
+      {
+        "vendorId": "anthropic",
+        "status": "ok",
+        "snapshotCount": 8
+      },
+      {
+        "vendorId": "cursor",
+        "status": "ok",
+        "snapshotCount": 1
+      }
+    ]
+  }
+}

@@ -65,7 +65,7 @@ admin keys loaded via SM aliases `ANTHROPIC_ADMIN_KEY` / `CURSOR_ADMIN_KEY`.
 |---|---|---|
 | **AWS** | **LIVE** — `status: ok`, 9 daily snapshots, MTD spend **49946¢ ($499.46)** | `api/post-refresh-mtd.json`, `api/post-refresh-with-aliases.json` |
 | **Anthropic** | **LIVE** — `status: ok`, 8 daily snapshots (via `ANTHROPIC_ADMIN_KEY` alias) | `api/post-refresh-with-aliases.json`, `api/get-index-with-aliases.json` |
-| **Cursor** | **DEGRADED** `unauthorized` HTTP 401 — key present (`CURSOR_ADMIN_KEY`) but Admin API rejected it (not Enterprise admin / wrong key type) | same |
+| **Cursor** | **LIVE** — Team Admin API key (`admin:*`) minted 2026-07-09; 1 cycle snapshot | `api/post-refresh-cursor-team-key.json` |
 
 Mutations:
 
@@ -80,17 +80,15 @@ degraded` + reason, and refresh log messages name the failure mode.
 
 ## Operator follow-ups (out of this PR)
 
-1. Fix `CURSOR_ADMIN_KEY` — current value is rejected with HTTP 401 by
-   `POST https://api.cursor.com/teams/spend`. Needs a Cursor **Enterprise
-   team admin** API key (Basic auth username). Until then Cursor stays
-   DEGRADED (manual snapshots still work).
-2. Set `AWS_COST_EXPLORER_USE_AMBIENT=1` (or explicit AWS keys) on the
+1. Set `AWS_COST_EXPLORER_USE_AMBIENT=1` (or explicit AWS keys) on the
    deployed Vercel/runtime env so production refresh uses the ambient role
-   path without requiring static keys.
-3. Optional hygiene: rename SM keys to the canonical
-   `ANTHROPIC_ADMIN_API_KEY` / `CURSOR_ADMIN_API_KEY` names (aliases already
-   accepted by `src/lib/secrets.ts`).
-4. Email / Teams alert delivery remains v2 —
+   path without requiring static keys. Also ensure deploy env loads
+   `ANTHROPIC_ADMIN_KEY` / `CURSOR_ADMIN_KEY` (or canonical `*_ADMIN_API_KEY`).
+2. Cursor Team Admin key was minted 2026-07-09 (`PLX MC vendor-spend`,
+   scope Admin) and written to `staging/ec2-secrets` + `prod/ec2-secrets`
+   as both `CURSOR_ADMIN_KEY` and `CURSOR_ADMIN_API_KEY`. The prior User
+   API key (`crsr_f40…`) was invalid for `/teams/spend` ("Invalid Team API Key").
+3. Email / Teams alert delivery remains v2 —
    `artifacts/platform/2026-06-30-vendor-spend-alerts-followup/`.
 
 ## Rollback
