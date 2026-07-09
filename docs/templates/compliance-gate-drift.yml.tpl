@@ -1,6 +1,6 @@
 # Compliance gate drift-check (EN-007). plx-mc-compliance.yml in this repo is a
 # generated copy of the PLX MC compliance gate. The single source is
-# scripts/generate-compliance-gate.py in the PUBLIC taylorvalton/PLX_MC repo,
+# scripts/generate-compliance-gate.py in the PUBLIC petralabx/PLX_MC repo,
 # pinned to a commit SHA. This job fetches that generator, emits the downstream
 # variant, and diffs it against the committed gate — failing on drift.
 
@@ -18,7 +18,7 @@ jobs:
   drift:
     runs-on: ubuntu-latest
     env:
-      GEN_REPO: taylorvalton/PLX_MC
+      GEN_REPO: petralabx/PLX_MC
       GEN_SHA: {{GEN_SHA}}
       GEN_PATH: scripts/generate-compliance-gate.py
       GATE_FILE: .github/workflows/plx-mc-compliance.yml

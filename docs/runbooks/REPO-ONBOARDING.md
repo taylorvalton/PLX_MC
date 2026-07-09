@@ -32,7 +32,7 @@ Consumer repos get thin layers only — **never copy the contract**:
 
    | Tier | Meaning | Examples |
    |------|---------|----------|
-   | `hub` | PLX_MC itself | `taylorvalton/PLX_MC` |
+   | `hub` | PLX_MC itself | `petralabx/PLX_MC` |
    | `product_app` | Customer-facing app | `plx-customer-portal` |
    | `product_platform` | Internal platform / swarm | `agentic-swarm` |
    | `skills` | Skill content repos | `petralabx/skills` |

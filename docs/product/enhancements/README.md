@@ -40,7 +40,7 @@ them from the entry. Keep slugs lowercase kebab‑case.
 
 | | |
 |---|---|
-| **Status** | Aligned |
+| **Status** | Done |
 | **Type** | Enhancement |
 | **Area** | Repo registry (`src/lib/mc-data/data.ts`), GitHub App, loop ledgers, MCP/compliance slugs, consumer repos |
 | **Screenshot** | _none (infra / policy)_ |
@@ -48,9 +48,10 @@ them from the entry. Keep slugs lowercase kebab‑case.
 
 **Observed / current behavior**
 
-All MC registry rows defaulted to `owner: taylorvalton`. New brand and inference
-repos should not be created under a personal account; platform repos (`plx-customer-portal`,
-`PLX_MC`, `agentic-swarm`) remain on `taylorvalton` until a scheduled transfer.
+Platform trio transferred to [`petralabx`](https://github.com/petralabx) on 2026-07-09
+(`PLX_MC`, `plx-customer-portal`, `agentic-swarm`). Registries, MCP `MC_REPO`,
+`GEN_REPO`, DB `repos.owner`, and fleet scripts updated. Brand/inference repos
+were already on the PLX org.
 
 **Desired behavior / requirement**
 
@@ -65,13 +66,16 @@ repos should not be created under a personal account; platform repos (`plx-custo
 **Aligned decisions**
 
 - Constants: `REPO_ORG_LEGACY`, `REPO_ORG_PLX`, `ALLOWED_REPO_ORGS`, `DEFAULT_NEW_REPO_ORG`.
-- Seeded owners: platform → legacy; inference + brands → PLX org.
+- Seeded owners: platform → PLX org (post-transfer); inference + brands → PLX org.
 - Runbook: `docs/runbooks/github-org-phased-migration.md`.
 
 **Deferred (honestly)**
 
-- Actual GitHub org provisioning and repo transfers (operator/infra).
-- Removing `REPO_ORG_LEGACY` from `ALLOWED_REPO_ORGS` after migration completes.
+- Org required-workflow rulesets + private-repo branch protection need GitHub Team
+  (API still reports `petralabx` plan `free` as of 2026-07-09).
+- Removing `REPO_ORG_LEGACY` from `ALLOWED_REPO_ORGS` after confirming no remaining
+  legacy consumers.
+- Vercel project reconnect to new GitHub paths (operator).
 
 <!-- ENTRY TEMPLATE — copy this block for each new item
 ### EN‑NNN — <short title>

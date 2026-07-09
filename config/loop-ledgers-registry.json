@@ -3,7 +3,7 @@
   "freshness": { "warn_after_days": 7, "stale_after_days": 30 },
   "repos": [
     {
-      "repo": "taylorvalton/agentic-swarm",
+      "repo": "petralabx/agentic-swarm",
       "display_name": "Agentic Swarm",
       "default_branch": "main",
       "ledger_glob": "docs/vmc/quality-ledger/*.artifacts.json",
@@ -11,7 +11,7 @@
       "evidence_dir": "docs/vmc/quality-ledger/evidence"
     },
     {
-      "repo": "taylorvalton/PLX_MC",
+      "repo": "petralabx/PLX_MC",
       "display_name": "PLX Mission Control",
       "default_branch": "main",
       "ledger_glob": "docs/plx-mc/quality-ledger/*.artifacts.json",
@@ -19,7 +19,7 @@
       "evidence_dir": "docs/plx-mc/quality-ledger/evidence"
     },
     {
-      "repo": "taylorvalton/plx-customer-portal",
+      "repo": "petralabx/plx-customer-portal",
       "display_name": "PLX Customer Portal",
       "default_branch": "staging",
       "ledger_glob": "docs/portal/quality-ledger/*.artifacts.json",

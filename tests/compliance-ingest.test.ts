@@ -35,7 +35,7 @@ beforeEach(() => {
 function prPayload(over: Record<string, unknown> = {}, prOver: Record<string, unknown> = {}) {
   return {
     action: "opened",
-    repository: { name: "PLX_MC", full_name: "taylorvalton/PLX_MC" },
+    repository: { name: "PLX_MC", full_name: "petralabx/PLX_MC" },
     pull_request: {
       number: 42,
       merged: false,

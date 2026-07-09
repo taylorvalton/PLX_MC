@@ -126,9 +126,9 @@ export const REPO_ORG = REPO_ORG_LEGACY;
 export const ALLOWED_REPO_ORGS = [REPO_ORG_LEGACY, REPO_ORG_PLX] as const;
 
 export const REPOS: Record<string, Repo> = {
-  "portal-web": { id: "portal-web", name: "plx-customer-portal", lang: "TypeScript · Next.js", def: "staging", owner: REPO_ORG_LEGACY, visibility: "private", scope: "Customer portal web application — the go-live codebase." },
-  "agentic-swarm": { id: "agentic-swarm", name: "agentic-swarm", lang: "TypeScript", def: "main", owner: REPO_ORG_LEGACY, visibility: "private", scope: "Background agent swarm that does the work." },
-  "plx-mc": { id: "plx-mc", name: "PLX_MC", lang: "TypeScript", def: "main", owner: REPO_ORG_LEGACY, visibility: "public", scope: "Mission Control — the human cockpit over the agents." },
+  "portal-web": { id: "portal-web", name: "plx-customer-portal", lang: "TypeScript · Next.js", def: "staging", owner: REPO_ORG_PLX, visibility: "private", scope: "Customer portal web application — the go-live codebase." },
+  "agentic-swarm": { id: "agentic-swarm", name: "agentic-swarm", lang: "TypeScript", def: "main", owner: REPO_ORG_PLX, visibility: "private", scope: "Background agent swarm that does the work." },
+  "plx-mc": { id: "plx-mc", name: "PLX_MC", lang: "TypeScript", def: "main", owner: REPO_ORG_PLX, visibility: "public", scope: "Mission Control — the human cockpit over the agents." },
   "local-inference": { id: "local-inference", name: "local-inference", lang: "—", def: "main", owner: REPO_ORG_PLX, visibility: "private", scope: "Local LLM inference runtime and tooling." },
   "for-and-against": { id: "for-and-against", name: "for-and-against", lang: "—", def: "main", owner: REPO_ORG_PLX, visibility: "private", scope: "For & Against consumer brand — marketing site, design system, and brand assets (PLX-structure, own tokens)." },
   "furgenics": { id: "furgenics", name: "furgenics", lang: "—", def: "main", owner: REPO_ORG_PLX, visibility: "private", scope: "Furgenics consumer brand — marketing site, design system, and brand assets (PLX-structure, own tokens)." },

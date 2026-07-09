@@ -2,22 +2,22 @@
   "schema_version": "plx-tracked-repos/v1",
   "description": "Repos that must follow PLX_MC governance (config/governance-contract.yaml + COLLABORATOR-SOP). MC visibility is optional per tier.",
   "governance_contract": {
-    "repo": "taylorvalton/PLX_MC",
+    "repo": "petralabx/PLX_MC",
     "path": "config/governance-contract.yaml",
     "surfaces_generator": "scripts/generate-governance-surfaces.py",
     "compliance_gate_generator": "scripts/generate-compliance-gate.py"
   },
   "collaborator_sop": {
-    "repo": "taylorvalton/PLX_MC",
+    "repo": "petralabx/PLX_MC",
     "path": "docs/COLLABORATOR-SOP.md"
   },
   "onboarding_runbook": "docs/runbooks/REPO-ONBOARDING.md",
   "scaffold_script": "scripts/scaffold-tracked-repo.sh",
   "repos": [
     {
-      "repo": "taylorvalton/PLX_MC",
+      "repo": "petralabx/PLX_MC",
       "display_name": "PLX Mission Control",
-      "org": "taylorvalton",
+      "org": "petralabx",
       "tier": "hub",
       "integration_branch": "main",
       "release_branch": null,
@@ -32,9 +32,9 @@
       "contributing_path": "docs/COLLABORATOR-SOP.md"
     },
     {
-      "repo": "taylorvalton/plx-customer-portal",
+      "repo": "petralabx/plx-customer-portal",
       "display_name": "PLX Customer Portal",
-      "org": "taylorvalton",
+      "org": "petralabx",
       "tier": "product_app",
       "integration_branch": "staging",
       "release_branch": "master",
@@ -49,9 +49,9 @@
       "contributing_path": "docs/runbooks/CONTRIBUTING.md"
     },
     {
-      "repo": "taylorvalton/agentic-swarm",
+      "repo": "petralabx/agentic-swarm",
       "display_name": "Agentic Swarm",
-      "org": "taylorvalton",
+      "org": "petralabx",
       "tier": "product_platform",
       "integration_branch": "main",
       "release_branch": null,

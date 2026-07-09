@@ -19,7 +19,7 @@ servers["PLX-MC"] = {
         "MC_BASE_URL": "https://mc.plxcustomer.io",
         "MC_MCP_API_KEY": "${env:MC_MCP_API_KEY}",
         "MC_OPERATOR_EMAIL": "${env:MC_OPERATOR_EMAIL}",
-        "MC_REPO": "taylorvalton/PLX_MC",
+        "MC_REPO": "petralabx/PLX_MC",
         "MC_RUNTIME": "cursor",
         "PLX_MC_MCP_ENABLED": "0",
         "SWARM_API_URL": "http://127.0.0.1:8900",

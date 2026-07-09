@@ -1,7 +1,7 @@
 {
   "name": "plx-mission-control",
-  "repositoryDependencies": ["github.com/taylorvalton/agentic-swarm"],
-  "install": "(command -v apt-get >/dev/null && sudo apt-get update && sudo apt-get install -y python3-venv python3-dev build-essential libpq-dev || true) && (if [ -d .swarm/.git ]; then git -C .swarm pull --ff-only || true; else git clone --depth=1 https://github.com/taylorvalton/agentic-swarm.git .swarm; fi) && python3 -m venv .swarm/.venv && .swarm/.venv/bin/pip install --upgrade pip && .swarm/.venv/bin/pip install -e ./.swarm && npm ci && python3 -m venv .venv && .venv/bin/pip install -r requirements.txt",
+  "repositoryDependencies": ["github.com/petralabx/agentic-swarm"],
+  "install": "(command -v apt-get >/dev/null && sudo apt-get update && sudo apt-get install -y python3-venv python3-dev build-essential libpq-dev || true) && (if [ -d .swarm/.git ]; then git -C .swarm pull --ff-only || true; else git clone --depth=1 https://github.com/petralabx/agentic-swarm.git .swarm; fi) && python3 -m venv .swarm/.venv && .swarm/.venv/bin/pip install --upgrade pip && .swarm/.venv/bin/pip install -e ./.swarm && npm ci && python3 -m venv .venv && .venv/bin/pip install -r requirements.txt",
   "terminals": [
     {
       "name": "swarm",

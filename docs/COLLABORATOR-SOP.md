@@ -30,9 +30,9 @@ The authoritative fleet list is `config/tracked-repos-registry.json`. Snapshot:
 
 | Repo | Tier | Gate | Status |
 |---|---|---|---|
-| `taylorvalton/PLX_MC` | hub | hard | active |
-| `taylorvalton/plx-customer-portal` | product_app | hard | active |
-| `taylorvalton/agentic-swarm` | product_platform | hard | active |
+| `petralabx/PLX_MC` | hub | hard | active |
+| `petralabx/plx-customer-portal` | product_app | hard | active |
+| `petralabx/agentic-swarm` | product_platform | hard | active |
 | `petralabx/skills` | skills | hard | active |
 | `petralabx/local-inference` | tooling | hard | active |
 | `petralabx/1hr-after` | tooling | hard | active |
@@ -236,7 +236,7 @@ Follow `docs/runbooks/plx-mc-mcp-team-registration.md`:
 - Register `https://mc.plxcustomer.io/api/cursor/mcp` (remote) or the stdio client
   under `tools/plx-mc-mcp/`.
 - Set `MC_REPO` to the repo you are working in (e.g. `taylorvalton/PLX_MC` or
-  `taylorvalton/plx-customer-portal`).
+  `petralabx/plx-customer-portal`).
 - Verify with tool `mc_self_check`.
 
 ### 9.3 Sharing a personal skill
