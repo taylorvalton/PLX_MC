@@ -38,6 +38,8 @@ validation and loop-ledgers will succeed for new repos.
 
 ## Follow-up: migrate legacy platform repos (EN-008)
 
+**Status (2026-07-09):** Platform trio transferred to `petralabx` (`PLX_MC`, `plx-customer-portal`, `agentic-swarm`). Registry/MCP/GEN_REPO updates land in the leftovers PR. Org required-workflow rulesets still need GitHub Team (API currently reports plan `free`).
+
 When the [`petralabx`](https://github.com/petralabx) org is ready and the operator schedules migration:
 
 ### Per-repo checklist

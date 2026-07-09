@@ -160,3 +160,18 @@ Production build records events but leaves tasks at `planned`.
 
 If merges land before deploy, operator replay: call `projectPullRequest` for the stored
 PR events against the production DB, then `runSweep` (or wait for the 5-min cron).
+
+## Step 9 — Org required-workflow ruleset (anti-tamper)
+
+After the hub lives at `petralabx/PLX_MC` (EN-008), pin the compliance gate so PRs
+cannot skip it by editing the PR-head workflow copy:
+
+```bash
+unset GITHUB_TOKEN
+./scripts/provision-org-ruleset-required-workflows.sh --dry-run
+./scripts/provision-org-ruleset-required-workflows.sh
+```
+
+Requires **GitHub Team** (or higher) on `petralabx`. On Free the API returns 403 —
+keep per-repo branch protection (`scripts/provision-fleet-branch-protection.sh`) as
+the substitute until Team is active. Evidence: `artifacts/compliance/<date>-org-ruleset/`.

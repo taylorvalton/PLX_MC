@@ -8,7 +8,7 @@
 #   unset GITHUB_TOKEN
 #   ./scripts/provision-fleet-compliance-hard.sh
 #   ./scripts/provision-fleet-compliance-hard.sh --dry-run
-#   ./scripts/provision-fleet-compliance-hard.sh --repo taylorvalton/PLX_MC
+#   ./scripts/provision-fleet-compliance-hard.sh --repo petralabx/PLX_MC
 
 set -euo pipefail
 
@@ -31,9 +31,9 @@ done
 
 # Active fleet — must match config/tracked-repos-registry.json (compliance_mode: hard).
 REPOS=(
-  taylorvalton/PLX_MC
-  taylorvalton/plx-customer-portal
-  taylorvalton/agentic-swarm
+  petralabx/PLX_MC
+  petralabx/plx-customer-portal
+  petralabx/agentic-swarm
   petralabx/skills
   petralabx/local-inference
   petralabx/1hr-after

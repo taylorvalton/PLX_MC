@@ -12,7 +12,9 @@
 - `POST {MC}/api/compliance/verify` and webhook return `401` without auth (not `503`).
 - Repo secrets present on every target: `PLX_MC_BASE_URL`, `COMPLIANCE_CI_TOKEN`.
 - Branch protection requires `compliance` (+ `drift` where applicable) — see
-  `scripts/provision-fleet-branch-protection.sh`.
+  `scripts/provision-fleet-branch-protection.sh`. After EN-008, also run
+  `scripts/provision-org-ruleset-required-workflows.sh` once `petralabx` is on
+  GitHub Team (required-workflow pin to `petralabx/PLX_MC@main`).
 - Acceptance tests green: `npm run test -- --run tests/compliance-projection.test.ts
   tests/compliance-multitask.test.ts tests/sync-projection.test.ts`.
 
@@ -22,9 +24,9 @@ Authoritative list: `config/tracked-repos-registry.json` (`compliance_mode: hard
 
 | Repo | Protected branch |
 |------|------------------|
-| `taylorvalton/PLX_MC` | `main` |
-| `taylorvalton/plx-customer-portal` | `staging` |
-| `taylorvalton/agentic-swarm` | `main` |
+| `petralabx/PLX_MC` | `main` |
+| `petralabx/plx-customer-portal` | `staging` |
+| `petralabx/agentic-swarm` | `main` |
 | `petralabx/skills` | `main` |
 | `petralabx/local-inference` | `main` |
 | `petralabx/1hr-after` | `main` |
@@ -48,7 +50,7 @@ The workflow reads it via `vars.COMPLIANCE_MODE` (see `.github/workflows/complia
 Verify:
 
 ```bash
-for r in taylorvalton/PLX_MC taylorvalton/plx-customer-portal taylorvalton/agentic-swarm \
+for r in petralabx/PLX_MC petralabx/plx-customer-portal petralabx/agentic-swarm \
   petralabx/skills petralabx/local-inference petralabx/1hr-after petralabx/furgenics \
   petralabx/for-and-against; do
   echo -n "$r: "

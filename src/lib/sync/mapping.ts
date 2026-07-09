@@ -8,7 +8,8 @@
 // numeric id of the user in the site User Information List — so this pure layer
 // emits a PRE-RESOLVED id passed in `opts.persons`; the engine (graph.ts) does
 // the email→lookupId resolution + caching and the honest fail-visible miss path.
-// The Initiative lookup column stays deferred (no lookup-id resolution yet).
+// Initiative on ToDos is two-way via `InitiativeLookupId` (pre-resolved in
+// `opts.initiativeLookupId` the same way persons are).
 //
 // §5.2: the Risk Register's Likelihood column stores High/Med/Low BY DESIGN;
 // this layer normalizes MC's "Medium" → "Med" outbound and back inbound —
@@ -18,13 +19,14 @@ import { ACTORS, HUMANS, PRIORITY, STAGES } from "@/lib/mc-data/data";
 import { evidenceComplete } from "@/lib/mc-data/helpers";
 import type { Bucket, Project, Repo, Risk, StageKey, Subtask, Task } from "@/lib/mc-data/types";
 
-export type EntityType = "task" | "risk" | "file";
+export type EntityType = "task" | "risk" | "file" | "bucket";
 export type EntityData = Record<string, unknown>;
 
 export const LIST_KEY_FOR: Record<EntityType, string> = {
   task: "todos",
   risk: "risks",
   file: "documents",
+  bucket: "roadmap",
 };
 
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
@@ -131,7 +133,13 @@ export function serializeSubtasks(subtasks: Subtask[] | undefined): string {
 export function outboundFields(
   type: EntityType,
   data: EntityData,
-  opts: { creating?: boolean; only?: string[]; persons?: Partial<Record<TaskPersonMc, number | null>> } = {}
+  opts: {
+    creating?: boolean;
+    only?: string[];
+    persons?: Partial<Record<TaskPersonMc, number | null>>;
+    /** Pre-resolved Roadmap item id for the Initiative lookup (null clears). */
+    initiativeLookupId?: number | null;
+  } = {}
 ): Record<string, unknown> {
   const include = (mcField: string) => !opts.only || opts.only.includes(mcField);
   const out: Record<string, unknown> = {};
@@ -162,6 +170,11 @@ export function outboundFields(
         const lookupId = opts.persons[mc];
         if (lookupId !== undefined) out[`${sp}LookupId`] = lookupId;
       }
+    }
+    // Initiative lookup: emit only when the engine supplied a resolved id (or
+    // null to clear). Absent means "leave untouched" (bucket not yet mirrored).
+    if (include("bucket") && opts.initiativeLookupId !== undefined) {
+      out.InitiativeLookupId = opts.initiativeLookupId;
     }
     return out;
   }
@@ -249,16 +262,49 @@ export function bucketOutboundFields(
   if (opts.creating) out.InitiativeID = bucket.id;
   if (opts.ownerLookupId) out.OwnerLookupId = opts.ownerLookupId;
   if (opts.projectLookupId) out.ProjectLookupId = opts.projectLookupId;
+  if (typeof bucket.progress === "number") out.PercentComplete = bucket.progress;
   return out;
+}
+
+const SP_TO_HEALTH: Record<string, Bucket["health"]> = {
+  "On track": "track",
+  "At risk": "risk",
+  "Off track": "off",
+};
+
+// Roadmap inbound (Gantt minimum): Title/Health/Start/Target → Bucket patches.
+// Owner/Project/PRD stay push-only for this increment.
+export function inboundBucketPatches(spFields: Record<string, unknown>): Partial<Bucket> {
+  const patches: Partial<Bucket> = {};
+  if (typeof spFields.Title === "string" && spFields.Title.trim()) patches.name = spFields.Title;
+  if (typeof spFields.Health === "string") {
+    const health = SP_TO_HEALTH[spFields.Health];
+    if (health) patches.health = health;
+  }
+  if (typeof spFields.StartDate === "string") {
+    const started = isoToDue(spFields.StartDate);
+    if (started) patches.started = started;
+  }
+  if (typeof spFields.TargetDate === "string") {
+    const target = isoToDue(spFields.TargetDate);
+    if (target) patches.target = target;
+  }
+  if (typeof spFields.PercentComplete === "number" && Number.isFinite(spFields.PercentComplete)) {
+    patches.progress = spFields.PercentComplete;
+  }
+  return patches;
 }
 
 // ─── Inbound (pull + two-way columns) ────────────────────────────────────────
 
 // Maps SharePoint fields → MC entity patches. Unknown/unparseable values are
 // skipped (never guess); push-only columns are never applied inbound.
+// InitiativeLookupId is resolved by the engine (sp_item_id → bucket id) before
+// reconcile — pass the resolved bucket id via `opts.bucket` when known.
 export function inboundPatches(
   type: EntityType,
-  spFields: Record<string, unknown>
+  spFields: Record<string, unknown>,
+  opts: { bucket?: string | null } = {}
 ): EntityData {
   const patches: EntityData = {};
 
@@ -277,6 +323,7 @@ export function inboundPatches(
       if (due) patches.due = due;
     }
     if (typeof spFields.Description === "string") patches.description = spFields.Description;
+    if (opts.bucket !== undefined) patches.bucket = opts.bucket;
     return patches;
   }
 
@@ -313,6 +360,7 @@ const FIELD_DISPLAY: Record<EntityType, Record<string, string>> = {
     assignee: "Assigned To",
     accountableOwner: "Accountable Owner",
     reporter: "Reporter",
+    bucket: "Initiative",
     reqs: "PRD Requirements",
     estimate: "Estimate",
     repos: "Repos",
@@ -322,6 +370,13 @@ const FIELD_DISPLAY: Record<EntityType, Record<string, string>> = {
   },
   risk: { title: "Title", like: "Likelihood", impact: "Impact", status: "Status", mit: "Mitigation" },
   file: { name: "Name", docType: "Document Type", modified: "Modified" },
+  bucket: {
+    name: "Title",
+    health: "Health",
+    started: "Start Date",
+    target: "Target Date",
+    progress: "% Complete",
+  },
 };
 
 export function displayFieldFor(type: EntityType, mcField: string): string | undefined {
@@ -357,6 +412,10 @@ export function parseFieldValue(type: EntityType, mcField: string, raw: string):
       }
       case "due":
         return /^[A-Z][a-z]{2}\s+\d{1,2}$/.test(raw) ? raw : (isoToDue(raw) ?? undefined);
+      case "bucket":
+        // Engine resolves InitiativeLookupId → BKT-* before conflict rows are
+        // written, so keep-SP receives a bucket id — accept BKT- prefixed ids.
+        return /^BKT-[A-Z0-9-]+$/.test(raw) ? raw : undefined;
       default:
         return undefined;
     }

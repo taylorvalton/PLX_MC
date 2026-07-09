@@ -1,10 +1,12 @@
 #!/usr/bin/env bash
 # Apply branch protection (required compliance + drift checks) on petralabx fleet repos.
-# Works on the free org plan — no GitHub Team / org rulesets required.
+# Prefer also running scripts/provision-org-ruleset-required-workflows.sh once the
+# org is on GitHub Team (required-workflow pin against petralabx/PLX_MC@main).
 #
 # Prerequisites:
 #   - gh CLI authenticated with a token that has **Administration: Read and write**
 #     on the target repos (fine-grained PAT) OR a classic PAT with full `repo` scope.
+#   - Private repos need GitHub Team/Pro for branch protection API (403 on Free).
 #   - If the org uses SAML SSO, authorize the token for petralabx first.
 #
 # Usage:
@@ -23,7 +25,7 @@ while [[ $# -gt 0 ]]; do
     --dry-run) DRY_RUN=1; shift ;;
     --repo) ONLY_REPO="$2"; shift 2 ;;
     -h|--help)
-      sed -n '2,12p' "$0"
+      sed -n '2,16p' "$0"
       exit 0
       ;;
     *) echo "unknown arg: $1" >&2; exit 1 ;;
@@ -31,6 +33,9 @@ while [[ $# -gt 0 ]]; do
 done
 
 REPOS=(
+  petralabx/PLX_MC
+  petralabx/plx-customer-portal
+  petralabx/agentic-swarm
   petralabx/skills
   petralabx/local-inference
   petralabx/1hr-after

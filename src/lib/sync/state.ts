@@ -212,12 +212,18 @@ export interface PatchBucketInput {
   repos?: string[];
   prd?: string | null;
   project?: string | null;
+  progress?: number;
 }
+
+// Gantt / Roadmap fields that participate in inbound conflict detection.
+const BUCKET_PUSHED_FIELDS = ["name", "health", "started", "target", "progress"];
 
 export async function patchBucket(id: string, patch: PatchBucketInput, actor: string): Promise<Bucket | null> {
   await ensureBucketsSeeded();
-  const existing = (await repo.getBuckets()).find((b) => b.id === id);
-  if (!existing) return null;
+  const rows = await repo.getBucketRows();
+  const existingRow = rows.find((r) => r.bucket.id === id);
+  if (!existingRow) return null;
+  const existing = existingRow.bucket;
   if (patch.repos) {
     await ensureReposSeeded();
     const registry = await repo.getRepos();
@@ -228,8 +234,11 @@ export async function patchBucket(id: string, patch: PatchBucketInput, actor: st
     }
   }
   if (patch.project) await assertProjectExists(patch.project);
-  const next: Bucket = { ...existing, ...definedEntries(patch) };
-  await repo.upsertBucket(next);
+  const defined = definedEntries(patch);
+  const next: Bucket = { ...existing, ...defined };
+  const pushedDirty = Object.keys(defined).filter((k) => BUCKET_PUSHED_FIELDS.includes(k));
+  const dirty = Array.from(new Set([...existingRow.dirtyFields, ...pushedDirty]));
+  await repo.upsertBucket(next, dirty);
   await repo.appendAudit(actor, `Edited initiative ${id} — pending Roadmap mirror.`, "pending");
   return next;
 }
@@ -408,7 +417,7 @@ export interface PatchTaskInput {
   priority?: Task["priority"];
   due?: string;
   description?: string;
-  bucket?: string; // DB-only (see §4)
+  bucket?: string; // Initiative lookup — pushed when Roadmap item is mirrored
   labels?: string[]; // DB-only
   coassignees?: string[]; // DB-only
   subtasks?: Task["subtasks"]; // DB-only (Subtask[], enriched in WS-3)
@@ -432,11 +441,12 @@ export interface PatchTaskOptions {
 //   SP  (pushed): title, stage, priority, due, description; the person columns
 //       assignee/accountableOwner/reporter (Item 1 — resolved to site-user lookup
 //       ids on the sweep); subtasks (Item 3 — push-only serialized mirror);
-//       repos and targetEnv (push-only targeting fields). A patch touching any
-//       of these re-queues the entity for push.
-//   DB  (jsonb-only, NOT pushed): bucket, labels, coassignees, comments, humanOnly.
-//       bucket/labels promote to SP once the Initiative lookup + a Labels column
-//       exist; comments stay app-only (EN-001 decision).
+//       repos and targetEnv (push-only targeting fields); bucket (Initiative
+//       lookup → Roadmap item id). A patch touching any of these re-queues the
+//       entity for push.
+//   DB  (jsonb-only, NOT pushed): labels, coassignees, comments, humanOnly.
+//       labels promote to SP once a Labels column exists; comments stay app-only
+//       (EN-001 decision).
 const PUSHED_FIELDS = [
   "title",
   "stage",
@@ -449,6 +459,7 @@ const PUSHED_FIELDS = [
   "subtasks",
   "repos",
   "targetEnv",
+  "bucket",
 ];
 
 export async function patchTask(

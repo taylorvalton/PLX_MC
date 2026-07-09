@@ -42,3 +42,6 @@ Thumbs.db
 # Vendored agentic-swarm checkout (cloned by .cursor/environment.json for swarm delegation)
 .swarm/
 .env*
+
+# Session-brain offline queue (fail-open local capture; not evidence bundles)
+artifacts/session-brain/

@@ -32,20 +32,20 @@ describe("mcp auth", () => {
       req({
         "x-api-key": "test-mcp-key",
         "x-mc-operator-email": "vince@petrasoap.com",
-        "x-mc-repo": "taylorvalton/PLX_MC",
+        "x-mc-repo": "petralabx/PLX_MC",
         "x-mc-runtime": "cursor",
         "x-mc-worker-id": "w1",
       })
     );
     expect(identity.operatorEmail).toBe("vince@petrasoap.com");
-    expect(identity.repo).toBe("taylorvalton/PLX_MC");
+    expect(identity.repo).toBe("petralabx/PLX_MC");
   });
 
   it("rejects missing operator email", () => {
     expect(() =>
       parseIdentity(
         req({
-          "x-mc-repo": "taylorvalton/PLX_MC",
+          "x-mc-repo": "petralabx/PLX_MC",
         })
       )
     ).toThrow(ApiError);
@@ -57,7 +57,7 @@ describe("mcp auth", () => {
         req({
           "x-api-key": "wrong",
           "x-mc-operator-email": "vince@petrasoap.com",
-          "x-mc-repo": "taylorvalton/PLX_MC",
+          "x-mc-repo": "petralabx/PLX_MC",
         })
       )
     ).toThrow(ApiError);
@@ -68,7 +68,7 @@ describe("mcp auth", () => {
       parseIdentity(
         req({
           "x-mc-operator-email": "outsider@example.com",
-          "x-mc-repo": "taylorvalton/PLX_MC",
+          "x-mc-repo": "petralabx/PLX_MC",
         })
       )
     ).toThrow(ApiError);
@@ -86,7 +86,7 @@ describe("mcp envelope", () => {
       operatorEmail: "vince@petrasoap.com",
       runtime: "cursor",
       workerId: "w1",
-      repo: "taylorvalton/PLX_MC",
+      repo: "petralabx/PLX_MC",
     });
     expect(meta.requestId).toMatch(/^[0-9a-f-]{36}$/i);
     expect(meta.actor.operatorEmail).toBe("vince@petrasoap.com");

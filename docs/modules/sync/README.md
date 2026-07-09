@@ -87,16 +87,15 @@ tenant against the committed schema with exit codes.
   attached repos are clamped to the persisted registry. The store exposes
   `allBuckets()` / `bucketById()` as the single source of truth (every consumer
   migrated off the fixture) plus optimistic create/edit
-  (reconcile-on-success / rollback+notice-on-failure). The buckets ↔ Roadmap
-  SharePoint mirror is DEFERRED (the engine does not mirror the Roadmap list
-  yet) — buckets are app-persistent for now, exactly as the repo registry
-  shipped DB-first; `sync_state` / `sp_item_id` columns are carried for that
-  future increment.
-- Still deferred to the public-deploy increment: Graph change webhooks,
-  notification DELIVERY (Teams/email — assignment/mention still in-app + audit
-  only), lookup columns (Initiative), the buckets ↔ Roadmap list two-way mirror,
-  and Project Documents (driveItem) sync — file entities are display fixtures
-  until then.
+  (reconcile-on-success / rollback+notice-on-failure). Buckets ↔ Roadmap:
+  outbound push is live (`pushBucketRoadmap`); inbound Gantt fields
+  (name/health/started/target/progress) pull via `pullRoadmap`. ToDos Initiative
+  lookup is two-way (`InitiativeLookupId` ↔ `task.bucket`) once the Roadmap item
+  has an `sp_item_id`.
+- Still deferred to a later increment: Graph change webhooks, notification
+  DELIVERY (Teams/email — assignment/mention still in-app + audit only), Labels
+  column on ToDos, and Project Documents (driveItem) sync — file entities are
+  display fixtures until then.
 
 ## Dependencies
 

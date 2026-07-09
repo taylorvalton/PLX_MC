@@ -642,23 +642,23 @@ describe("config/loop-ledgers-registry.json — seeded registry", () => {
     const result = parseRegistryJson(raw);
     if (!result.ok) throw new Error(result.error);
     const slugs = result.config.repos.map((r) => r.repo);
-    expect(slugs).toContain("taylorvalton/agentic-swarm");
+    expect(slugs).toContain("petralabx/agentic-swarm");
     // The PLX_MC repo slug uses an underscore; the hyphenated "plx-mc" 404s on
     // the GitHub API (hyphen != underscore), so the row would be permanently
     // not_found instead of resolving. Guard against reverting to the hyphen.
-    expect(slugs).toContain("taylorvalton/PLX_MC");
+    expect(slugs).toContain("petralabx/PLX_MC");
     expect(slugs).not.toContain("taylorvalton/plx-mc");
-    expect(slugs).toContain("taylorvalton/plx-customer-portal");
+    expect(slugs).toContain("petralabx/plx-customer-portal");
   });
 
   it("uses the correct default branches", () => {
     const result = parseRegistryJson(raw);
     if (!result.ok) throw new Error(result.error);
     const byRepo = Object.fromEntries(result.config.repos.map((r) => [r.repo, r]));
-    expect(byRepo["taylorvalton/agentic-swarm"]?.default_branch).toBe("main");
-    expect(byRepo["taylorvalton/PLX_MC"]?.default_branch).toBe("main");
+    expect(byRepo["petralabx/agentic-swarm"]?.default_branch).toBe("main");
+    expect(byRepo["petralabx/PLX_MC"]?.default_branch).toBe("main");
     // Portal ships on staging; loop-ledger reads resolve there (branch-truth P1).
-    expect(byRepo["taylorvalton/plx-customer-portal"]?.default_branch).toBe("staging");
+    expect(byRepo["petralabx/plx-customer-portal"]?.default_branch).toBe("staging");
   });
 
   it("has correct top-level freshness defaults", () => {
