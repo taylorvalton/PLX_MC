@@ -84,3 +84,10 @@ npx vitest run tests/compliance-github-oidc.test.ts tests/compliance-verify-rout
 - Fleet (`agentic-swarm`, `plx-customer-portal`) = Phase 2 after PLX_MC OIDC dogfood.
 - Downstream copies of the gate must be regenerated from
   `python scripts/generate-compliance-gate.py --emit downstream`.
+
+## Deploy / OIDC enable (2026-07-09)
+
+- Merge: https://github.com/petralabx/PLX_MC/pull/112 (`f57b02fd`)
+- Production deploy: `dpl_52pkPJFHcRoNy1ZeSZkW4KHC1VZ4` READY → `mc.plxcustomer.io`
+- Env (booleans/config only): `COMPLIANCE_OIDC_ENABLED=1`, audience + allowlist set, `COMPLIANCE_CI_TOKEN` still present
+- Live probes: missing/bad auth → 401; valid bearer → 200 pass
