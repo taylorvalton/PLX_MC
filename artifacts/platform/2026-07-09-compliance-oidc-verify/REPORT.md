@@ -53,6 +53,15 @@ npx vitest run tests/compliance-github-oidc.test.ts tests/compliance-verify-rout
 → All pre-push checks passed (833 vitest + python suite + next build + e2e)
 ```
 
+
+## PR / CI (2026-07-09)
+
+- PR: https://github.com/petralabx/PLX_MC/pull/112
+- Head: `ba4fe9b`
+- CI Preflight + full suite: **success** (run 29021273285)
+- Compliance gate: **PASS** with `auth=bearer-fallback` (run 29021273058) — expected until OIDC enabled post-deploy
+- Vercel pre-staged: `COMPLIANCE_OIDC_AUDIENCE`, `COMPLIANCE_OIDC_REPO_ALLOWLIST`; `COMPLIANCE_OIDC_ENABLED` still unset; `COMPLIANCE_CI_TOKEN` present
+
 ## Deploy And Dogfood Evidence
 
 - SC 7 deploy evidence: **TODO** — after merge, set on Vercel/SM (booleans only):
