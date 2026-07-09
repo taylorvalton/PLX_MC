@@ -26,6 +26,14 @@ vi.mock("@/lib/sync/repo", () => ({
   async getBuckets() {
     return store.buckets;
   },
+  async getBucketRows() {
+    return store.buckets.map((bucket) => ({
+      bucket,
+      syncState: bucket.sync?.state ?? "pending",
+      spItemId: null as string | null,
+      dirtyFields: [] as string[],
+    }));
+  },
   async getProjects() {
     return [];
   },

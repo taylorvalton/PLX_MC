@@ -32,9 +32,10 @@ vi.mock("@/lib/sync/graph", () => {
 
 vi.mock("@/lib/sync/mapping", () => ({
   outboundFields: () => ({ Title: "x" }),
+  inboundBucketPatches: () => ({}),
+  inboundPatches: () => ({}),
   displayFieldFor: (_t: string, f: string) => f,
   displayValue: (v: unknown) => String(v ?? "—"),
-  inboundPatches: () => ({}),
   mcFieldFor: (_t: string, f: string) => f,
   parseFieldValue: () => undefined,
   reconcileInbound: () => ({ apply: {}, conflicts: [] }),
@@ -72,6 +73,9 @@ vi.mock("@/lib/sync/repo", () => ({
   getRepos: async () => [],
   getProjectRows: async () => [],
   getBucketRows: async () => [],
+  getBucketBySpItemId: async () => null,
+  seedBuckets: async () => {},
+  seedProjects: async () => {},
 }));
 
 // Imported AFTER the mocks so engine's repo/graph/mapping imports resolve to them.

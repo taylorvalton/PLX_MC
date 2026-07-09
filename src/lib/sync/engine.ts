@@ -6,11 +6,12 @@
 //
 // Scope of this increment: ToDos + Risk Register lists, including the ToDos
 // person columns (Assigned To ↔, Accountable Owner →, Reporter →) resolved to
-// site-user lookup ids. Documents (driveItem content) and the Initiative lookup
-// column land with a later increment (see docs/modules/sync/README.md).
+// site-user lookup ids, the Initiative lookup on ToDos (two-way via Roadmap
+// item ids), and Roadmap Gantt inbound (name/health/started/target). Documents
+// (driveItem content) remain deferred (see docs/modules/sync/README.md).
 
 import { ACTORS, BUCKETS, FILES, HUMANS, PROJECTS, REPOS, RISKS, SP_CONFLICTS, SP_ERRORS, TASKS } from "@/lib/mc-data/data";
-import type { SyncState, Task } from "@/lib/mc-data/types";
+import type { Bucket, SyncState, Task } from "@/lib/mc-data/types";
 import {
   createListItem,
   findItemByField,
@@ -30,6 +31,7 @@ import {
   bucketOutboundFields,
   displayFieldFor,
   displayValue,
+  inboundBucketPatches,
   inboundPatches,
   mcFieldFor,
   outboundFields,
@@ -82,6 +84,24 @@ export async function resolveTaskPersons(
     else persons[mc] = id;
   }
   return { persons, unresolved };
+}
+
+// Resolve a task's Initiative lookup to the Roadmap list item id (SharePoint
+// stores Initiative as a lookup to Roadmap). Returns undefined when the bucket
+// is not yet mirrored (leave column untouched + audit); null when the task has
+// no bucket (clear the column).
+export async function resolveInitiativeLookupId(
+  task: Pick<Task, "bucket">,
+  loadBuckets: () => Promise<repo.BucketWithSync[]> = () => repo.getBucketRows()
+): Promise<{ initiativeLookupId?: number | null; unresolvedBucket?: string }> {
+  const bucketId = task.bucket;
+  if (!bucketId) return { initiativeLookupId: null };
+  const rows = await loadBuckets();
+  const hit = rows.find((r) => r.bucket.id === bucketId);
+  if (!hit?.spItemId) return { unresolvedBucket: bucketId };
+  const n = Number(hit.spItemId);
+  if (Number.isNaN(n)) return { unresolvedBucket: bucketId };
+  return { initiativeLookupId: n };
 }
 
 // ─── Seed bootstrap ──────────────────────────────────────────────────────────
@@ -197,12 +217,29 @@ async function pushEntity(ctx: SiteContext, row: repo.EntityRow): Promise<"synce
     row.entity_type === "task"
       ? await resolveTaskPersons(ctx, row.data as unknown as Task)
       : null;
-  const withPersons = <T extends object>(opts: T): T & { persons?: ResolvedPersons["persons"] } =>
-    resolved ? { ...opts, persons: resolved.persons } : opts;
+  const initiative =
+    row.entity_type === "task" ? await resolveInitiativeLookupId(row.data as unknown as Task) : {};
+  if (initiative.unresolvedBucket) {
+    await repo.appendAudit(
+      SYNC_ACTOR,
+      `${row.id} · Initiative: ${initiative.unresolvedBucket} is not yet mirrored to Roadmap — Initiative lookup skipped; other fields pushed.`,
+      "pending"
+    );
+  }
+  const withLookups = <T extends object>(
+    opts: T
+  ): T & { persons?: ResolvedPersons["persons"]; initiativeLookupId?: number | null } => {
+    const next: T & { persons?: ResolvedPersons["persons"]; initiativeLookupId?: number | null } = {
+      ...opts,
+    };
+    if (resolved) next.persons = resolved.persons;
+    if (initiative.initiativeLookupId !== undefined) next.initiativeLookupId = initiative.initiativeLookupId;
+    return next;
+  };
   try {
     if (row.sp_item_id) {
       const only = row.dirty_fields.length > 0 ? row.dirty_fields : undefined;
-      await patchListItemFields(ctx, listKey, row.sp_item_id, outboundFields(row.entity_type, row.data, withPersons({ only })));
+      await patchListItemFields(ctx, listKey, row.sp_item_id, outboundFields(row.entity_type, row.data, withLookups({ only })));
       await repo.updateEntity(row.entity_type, row.id, { syncState: "synced", dirtyFields: [] });
       await auditUnresolvedPersons(row, resolved);
       return "synced";
@@ -213,11 +250,11 @@ async function pushEntity(ctx: SiteContext, row: repo.EntityRow): Promise<"synce
       const existing = await findItemByField(ctx, "todos", "TaskID", row.id);
       if (existing) {
         itemId = existing.id;
-        await patchListItemFields(ctx, listKey, itemId, outboundFields("task", row.data, withPersons({})));
+        await patchListItemFields(ctx, listKey, itemId, outboundFields("task", row.data, withLookups({})));
       }
     }
     if (!itemId) {
-      itemId = await createListItem(ctx, listKey, outboundFields(row.entity_type, row.data, withPersons({ creating: true })));
+      itemId = await createListItem(ctx, listKey, outboundFields(row.entity_type, row.data, withLookups({ creating: true })));
     }
     await repo.updateEntity(row.entity_type, row.id, {
       syncState: "synced",
@@ -436,6 +473,14 @@ async function pullList(ctx: SiteContext, listKey: string, type: EntityType): Pr
         const actorId = email ? actorIdByEmail(email) : null;
         if (actorId) patches.assignee = actorId;
       }
+      // Initiative lookup → bucket id (match Roadmap sp_item_id).
+      const initRaw = item.fields.InitiativeLookupId;
+      if (initRaw !== undefined && initRaw !== null && initRaw !== "") {
+        const hit = await repo.getBucketBySpItemId(String(initRaw));
+        if (hit) patches.bucket = hit.bucket.id;
+      } else if (initRaw === null || initRaw === "") {
+        patches.bucket = null;
+      }
     }
     const { apply, conflicts } = reconcileInbound(row.data, row.dirty_fields, patches);
     for (const c of conflicts) {
@@ -473,6 +518,75 @@ async function pullList(ctx: SiteContext, listKey: string, type: EntityType): Pr
   return result;
 }
 
+// Roadmap inbound (Gantt minimum): pull name/health/started/target into buckets.
+async function pullRoadmap(ctx: SiteContext): Promise<InboundResult> {
+  const result: InboundResult = { pulled: 0, conflicts: 0, skipped: 0 };
+  if (!ctx.listIds[ROADMAP_KEY]) return result;
+  const stored = await repo.getDeltaLink(ROADMAP_KEY);
+  const { items, deltaLink } = await listDelta(ctx, ROADMAP_KEY, stored);
+  const rows = await repo.getBucketRows();
+
+  for (const item of items) {
+    if (item.deleted || !item.fields) continue;
+    let row =
+      rows.find((r) => r.spItemId === item.id) ??
+      (typeof item.fields.InitiativeID === "string"
+        ? rows.find((r) => r.bucket.id === item.fields?.InitiativeID)
+        : undefined);
+    if (!row && typeof item.fields.InitiativeID === "string") {
+      // Adopt: first sighting of a known bucket by InitiativeID.
+      const byKey = rows.find((r) => r.bucket.id === item.fields?.InitiativeID);
+      if (byKey) {
+        await repo.updateBucket(byKey.bucket.id, { spItemId: item.id });
+        row = { ...byKey, spItemId: item.id };
+      }
+    }
+    if (!row) {
+      result.skipped += 1;
+      continue;
+    }
+    const patches = inboundBucketPatches(item.fields) as EntityData;
+    const { apply, conflicts } = reconcileInbound(
+      row.bucket as unknown as EntityData,
+      row.dirtyFields,
+      patches
+    );
+    for (const c of conflicts) {
+      await repo.insertConflict({
+        id: `cf-${row.bucket.id.toLowerCase()}-${c.field}-${Date.now()}`,
+        entityType: "bucket",
+        entityId: row.bucket.id,
+        field: displayFieldFor("bucket", c.field) ?? c.field,
+        mcVal: c.mcVal,
+        spVal: c.spVal,
+        by: SYNC_ACTOR,
+        note: "Edited in SharePoint Roadmap while Mission Control also changed it.",
+      });
+      await repo.updateBucket(row.bucket.id, { syncState: "conflict" });
+      await repo.appendAudit(
+        SYNC_ACTOR,
+        `Conflict detected on ${row.bucket.id} · ${c.field} (edited both sides on Roadmap).`,
+        "conflict"
+      );
+      result.conflicts += 1;
+    }
+    if (Object.keys(apply).length > 0) {
+      await repo.updateBucket(row.bucket.id, {
+        patch: apply as Partial<Bucket>,
+        dirtyFields: row.dirtyFields.filter((f) => !(f in apply)),
+      });
+      await repo.appendAudit(
+        SYNC_ACTOR,
+        `Inbound Roadmap change pulled — ${row.bucket.id} ${Object.keys(apply).join(", ")} updated from SharePoint.`,
+        "synced"
+      );
+      result.pulled += 1;
+    }
+  }
+  await repo.saveDeltaLink(ROADMAP_KEY, deltaLink);
+  return result;
+}
+
 // ─── The sweep ───────────────────────────────────────────────────────────────
 
 export interface SweepResult {
@@ -493,9 +607,16 @@ export async function runSweep(actor: string = SYNC_ACTOR): Promise<SweepResult>
   // Inbound FIRST: SharePoint-side edits must be seen — and dirty-field
   // conflicts raised (§5.1) — before any outbound write. Pushing first would
   // silently overwrite the remote edit: last-write-wins, which is forbidden.
+  // Roadmap before ToDos so Initiative lookup resolution sees current buckets.
   let pulled = 0;
   let conflicts = 0;
   let skippedInbound = 0;
+  {
+    const r = await pullRoadmap(ctx);
+    pulled += r.pulled;
+    conflicts += r.conflicts;
+    skippedInbound += r.skipped;
+  }
   for (const { listKey, type } of DELTA_LISTS) {
     const r = await pullList(ctx, listKey, type);
     pulled += r.pulled;
@@ -503,10 +624,17 @@ export async function runSweep(actor: string = SYNC_ACTOR): Promise<SweepResult>
     skippedInbound += r.skipped;
   }
 
-  // Outbound: conflicted entities are no longer "pending", so they are held
-  // back until a human resolves them.
+  // Outbound: Projects + Roadmap before tasks so InitiativeLookupId can resolve
+  // on the same sweep. Conflicted entities are no longer "pending", so they are
+  // held back until a human resolves them.
   let pushed = 0;
   let pushErrors = 0;
+  // Push-only repo-registry mirror (Item 2) — counted with the outbound pushes.
+  pushed += await pushRepoRegistry(ctx);
+  // Push-only projects mirror (P2) — must run before Roadmap (Project lookup).
+  pushed += await pushProjectsMirror(ctx);
+  // Push-only Roadmap / initiatives mirror (EN-005) — before task Initiative lookup.
+  pushed += await pushBucketRoadmap(ctx);
   for (const type of PUSHABLE) {
     const rows = await repo.getEntities(type);
     for (const row of rows.filter((r) => r.sync_state === "pending")) {
@@ -515,12 +643,6 @@ export async function runSweep(actor: string = SYNC_ACTOR): Promise<SweepResult>
       else pushErrors += 1;
     }
   }
-  // Push-only repo-registry mirror (Item 2) — counted with the outbound pushes.
-  pushed += await pushRepoRegistry(ctx);
-  // Push-only projects mirror (P2) — must run before Roadmap (Project lookup).
-  pushed += await pushProjectsMirror(ctx);
-  // Push-only Roadmap / initiatives mirror (EN-005).
-  pushed += await pushBucketRoadmap(ctx);
 
   const lastSweep = repo.stamp();
   // Only audit a sweep that actually changed something. Under the scheduled
@@ -555,12 +677,23 @@ async function pushSingleField(ctx: SiteContext, type: EntityType, row: repo.Ent
   if (!row.sp_item_id) return false;
   const listKey = type === "task" ? "todos" : "risks";
   let persons: ResolvedPersons["persons"] | undefined;
+  let initiativeLookupId: number | null | undefined;
   if (type === "task") {
     persons = (await resolveTaskPersons(ctx, row.data as unknown as Task)).persons;
     const isPerson = TASK_PERSON_FIELDS.some((f) => f.mc === mcField);
     if (isPerson && persons[mcField as TaskPersonMc] === undefined) return false; // unresolved person — never fabricate
+    if (mcField === "bucket") {
+      const init = await resolveInitiativeLookupId(row.data as unknown as Task);
+      if (init.unresolvedBucket) return false;
+      initiativeLookupId = init.initiativeLookupId;
+    }
   }
-  await patchListItemFields(ctx, listKey, row.sp_item_id, outboundFields(type, row.data, { only: [mcField], persons }));
+  await patchListItemFields(
+    ctx,
+    listKey,
+    row.sp_item_id,
+    outboundFields(type, row.data, { only: [mcField], persons, initiativeLookupId })
+  );
   return true;
 }
 
