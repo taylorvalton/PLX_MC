@@ -20,11 +20,14 @@ import {
   allRepos,
   allRisks,
   allTasks,
+  allProjects,
   bucketById,
   commentsForBucket,
   deleteBucketComment,
   editBucketComment,
   mentionables,
+  projectById,
+  updateBucket,
 } from "@/lib/mc-data/store";
 
 import { Avatar, AvatarStack, HealthPill, PMark, ReqChip, SyncTick } from "./atoms";
@@ -71,6 +74,7 @@ export function BucketDetail({ route, nav }: ScreenProps) {
   useMcVersion();
 
   const bucket = bucketById(route.bucketId ?? FALLBACK_BUCKET.id) ?? FALLBACK_BUCKET;
+  const parentProject = bucket.project ? projectById(bucket.project) : undefined;
   const rollups = rollupsForBucket(bucket.id, allTasks(), MILESTONES, allRisks());
   const prd = bucket.prd ? PRDS[bucket.prd] : null;
   const trace = TRACE.bucket === bucket.id ? TRACE : null;
@@ -125,6 +129,16 @@ export function BucketDetail({ route, nav }: ScreenProps) {
             ← Back
           </button>
           <span className="kk bucket-kicker">Initiative · {bucket.id}</span>
+          {parentProject ? (
+            <button
+              type="button"
+              className="kk bucket-kicker"
+              style={{ marginLeft: 8 }}
+              onClick={() => nav("project", { projectId: parentProject.id, bucketId: bucket.id })}
+            >
+              Project · {parentProject.name}
+            </button>
+          ) : null}
           <h1>{bucket.name}</h1>
           <p className="sub">{bucket.desc}</p>
         </div>
@@ -166,6 +180,22 @@ export function BucketDetail({ route, nav }: ScreenProps) {
           <div className="f">
             <span className="k">Started</span>
             <span className="v sm">{bucket.started}</span>
+          </div>
+          <div className="f">
+            <span className="k">Project</span>
+            <span className="v sm">
+              <select
+                value={bucket.project ?? ""}
+                onChange={(event) => updateBucket(bucket.id, { project: event.target.value || null })}
+              >
+                <option value="">No project</option>
+                {allProjects().map((project) => (
+                  <option key={project.id} value={project.id}>
+                    {project.name}
+                  </option>
+                ))}
+              </select>
+            </span>
           </div>
           <div className="f">
             <span className="k">Tasks</span>

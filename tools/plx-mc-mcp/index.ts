@@ -42,7 +42,7 @@ function requireConfig() {
   if (!MCP_ENABLED) throw new Error("PLX_MC_MCP_ENABLED=0");
   if (!MC_MCP_API_KEY) throw new Error("MC_MCP_API_KEY is not set");
   if (!MC_OPERATOR_EMAIL) throw new Error("MC_OPERATOR_EMAIL (or MC_ACCOUNTABLE) is not set");
-  if (!MC_REPO) throw new Error("MC_REPO is not set (e.g. taylorvalton/PLX_MC)");
+  if (!MC_REPO) throw new Error("MC_REPO is not set (e.g. petralabx/PLX_MC)");
 }
 
 async function mcFetch(path: string, init?: { method?: string; body?: unknown }): Promise<unknown> {

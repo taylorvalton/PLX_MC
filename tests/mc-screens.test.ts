@@ -20,6 +20,7 @@ const EXPECTED_SCREENS = {
   matrix: true,
   feed: true,
   bucket: true,
+  project: true,
   repos: true,
   files: true,
   sync: true,

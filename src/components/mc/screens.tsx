@@ -4,6 +4,7 @@ import type { ComponentType } from "react";
 import { AiSpendView } from "./vendor-spend";
 import { AgentFeed } from "./agent-feed";
 import { BucketDetail } from "./bucket-detail";
+import { ProjectDetail } from "./project-detail";
 import { FilesView } from "./files-view";
 import { GovernanceSopsView } from "./governance-sops";
 import { SkillsDirectoryView } from "./skills-directory";
@@ -29,6 +30,7 @@ export const SCREENS: Record<Screen, ComponentType<ScreenProps>> = {
   matrix: TraceabilityMatrix,
   feed: AgentFeed,
   bucket: BucketDetail,
+  project: ProjectDetail,
   repos: ReposView,
   files: FilesView,
   sync: SyncConsole,

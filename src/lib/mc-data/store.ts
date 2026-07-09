@@ -20,6 +20,7 @@ import {
   CURRENT_USER,
   FILES,
   INBOX,
+  PROJECTS,
   REPOS,
   ALLOWED_REPO_ORGS,
   DEFAULT_NEW_REPO_ORG,
@@ -46,6 +47,7 @@ import type {
   FileEntry,
   Human,
   InboxNotification,
+  Project,
   Repo,
   RepoRequest,
   Risk,
@@ -82,6 +84,8 @@ interface McState {
   // hydrated from the server snapshot; a created bucket adds here. The single
   // source of truth behind allBuckets()/bucketById() (no more direct fixture reads).
   buckets: Record<string, Bucket>;
+  // P2: projects (parent above buckets), keyed by id. Seeded from PROJECTS fixture.
+  projects: Record<string, Project>;
 }
 
 const clone = <T>(v: T): T => JSON.parse(JSON.stringify(v));
@@ -106,6 +110,7 @@ function initialState(): McState {
       BUCKETS.map((b) => [b.id, clone(b.comments ?? [])])
     ),
     buckets: Object.fromEntries(BUCKETS.map((b) => [b.id, clone(b)])),
+    projects: Object.fromEntries(PROJECTS.map((p) => [p.id, clone(p)])),
   };
 }
 
@@ -252,6 +257,10 @@ export const commentsForBucket = (bucketId: string): Comment[] =>
 // replaces direct BUCKETS / BUCKET_IDX fixture reads. Reactive via useMcVersion.
 export const allBuckets = (): Bucket[] => Object.values(state.buckets);
 export const bucketById = (id: string): Bucket | undefined => state.buckets[id];
+export const allProjects = (): Project[] => Object.values(state.projects);
+export const projectById = (id: string): Project | undefined => state.projects[id];
+export const bucketsForProject = (projectId: string): Bucket[] =>
+  allBuckets().filter((b) => b.project === projectId);
 
 // ─── Internal helpers ────────────────────────────────────────────────────────
 
@@ -294,6 +303,8 @@ interface ServerSnapshot {
   bucketComments?: Record<string, Comment[]>;
   // EN-005 — persisted buckets/initiatives.
   buckets?: Bucket[];
+  // P2 — persisted projects.
+  projects?: Project[];
 }
 
 // Adopt the server's truth for everything the engine owns; notifications,
@@ -316,6 +327,7 @@ function applyServerState(snapshot: ServerSnapshot) {
   // EN-005 — adopt the persisted buckets so created/edited initiatives survive a
   // reload (the server is the source of truth on hydrate).
   if (snapshot.buckets) state.buckets = Object.fromEntries(snapshot.buckets.map((b) => [b.id, b]));
+  if (snapshot.projects) state.projects = Object.fromEntries(snapshot.projects.map((p) => [p.id, p]));
   for (const list of state.lists) {
     const counts = snapshot.counts[list.key];
     if (counts) {
@@ -1180,6 +1192,152 @@ export function deleteBucketComment(bucketId: string, commentId: string, actor: 
   persistBucketThread(bucketId, prior);
 }
 
+// ─── Projects (P2 — parent above buckets) ────────────────────────────────────
+
+export interface NewProjectInput {
+  name: string;
+  owner?: string;
+  health?: Project["health"];
+  target?: string;
+  started?: string;
+  desc?: string;
+  repos?: string[];
+  prd?: string | null;
+}
+
+function projectIdFromName(name: string, existing: Set<string>): string {
+  const slug = name
+    .trim()
+    .toUpperCase()
+    .replace(/[^A-Z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 24);
+  const base = `PRJ-${slug || "NEW"}`;
+  if (!existing.has(base)) return base;
+  let n = 2;
+  while (existing.has(`${base}-${n}`)) n += 1;
+  return `${base}-${n}`;
+}
+
+type ProjectCreateMirror = (input: NewProjectInput & { repos: string[] }) => Promise<Project>;
+const defaultProjectCreateMirror: ProjectCreateMirror = (input) =>
+  api<Project>("/projects", { method: "POST", body: JSON.stringify(input) });
+let projectCreateMirror = defaultProjectCreateMirror;
+let projectCreateMirrorInjected = false;
+let projectCreateInFlight: Promise<void> = Promise.resolve();
+
+export function __setProjectCreateMirrorForTests(fn: ProjectCreateMirror | null) {
+  projectCreateMirror = fn ?? defaultProjectCreateMirror;
+  projectCreateMirrorInjected = fn !== null;
+}
+
+export function __projectCreateSettled(): Promise<void> {
+  return projectCreateInFlight;
+}
+
+export function addProject(input: NewProjectInput): Project {
+  const name = (input.name ?? "").trim();
+  const id = projectIdFromName(name, new Set(Object.keys(state.projects)));
+  const requestedRepos = input.repos ?? [];
+  const repos = allowedReposOnly(requestedRepos, state.repos);
+  const dropped = disallowedRepos(requestedRepos, state.repos);
+  if (dropped.length > 0) {
+    pushNotice(`Skipped repos not in the registry: ${dropped.join(", ")}. Request them first.`, "info");
+  }
+  const today = new Date().toISOString().slice(0, 10).replace(/-/g, ".");
+  const project: Project = {
+    id,
+    name,
+    owner: input.owner || CURRENT_USER,
+    health: input.health ?? "track",
+    target: (input.target ?? "").trim() || "—",
+    started: (input.started ?? "").trim() || today,
+    desc: (input.desc ?? "").trim(),
+    repos,
+    sync: { state: "pending", ts: stamp(), sp: "Projects · unprovisioned" },
+    prd: input.prd ?? null,
+  };
+  state.projects = { ...state.projects, [id]: project };
+  pushAudit(project.owner, `Created project ${id} (${name}) — pending Projects mirror.`, "pending");
+  emit();
+  if (typeof window === "undefined" && !projectCreateMirrorInjected) return project;
+  projectCreateInFlight = projectCreateMirror({ ...input, repos }).then(
+    (created) => {
+      const next = { ...state.projects };
+      if (created.id !== id) delete next[id];
+      next[created.id] = created;
+      state.projects = next;
+      emit();
+    },
+    (err) => {
+      const next = { ...state.projects };
+      delete next[id];
+      state.projects = next;
+      pushNotice(
+        `Couldn't save the new project "${name}" — it was rolled back. ${
+          err instanceof Error ? err.message : "The server rejected it."
+        }`
+      );
+      emit();
+    }
+  );
+  return project;
+}
+
+export type ProjectPatch = Partial<
+  Pick<Project, "name" | "owner" | "health" | "target" | "started" | "desc" | "repos" | "prd">
+>;
+
+type ProjectUpdateMirror = (id: string, patch: ProjectPatch) => Promise<Project>;
+const defaultProjectUpdateMirror: ProjectUpdateMirror = (id, patch) =>
+  api<Project>(`/projects/${id}`, { method: "PATCH", body: JSON.stringify({ actor: CURRENT_USER, ...patch }) });
+let projectUpdateMirror = defaultProjectUpdateMirror;
+let projectUpdateMirrorInjected = false;
+let projectUpdateInFlight: Promise<void> = Promise.resolve();
+
+export function __setProjectUpdateMirrorForTests(fn: ProjectUpdateMirror | null) {
+  projectUpdateMirror = fn ?? defaultProjectUpdateMirror;
+  projectUpdateMirrorInjected = fn !== null;
+}
+
+export function __projectUpdateSettled(): Promise<void> {
+  return projectUpdateInFlight;
+}
+
+export function updateProject(id: string, patch: ProjectPatch): Promise<void> | void {
+  const existing = state.projects[id];
+  if (!existing) return;
+  let clamped: ProjectPatch = patch;
+  if (patch.repos) {
+    const repos = allowedReposOnly(patch.repos, state.repos);
+    const dropped = disallowedRepos(patch.repos, state.repos);
+    if (dropped.length > 0) pushNotice(`Skipped repos not in the registry: ${dropped.join(", ")}.`, "info");
+    clamped = { ...patch, repos };
+  }
+  const entries = Object.entries(clamped).filter(([, v]) => v !== undefined);
+  if (entries.length === 0) return;
+  const prior = clone(existing);
+  state.projects = { ...state.projects, [id]: { ...existing, ...Object.fromEntries(entries) } };
+  emit();
+  if (typeof window === "undefined" && !projectUpdateMirrorInjected) return;
+  projectUpdateInFlight = projectUpdateMirror(id, clamped).then(
+    (saved) => {
+      state.projects = { ...state.projects, [id]: saved };
+      emit();
+    },
+    (err) => {
+      state.projects = { ...state.projects, [id]: prior };
+      pushNotice(
+        `Couldn't save the change to ${id} — it was rolled back. ${
+          err instanceof Error ? err.message : "The server rejected the update."
+        }`
+      );
+      emit();
+    }
+  );
+  return projectUpdateInFlight;
+}
+
 // ─── Buckets / initiatives (EN-005) ──────────────────────────────────────────
 
 export interface NewBucketInput {
@@ -1191,6 +1349,7 @@ export interface NewBucketInput {
   desc?: string;
   repos?: string[];
   prd?: string | null;
+  project?: string | null;
 }
 
 function bucketIdFromName(name: string, existing: Set<string>): string {
@@ -1242,6 +1401,10 @@ export function addBucket(input: NewBucketInput): Bucket {
     pushNotice(`Skipped repos not in the registry: ${dropped.join(", ")}. Request them first.`, "info");
   }
   const today = new Date().toISOString().slice(0, 10).replace(/-/g, ".");
+  const defaultProject =
+    input.project === undefined
+      ? (state.projects["PRJ-PORTAL-GOLIVE"]?.id ?? Object.keys(state.projects)[0] ?? null)
+      : input.project;
   const bucket: Bucket = {
     id,
     name,
@@ -1253,6 +1416,7 @@ export function addBucket(input: NewBucketInput): Bucket {
     repos,
     sync: { state: "pending", ts: stamp(), sp: "Roadmap · unprovisioned" },
     prd: input.prd ?? null,
+    project: defaultProject,
   };
   state.buckets = { ...state.buckets, [id]: bucket };
   pushAudit(bucket.owner, `Created initiative ${id} (${name}) — pending Roadmap mirror.`, "pending");
@@ -1283,7 +1447,7 @@ export function addBucket(input: NewBucketInput): Bucket {
 
 // The editable subset of a Bucket, routed through the single persisted-edit path.
 export type BucketPatch = Partial<
-  Pick<Bucket, "name" | "owner" | "health" | "target" | "started" | "desc" | "repos" | "prd">
+  Pick<Bucket, "name" | "owner" | "health" | "target" | "started" | "desc" | "repos" | "prd" | "project">
 >;
 
 // The bucket-edit PATCH mirror seam (mirrors patchMirror): default issues the
@@ -1520,5 +1684,11 @@ export function resetStore() {
   bucketCreateMirror = defaultBucketCreateMirror;
   bucketCreateMirrorInjected = false;
   bucketCreateInFlight = Promise.resolve();
+  projectCreateMirror = defaultProjectCreateMirror;
+  projectCreateMirrorInjected = false;
+  projectCreateInFlight = Promise.resolve();
+  projectUpdateMirror = defaultProjectUpdateMirror;
+  projectUpdateMirrorInjected = false;
+  projectUpdateInFlight = Promise.resolve();
   emit();
 }

@@ -8,10 +8,13 @@ import { CURRENT_USER, SP_LISTS } from "@/lib/mc-data/data";
 import { assignmentViolation, isAgentId, stageAdvanceViolation } from "@/lib/mc-data/policy";
 import { disallowedRepos } from "@/lib/mc-data/repos";
 import type {
+  ActivityEntry,
   AuditRow,
   Bucket,
   Comment,
   FileEntry,
+  Project,
+  PullRequest,
   Repo,
   RepoRequest,
   Risk,
@@ -41,6 +44,8 @@ export interface StateSnapshot {
   bucketComments: Record<string, Comment[]>;
   // EN-005 — persisted buckets/initiatives, so user-created ones survive reload.
   buckets: Bucket[];
+  // P2 — persisted projects (parent above buckets), so user-created ones survive reload.
+  projects: Project[];
 }
 
 export async function snapshot(): Promise<StateSnapshot> {
@@ -48,7 +53,7 @@ export async function snapshot(): Promise<StateSnapshot> {
   await ensureReposSeeded();
   await ensureProjectsSeeded();
   await ensureBucketsSeeded();
-  const [tasks, risks, files, conflicts, errors, audit, counts, repos, repoRequests, bucketComments, buckets, lastSweptAt] = await Promise.all([
+  const [tasks, risks, files, conflicts, errors, audit, counts, repos, repoRequests, bucketComments, buckets, projects, lastSweptAt] = await Promise.all([
     repo.getEntities("task"),
     repo.getEntities("risk"),
     repo.getEntities("file"),
@@ -60,6 +65,7 @@ export async function snapshot(): Promise<StateSnapshot> {
     repo.getRepoRequests(),
     repo.bucketCommentsByBucket(),
     repo.getBuckets(),
+    repo.getProjects(),
     repo.lastSweepAt(),
   ]);
   return {
@@ -83,6 +89,7 @@ export async function snapshot(): Promise<StateSnapshot> {
     repoRequests,
     bucketComments,
     buckets,
+    projects,
     // Lists not yet mirrored (roadmap, milestones) keep their fixture counts;
     // mirrored lists report live counts. The store merges via SP_LISTS keys.
     // Heartbeat from delta_links (advances every sweep, incl. no-op ones),
@@ -121,6 +128,21 @@ function nextBucketId(name: string, existing: Set<string>): string {
 const definedEntries = <T extends object>(patch: T): Partial<T> =>
   Object.fromEntries(Object.entries(patch).filter(([, v]) => v !== undefined)) as Partial<T>;
 
+async function assertProjectExists(projectId: string): Promise<void> {
+  await ensureProjectsSeeded();
+  const known = new Set((await repo.getProjects()).map((p) => p.id));
+  if (!known.has(projectId)) {
+    throw new ApiError("not_found", `unknown project ${projectId}`, 404);
+  }
+}
+
+async function defaultProjectId(): Promise<string | null> {
+  await ensureProjectsSeeded();
+  const projects = await repo.getProjects();
+  const portal = projects.find((p) => p.id === "PRJ-PORTAL-GOLIVE");
+  return portal?.id ?? projects[0]?.id ?? null;
+}
+
 export interface CreateBucketInput {
   name: string;
   owner?: string;
@@ -130,6 +152,7 @@ export interface CreateBucketInput {
   desc?: string;
   repos?: string[];
   prd?: string | null;
+  project?: string | null;
 }
 
 export async function createBucket(input: CreateBucketInput): Promise<Bucket> {
@@ -153,6 +176,14 @@ export async function createBucket(input: CreateBucketInput): Promise<Bucket> {
   const existing = await repo.getBuckets();
   const id = nextBucketId(name, new Set(existing.map((b) => b.id)));
   const today = new Date().toISOString().slice(0, 10).replace(/-/g, ".");
+  let projectId: string | null;
+  if (input.project === null) projectId = null;
+  else if (input.project) {
+    await assertProjectExists(input.project);
+    projectId = input.project;
+  } else {
+    projectId = await defaultProjectId();
+  }
   const bucket: Bucket = {
     id,
     name,
@@ -164,6 +195,7 @@ export async function createBucket(input: CreateBucketInput): Promise<Bucket> {
     repos: input.repos ?? [],
     sync: { state: "pending", ts: repo.stamp(), sp: "Roadmap · unprovisioned" },
     prd: input.prd ?? null,
+    project: projectId,
   };
   await repo.upsertBucket(bucket);
   await repo.appendAudit(bucket.owner, `Created initiative ${id} (${name}) — pending Roadmap mirror.`, "pending");
@@ -179,11 +211,115 @@ export interface PatchBucketInput {
   desc?: string;
   repos?: string[];
   prd?: string | null;
+  project?: string | null;
+  progress?: number;
 }
+
+// Gantt / Roadmap fields that participate in inbound conflict detection.
+const BUCKET_PUSHED_FIELDS = ["name", "health", "started", "target", "progress"];
 
 export async function patchBucket(id: string, patch: PatchBucketInput, actor: string): Promise<Bucket | null> {
   await ensureBucketsSeeded();
-  const existing = (await repo.getBuckets()).find((b) => b.id === id);
+  const rows = await repo.getBucketRows();
+  const existingRow = rows.find((r) => r.bucket.id === id);
+  if (!existingRow) return null;
+  const existing = existingRow.bucket;
+  if (patch.repos) {
+    await ensureReposSeeded();
+    const registry = await repo.getRepos();
+    const registryMap = Object.fromEntries(registry.map((r) => [r.id, r]));
+    const offlist = disallowedRepos(patch.repos, registryMap);
+    if (offlist.length > 0) {
+      throw new ApiError("repo_not_allowed", `These repos are not in the registry: ${offlist.join(", ")}.`, 422);
+    }
+  }
+  if (patch.project) await assertProjectExists(patch.project);
+  const defined = definedEntries(patch);
+  const next: Bucket = { ...existing, ...defined };
+  const pushedDirty = Object.keys(defined).filter((k) => BUCKET_PUSHED_FIELDS.includes(k));
+  const dirty = Array.from(new Set([...existingRow.dirtyFields, ...pushedDirty]));
+  await repo.upsertBucket(next, dirty);
+  await repo.appendAudit(actor, `Edited initiative ${id} — pending Roadmap mirror.`, "pending");
+  return next;
+}
+
+// ─── Projects (P2 — parent above buckets) ────────────────────────────────────
+
+function nextProjectId(name: string, existing: Set<string>): string {
+  const slug = name
+    .trim()
+    .toUpperCase()
+    .replace(/[^A-Z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 24);
+  const base = `PRJ-${slug || "NEW"}`;
+  if (!existing.has(base)) return base;
+  let n = 2;
+  while (existing.has(`${base}-${n}`)) n += 1;
+  return `${base}-${n}`;
+}
+
+export interface CreateProjectInput {
+  name: string;
+  owner?: string;
+  health?: Project["health"];
+  target?: string;
+  started?: string;
+  desc?: string;
+  repos?: string[];
+  prd?: string | null;
+}
+
+export async function createProject(input: CreateProjectInput): Promise<Project> {
+  await ensureSeeded();
+  await ensureReposSeeded();
+  await ensureProjectsSeeded();
+  const name = input.name.trim();
+  if (!name) throw new ApiError("invalid_request", "A project needs a name.", 422);
+  const registry = await repo.getRepos();
+  const registryMap = Object.fromEntries(registry.map((r) => [r.id, r]));
+  const offlist = disallowedRepos(input.repos ?? [], registryMap);
+  if (offlist.length > 0) {
+    throw new ApiError(
+      "repo_not_allowed",
+      `These repos are not in the registry: ${offlist.join(", ")}. Request and get them approved first.`,
+      422
+    );
+  }
+  const existing = await repo.getProjects();
+  const id = nextProjectId(name, new Set(existing.map((p) => p.id)));
+  const today = new Date().toISOString().slice(0, 10).replace(/-/g, ".");
+  const project: Project = {
+    id,
+    name,
+    owner: input.owner || CURRENT_USER,
+    health: input.health ?? "track",
+    target: input.target?.trim() || "—",
+    started: input.started?.trim() || today,
+    desc: (input.desc ?? "").trim(),
+    repos: input.repos ?? [],
+    sync: { state: "pending", ts: repo.stamp(), sp: "Projects · unprovisioned" },
+    prd: input.prd ?? null,
+  };
+  await repo.upsertProject(project);
+  await repo.appendAudit(project.owner, `Created project ${id} (${name}) — pending Projects mirror.`, "pending");
+  return project;
+}
+
+export interface PatchProjectInput {
+  name?: string;
+  owner?: string;
+  health?: Project["health"];
+  target?: string;
+  started?: string;
+  desc?: string;
+  repos?: string[];
+  prd?: string | null;
+}
+
+export async function patchProject(id: string, patch: PatchProjectInput, actor: string): Promise<Project | null> {
+  await ensureProjectsSeeded();
+  const existing = (await repo.getProjects()).find((p) => p.id === id);
   if (!existing) return null;
   if (patch.repos) {
     await ensureReposSeeded();
@@ -194,9 +330,9 @@ export async function patchBucket(id: string, patch: PatchBucketInput, actor: st
       throw new ApiError("repo_not_allowed", `These repos are not in the registry: ${offlist.join(", ")}.`, 422);
     }
   }
-  const next: Bucket = { ...existing, ...definedEntries(patch) };
-  await repo.upsertBucket(next);
-  await repo.appendAudit(actor, `Edited initiative ${id} — pending Roadmap mirror.`, "pending");
+  const next: Project = { ...existing, ...definedEntries(patch) };
+  await repo.upsertProject(next);
+  await repo.appendAudit(actor, `Edited project ${id} — pending Projects mirror.`, "pending");
   return next;
 }
 
@@ -281,7 +417,7 @@ export interface PatchTaskInput {
   priority?: Task["priority"];
   due?: string;
   description?: string;
-  bucket?: string; // DB-only (see §4)
+  bucket?: string; // Initiative lookup — pushed when Roadmap item is mirrored
   labels?: string[]; // DB-only
   coassignees?: string[]; // DB-only
   subtasks?: Task["subtasks"]; // DB-only (Subtask[], enriched in WS-3)
@@ -291,17 +427,26 @@ export interface PatchTaskInput {
   repos?: string[]; // EN-005 — pushed, allow-list enforced
   targetEnv?: Task["targetEnv"]; // pushed Target Environment column
   agentRunApproved?: boolean; // EN-005 — DB-only operator approval of an approve-mode agent run
+  prs?: PullRequest[]; // DB-only — PR links (compliance projection)
+  merge?: { sha: string; on: string }; // DB-only — merge metadata (compliance projection)
+  activityLine?: Pick<ActivityEntry, "who" | "what" | "kind">; // DB-only append
+}
+
+export interface PatchTaskOptions {
+  /** Compliance PR projection may promote to merged without a complete evidence bundle. */
+  complianceProjection?: boolean;
 }
 
 // Persistence tiers:
 //   SP  (pushed): title, stage, priority, due, description; the person columns
 //       assignee/accountableOwner/reporter (Item 1 — resolved to site-user lookup
 //       ids on the sweep); subtasks (Item 3 — push-only serialized mirror);
-//       repos and targetEnv (push-only targeting fields). A patch touching any
-//       of these re-queues the entity for push.
-//   DB  (jsonb-only, NOT pushed): bucket, labels, coassignees, comments, humanOnly.
-//       bucket/labels promote to SP once the Initiative lookup + a Labels column
-//       exist; comments stay app-only (EN-001 decision).
+//       repos and targetEnv (push-only targeting fields); bucket (Initiative
+//       lookup → Roadmap item id). A patch touching any of these re-queues the
+//       entity for push.
+//   DB  (jsonb-only, NOT pushed): labels, coassignees, comments, humanOnly.
+//       labels promote to SP once a Labels column exists; comments stay app-only
+//       (EN-001 decision).
 const PUSHED_FIELDS = [
   "title",
   "stage",
@@ -314,15 +459,22 @@ const PUSHED_FIELDS = [
   "subtasks",
   "repos",
   "targetEnv",
+  "bucket",
 ];
 
-export async function patchTask(id: string, patch: PatchTaskInput, actor: string): Promise<Task | null> {
+export async function patchTask(
+  id: string,
+  patch: PatchTaskInput,
+  actor: string,
+  opts: PatchTaskOptions = {}
+): Promise<Task | null> {
   await ensureSeeded();
   const row = await repo.getEntity("task", id);
   if (!row) return null;
 
-  const entries = Object.entries(patch).filter(([, v]) => v !== undefined);
-  if (entries.length === 0) return row.data as unknown as Task;
+  const { activityLine, ...taskPatch } = patch;
+  const entries = Object.entries(taskPatch).filter(([, v]) => v !== undefined);
+  if (entries.length === 0 && !activityLine) return row.data as unknown as Task;
 
   // Accountability policy (EN-003), enforced server-side in lockstep with the
   // client store: reject an agent executor on a human-only task, and reject a
@@ -330,22 +482,27 @@ export async function patchTask(id: string, patch: PatchTaskInput, actor: string
   // incomplete evidence). The effective task folds the incoming patch so a
   // patch that sets both owner and stage is evaluated against the new owner.
   const current = row.data as unknown as Task;
-  const effective = { ...current, ...patch } as Task;
-  if ("assignee" in patch) {
-    const violation = assignmentViolation(effective, patch.assignee ?? null);
+  const effective = { ...current, ...taskPatch } as Task;
+  if ("assignee" in taskPatch) {
+    const violation = assignmentViolation(effective, taskPatch.assignee ?? null);
     if (violation) throw new ApiError("human_only_violation", violation, 409);
   }
-  if ("stage" in patch && patch.stage) {
-    const violation = stageAdvanceViolation(effective, patch.stage);
-    if (violation) throw new ApiError("stage_blocked", violation, 409);
+  if ("stage" in taskPatch && taskPatch.stage) {
+    const skipEvidenceGate =
+      opts.complianceProjection &&
+      (taskPatch.stage === "merged" || taskPatch.stage === "verified" || taskPatch.stage === "progress");
+    if (!skipEvidenceGate) {
+      const violation = stageAdvanceViolation(effective, taskPatch.stage);
+      if (violation) throw new ApiError("stage_blocked", violation, 409);
+    }
   }
   // Allow-list enforcement on edit (EN-005): a task's repos may only be set to
   // registry members — the SAME persisted allow-list createTask validates against.
-  if (patch.repos) {
+  if (taskPatch.repos) {
     await ensureReposSeeded();
     const registry = await repo.getRepos();
     const registryMap = Object.fromEntries(registry.map((r) => [r.id, r]));
-    const offlist = disallowedRepos(patch.repos, registryMap);
+    const offlist = disallowedRepos(taskPatch.repos, registryMap);
     if (offlist.length > 0) {
       throw new ApiError(
         "repo_not_allowed",
@@ -358,18 +515,32 @@ export async function patchTask(id: string, patch: PatchTaskInput, actor: string
   const pushedDirty = entries.map(([k]) => k).filter((k) => PUSHED_FIELDS.includes(k));
   const dirty = Array.from(new Set([...row.dirty_fields, ...pushedDirty]));
 
+  const dataPatch: EntityData = Object.fromEntries(entries);
+  if (activityLine) {
+    const prev = (current.activity ?? []) as ActivityEntry[];
+    dataPatch.activity = [
+      ...prev,
+      {
+        age: "now",
+        who: activityLine.who,
+        what: activityLine.what,
+        kind: activityLine.kind ?? "move",
+      },
+    ];
+  }
+
   await repo.updateEntity("task", id, {
-    patch: Object.fromEntries(entries),
+    patch: dataPatch,
     // Person columns are pushed now (Item 1), so a person-only patch re-queues
     // the entity for the next outbound sweep.
     syncState: pushedDirty.length > 0 ? "pending" : undefined,
     dirtyFields: dirty,
   });
 
-  if ("assignee" in patch) {
+  if ("assignee" in taskPatch) {
     await repo.appendAudit(
       actor,
-      patch.assignee === null
+      taskPatch.assignee === null
         ? `Unassigned ${id} — clearing Assigned To on the next SharePoint sync.`
         : `Reassigned ${id} — Assigned To mirrors to SharePoint on the next sync.`,
       "pending"

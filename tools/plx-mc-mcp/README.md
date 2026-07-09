@@ -32,7 +32,7 @@ composed swarm delegation.
 
 ```bash
 cd tools/plx-mc-mcp && npm install
-PLX_MC_MCP_ENABLED=1 MC_MCP_API_KEY=... MC_OPERATOR_EMAIL=... MC_REPO=taylorvalton/PLX_MC npx tsx index.ts
+PLX_MC_MCP_ENABLED=1 MC_MCP_API_KEY=... MC_OPERATOR_EMAIL=... MC_REPO=petralabx/PLX_MC npx tsx index.ts
 ```
 
 ## Remote HTTP

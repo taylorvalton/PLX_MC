@@ -39,7 +39,7 @@ export function parseIdentity(req: Request): McpIdentity {
     throw new ApiError("operator_not_allowed", `Operator ${operatorEmail} is not on the PLX MC allowlist.`, 403);
   }
   if (!repo || repo === "unknown") {
-    throw new ApiError("missing_repo", "X-MC-Repo is required (e.g. taylorvalton/PLX_MC).", 400);
+    throw new ApiError("missing_repo", "X-MC-Repo is required (e.g. petralabx/PLX_MC).", 400);
   }
   return { operatorEmail, runtime, workerId, repo };
 }

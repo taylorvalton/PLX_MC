@@ -11,6 +11,11 @@ const db = vi.hoisted(() => ({
   events: [] as { kind: string; actor: string; repo?: string | null; taskId?: string | null; pr?: string | null; payload?: Record<string, unknown> }[],
 }));
 
+vi.mock("@/lib/compliance/projection", () => ({
+  projectionEnabled: () => false,
+  projectPullRequest: vi.fn(async () => {}),
+}));
+
 vi.mock("@/lib/compliance/repo", () => ({
   async getDispatch(id: string) {
     return db.dispatches.get(id) ?? null;
@@ -30,7 +35,7 @@ beforeEach(() => {
 function prPayload(over: Record<string, unknown> = {}, prOver: Record<string, unknown> = {}) {
   return {
     action: "opened",
-    repository: { name: "PLX_MC", full_name: "taylorvalton/PLX_MC" },
+    repository: { name: "PLX_MC", full_name: "petralabx/PLX_MC" },
     pull_request: {
       number: 42,
       merged: false,

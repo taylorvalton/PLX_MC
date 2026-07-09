@@ -5,7 +5,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { CURRENT_USER } from "@/lib/mc-data";
 import type { Bucket } from "@/lib/mc-data";
 import { useMcVersion } from "@/lib/mc-data/hooks";
-import { actorById, addBucket, allRepos } from "@/lib/mc-data/store";
+import { actorById, addBucket, allProjects, allRepos } from "@/lib/mc-data/store";
 
 import { Avatar } from "./atoms";
 import { PeoplePicker } from "./people-picker";
@@ -17,8 +17,18 @@ const HEALTH_OPTIONS: Array<{ value: Bucket["health"]; label: string }> = [
   { value: "off", label: "Off track" },
 ];
 
-export function NewInitiativeModal({ onClose, nav }: { onClose: () => void; nav: Nav }) {
+export function NewInitiativeModal({
+  onClose,
+  nav,
+  projectId,
+}: {
+  onClose: () => void;
+  nav: Nav;
+  projectId?: string;
+}) {
   useMcVersion();
+  const projects = allProjects();
+  const defaultProjectId = projectId ?? projects.find((p) => p.id === "PRJ-PORTAL-GOLIVE")?.id ?? projects[0]?.id ?? null;
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   // A bucket is always human-accountable (EN-003); default to the operator.
@@ -27,6 +37,7 @@ export function NewInitiativeModal({ onClose, nav }: { onClose: () => void; nav:
   const [health, setHealth] = useState<Bucket["health"]>("track");
   const [target, setTarget] = useState("");
   const [repos, setRepos] = useState<string[]>([]);
+  const [selectedProjectId, setSelectedProjectId] = useState<string | null>(defaultProjectId);
   const nameRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
@@ -51,10 +62,11 @@ export function NewInitiativeModal({ onClose, nav }: { onClose: () => void; nav:
       target,
       desc: description,
       repos,
+      project: selectedProjectId,
     });
     onClose();
-    nav("bucket", { bucketId: created.id });
-  }, [canCreate, name, ownerId, health, target, description, repos, onClose, nav]);
+    nav("bucket", { bucketId: created.id, projectId: selectedProjectId ?? undefined });
+  }, [canCreate, name, ownerId, health, target, description, repos, selectedProjectId, onClose, nav]);
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -154,6 +166,23 @@ export function NewInitiativeModal({ onClose, nav }: { onClose: () => void; nav:
                 ))}
               </div>
             </div>
+
+            <label className="ntm-fact">
+              <span className="k">Project</span>
+              <div className="ntm-select-wrap">
+                <select
+                  value={selectedProjectId ?? ""}
+                  onChange={(event) => setSelectedProjectId(event.target.value || null)}
+                >
+                  <option value="">No project</option>
+                  {projects.map((project) => (
+                    <option key={project.id} value={project.id}>
+                      {project.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </label>
 
             <label className="ntm-fact">
               <span className="k">Target</span>

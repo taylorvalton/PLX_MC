@@ -533,33 +533,150 @@ export async function upsertRepoRequest(req: RepoRequest): Promise<void> {
 interface BucketRow {
   id: string;
   data: Bucket;
+  project_id: string | null;
 }
 
 export async function getBuckets(): Promise<Bucket[]> {
-  const rows = await query<BucketRow>("SELECT id, data FROM buckets ORDER BY created_at, id");
-  return rows.map((r) => r.data);
+  const rows = await query<BucketRow>("SELECT id, data, project_id FROM buckets ORDER BY created_at, id");
+  // The relational FK is authoritative for the parent (the 011 backfill set it
+  // without rewriting jsonb) — fold it into the shape when data.project is unset.
+  return rows.map((r) => (r.data.project === undefined ? { ...r.data, project: r.project_id } : r.data));
 }
 
 // Idempotent seed of the fixture buckets — never disturbs an existing/edited row
 // (ON CONFLICT DO NOTHING), so a fresh DB gets the 8 initiatives and any edits
-// persist across boots.
+// persist across boots. The relational project_id FK is written from the fixture's
+// `project` so the jsonb and the FK never disagree on a fresh seed.
 export async function seedBuckets(buckets: Bucket[]): Promise<void> {
   for (const b of buckets) {
     await query(
-      `INSERT INTO buckets (id, data, sync_state) VALUES ($1, $2, $3)
+      `INSERT INTO buckets (id, data, sync_state, project_id) VALUES ($1, $2, $3, $4)
        ON CONFLICT (id) DO NOTHING`,
-      [b.id, JSON.stringify(b), b.sync?.state ?? "pending"]
+      [b.id, JSON.stringify(b), b.sync?.state ?? "pending", b.project ?? null]
     );
   }
 }
 
-// Upsert a bucket (create or edit). An edit re-queues the (future) Roadmap mirror
-// (sync_state -> pending), preserving the prior sp_item_id.
-export async function upsertBucket(b: Bucket): Promise<void> {
+// Upsert a bucket (create or edit). An edit re-queues the Roadmap mirror
+// (sync_state -> pending), preserving the prior sp_item_id. The relational
+// project_id FK moves with data.project in the same statement (one write path).
+// `dirtyFields` (when provided) replaces the dirty set used for inbound conflict
+// detection on Gantt fields.
+export async function upsertBucket(b: Bucket, dirtyFields?: string[]): Promise<void> {
+  if (dirtyFields) {
+    await query(
+      `INSERT INTO buckets (id, data, sync_state, project_id, dirty_fields) VALUES ($1, $2, 'pending', $3, $4::jsonb)
+       ON CONFLICT (id) DO UPDATE SET data = $2, sync_state = 'pending', project_id = $3, dirty_fields = $4::jsonb, updated_at = now()`,
+      [b.id, JSON.stringify(b), b.project ?? null, JSON.stringify(dirtyFields)]
+    );
+    return;
+  }
   await query(
-    `INSERT INTO buckets (id, data, sync_state) VALUES ($1, $2, 'pending')
-     ON CONFLICT (id) DO UPDATE SET data = $2, sync_state = 'pending', updated_at = now()`,
-    [b.id, JSON.stringify(b)]
+    `INSERT INTO buckets (id, data, sync_state, project_id) VALUES ($1, $2, 'pending', $3)
+     ON CONFLICT (id) DO UPDATE SET data = $2, sync_state = 'pending', project_id = $3, updated_at = now()`,
+    [b.id, JSON.stringify(b), b.project ?? null]
+  );
+}
+
+export interface BucketWithSync {
+  bucket: Bucket;
+  syncState: SyncState;
+  spItemId: string | null;
+  dirtyFields: string[];
+}
+
+export async function getBucketRows(): Promise<BucketWithSync[]> {
+  const rows = await query<{
+    id: string;
+    data: Bucket;
+    sync_state: SyncState;
+    sp_item_id: string | null;
+    project_id: string | null;
+    dirty_fields: string[] | null;
+  }>("SELECT id, data, sync_state, sp_item_id, project_id, dirty_fields FROM buckets ORDER BY created_at, id");
+  return rows.map((r) => ({
+    bucket: r.data.project === undefined ? { ...r.data, project: r.project_id } : r.data,
+    syncState: r.sync_state,
+    spItemId: r.sp_item_id,
+    dirtyFields: Array.isArray(r.dirty_fields) ? r.dirty_fields : [],
+  }));
+}
+
+export async function getBucketBySpItemId(spItemId: string): Promise<BucketWithSync | null> {
+  const rows = await query<{
+    id: string;
+    data: Bucket;
+    sync_state: SyncState;
+    sp_item_id: string | null;
+    project_id: string | null;
+    dirty_fields: string[] | null;
+  }>("SELECT id, data, sync_state, sp_item_id, project_id, dirty_fields FROM buckets WHERE sp_item_id = $1 LIMIT 1", [
+    spItemId,
+  ]);
+  const r = rows[0];
+  if (!r) return null;
+  return {
+    bucket: r.data.project === undefined ? { ...r.data, project: r.project_id } : r.data,
+    syncState: r.sync_state,
+    spItemId: r.sp_item_id,
+    dirtyFields: Array.isArray(r.dirty_fields) ? r.dirty_fields : [],
+  };
+}
+
+export async function updateBucket(
+  id: string,
+  opts: {
+    patch?: Partial<Bucket>;
+    syncState?: SyncState;
+    dirtyFields?: string[];
+    spItemId?: string;
+  }
+): Promise<void> {
+  const sets: string[] = ["updated_at = now()"];
+  const params: unknown[] = [id];
+  let n = 2;
+  if (opts.patch && Object.keys(opts.patch).length > 0) {
+    sets.push(`data = data || $${n}::jsonb`);
+    params.push(JSON.stringify(opts.patch));
+    n += 1;
+  }
+  if (opts.syncState) {
+    sets.push(`sync_state = $${n}`);
+    params.push(opts.syncState);
+    n += 1;
+  }
+  if (opts.dirtyFields) {
+    sets.push(`dirty_fields = $${n}::jsonb`);
+    params.push(JSON.stringify(opts.dirtyFields));
+    n += 1;
+  }
+  if (opts.spItemId !== undefined) {
+    sets.push(`sp_item_id = $${n}`);
+    params.push(opts.spItemId);
+    n += 1;
+  }
+  await query(`UPDATE buckets SET ${sets.join(", ")} WHERE id = $1`, params);
+}
+
+export async function setBucketSync(
+  id: string,
+  syncState: SyncState,
+  opts: { spItemId?: string; spRef?: string } = {}
+): Promise<void> {
+  await query(
+    `UPDATE buckets
+        SET sync_state = $2,
+            sp_item_id = COALESCE($3, sp_item_id),
+            dirty_fields = '[]'::jsonb,
+            data = jsonb_set(data, '{sync}', data->'sync' || $4::jsonb),
+            updated_at = now()
+      WHERE id = $1`,
+    [
+      id,
+      syncState,
+      opts.spItemId ?? null,
+      JSON.stringify({ state: syncState, ts: stamp(), ...(opts.spRef ? { sp: opts.spRef } : {}) }),
+    ]
   );
 }
 
@@ -575,6 +692,21 @@ export async function getProjects(): Promise<Project[]> {
   return rows.map((r) => r.data);
 }
 
+// Projects with their sync bookkeeping (for the push-only Projects mirror —
+// the same shape the repo-registry push consumes).
+export interface ProjectWithSync {
+  project: Project;
+  syncState: SyncState;
+  spItemId: string | null;
+}
+
+export async function getProjectRows(): Promise<ProjectWithSync[]> {
+  const rows = await query<{ id: string; data: Project; sync_state: SyncState; sp_item_id: string | null }>(
+    "SELECT id, data, sync_state, sp_item_id FROM projects ORDER BY created_at, id"
+  );
+  return rows.map((r) => ({ project: r.data, syncState: r.sync_state, spItemId: r.sp_item_id }));
+}
+
 // Idempotent seed of the fixture projects — mirrors seedBuckets (never disturbs an
 // existing/edited row), so a fresh DB gets the umbrella project and edits persist.
 export async function seedProjects(projects: Project[]): Promise<void> {
@@ -585,4 +717,37 @@ export async function seedProjects(projects: Project[]): Promise<void> {
       [p.id, JSON.stringify(p), p.sync?.state ?? "pending"]
     );
   }
+}
+
+// Upsert a project (create or edit). An edit re-queues the push-only Projects
+// mirror (sync_state -> pending), preserving the prior sp_item_id.
+export async function upsertProject(p: Project): Promise<void> {
+  await query(
+    `INSERT INTO projects (id, data, sync_state) VALUES ($1, $2, 'pending')
+     ON CONFLICT (id) DO UPDATE SET data = $2, sync_state = 'pending', updated_at = now()`,
+    [p.id, JSON.stringify(p)]
+  );
+}
+
+// Record a push outcome for a project: relational sync columns AND the jsonb
+// data.sync ref move together in one statement (one write path, no drift).
+export async function setProjectSync(
+  id: string,
+  syncState: SyncState,
+  opts: { spItemId?: string; spRef?: string } = {}
+): Promise<void> {
+  await query(
+    `UPDATE projects
+        SET sync_state = $2,
+            sp_item_id = COALESCE($3, sp_item_id),
+            data = jsonb_set(data, '{sync}', data->'sync' || $4::jsonb),
+            updated_at = now()
+      WHERE id = $1`,
+    [
+      id,
+      syncState,
+      opts.spItemId ?? null,
+      JSON.stringify({ state: syncState, ts: stamp(), ...(opts.spRef ? { sp: opts.spRef } : {}) }),
+    ]
+  );
 }

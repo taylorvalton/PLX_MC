@@ -46,7 +46,7 @@ function headers(): HeadersInit {
   return {
     "x-api-key": "test-mcp-key",
     "x-mc-operator-email": "vince@petrasoap.com",
-    "x-mc-repo": "taylorvalton/PLX_MC",
+    "x-mc-repo": "petralabx/PLX_MC",
     "x-mc-runtime": "cursor",
     "x-mc-worker-id": "skills-test",
   };

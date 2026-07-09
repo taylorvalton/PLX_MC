@@ -77,9 +77,12 @@ export const LIST_DISPLAY_NAMES: Record<string, string> = {
 };
 
 // Optional lists resolved only when provisioned (a missing one must NOT block
-// the core sweep). The push-only Repo Registry mirror (EN-002 / Item 2).
+// the core sweep). Push-only mirrors: Repo Registry (EN-002), Projects (P2).
 export const REPO_REGISTRY_DISPLAY = "Repo Registry";
 export const REPO_REGISTRY_KEY = "reporegistry";
+export const PROJECTS_DISPLAY = "Projects";
+export const PROJECTS_KEY = "projects";
+export const ROADMAP_KEY = "roadmap";
 
 export interface SiteContext {
   siteId: string;
@@ -102,9 +105,11 @@ export async function siteContext(): Promise<SiteContext> {
     listIds[key] = id;
   }
   // Optional lists: resolved when present, never required (a missing one can't
-  // block the core sweep). The push-only Repo Registry mirror (Item 2).
+  // block the core sweep). Push-only mirrors: Repo Registry (Item 2), Projects (P2).
   const repoRegistry = byName.get(REPO_REGISTRY_DISPLAY);
   if (repoRegistry) listIds[REPO_REGISTRY_KEY] = repoRegistry;
+  const projects = byName.get(PROJECTS_DISPLAY);
+  if (projects) listIds[PROJECTS_KEY] = projects;
   cachedSite = { siteId: site.id, listIds };
   return cachedSite;
 }

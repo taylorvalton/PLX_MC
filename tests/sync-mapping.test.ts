@@ -6,11 +6,15 @@
 import { describe, expect, it } from "vitest";
 import type { Risk, Task } from "@/lib/mc-data";
 import {
+  bucketOutboundFields,
   dueToIso,
+  inboundBucketPatches,
   inboundPatches,
   isoToDue,
+  mcDateToIso,
   outboundFields,
   parseFieldValue,
+  projectOutboundFields,
   reconcileInbound,
   serializeSubtasks,
 } from "@/lib/sync/mapping";
@@ -84,22 +88,25 @@ describe("outbound task mapping", () => {
     expect(outboundFields("task", { ...task, targetEnv: "production" } as never).TargetEnvironment).toBe("Production");
   });
 
-  it("emits person columns as <Name>LookupId from pre-resolved ids, never the bare column or the Initiative lookup", () => {
-    // The person mirror is now wired (Item 1): the engine resolves each MC actor
+  it("emits person columns as <Name>LookupId from pre-resolved ids; Initiative only when resolved", () => {
+    // The person mirror is wired (Item 1): the engine resolves each MC actor
     // to its site User Information List id and passes it in `persons`; the pure
-    // layer emits `<InternalName>LookupId`. With no `persons` opt nothing is
-    // emitted (back-compat). The Initiative lookup stays deferred.
+    // layer emits `<InternalName>LookupId`. With no `persons` / initiative opts
+    // nothing is emitted (back-compat).
     expect(Object.keys(fields)).not.toContain("AssignedToLookupId");
     expect(Object.keys(fields)).not.toContain("Initiative");
+    expect(Object.keys(fields)).not.toContain("InitiativeLookupId");
 
     const resolved = outboundFields("task", task as never, {
       creating: true,
       persons: { assignee: 23, accountableOwner: 7, reporter: 42 },
+      initiativeLookupId: 99,
     });
     expect(resolved.AssignedToLookupId).toBe(23);
     expect(resolved.AccountableOwnerLookupId).toBe(7);
     expect(resolved.ReporterLookupId).toBe(42);
-    // never the bare person column name, never the still-deferred Initiative lookup
+    expect(resolved.InitiativeLookupId).toBe(99);
+    // never the bare person column name or bare Initiative column
     expect(Object.keys(resolved)).not.toContain("AssignedTo");
     expect(Object.keys(resolved)).not.toContain("Initiative");
   });
@@ -123,7 +130,7 @@ describe("outbound task mapping", () => {
     expect(out.AssignedToLookupId).toBe(9);
   });
 
-  it("emits the push-only Subtasks column (Item 3) but still not bucket/labels/coassignees/Initiative", () => {
+  it("emits Subtasks (push-only) and InitiativeLookupId when resolved; still not labels/coassignees", () => {
     const t: Task = {
       ...task,
       bucket: "BKT-DAPI",
@@ -131,13 +138,27 @@ describe("outbound task mapping", () => {
       coassignees: ["ricardo", "stephen"],
       subtasks: [{ id: "SUB-1", t: "spike", done: false, who: "vince" }],
     };
-    const keys = Object.keys(outboundFields("task", t as never, { creating: true }));
-    expect(keys).toContain("Subtasks"); // Item 3 — sub-tasks now mirror (push-only)
-    // …the rest stay DB-only until their lookup/columns exist.
+    const keys = Object.keys(outboundFields("task", t as never, { creating: true, initiativeLookupId: 12 }));
+    expect(keys).toContain("Subtasks");
+    expect(keys).toContain("InitiativeLookupId");
     expect(keys).not.toContain("Initiative");
     expect(keys).not.toContain("Bucket");
     expect(keys).not.toContain("Labels");
     expect(keys).not.toContain("Coassignees");
+  });
+
+  it("clears Initiative with null and omits it when unresolved (undefined)", () => {
+    expect(outboundFields("task", task as never, { initiativeLookupId: null }).InitiativeLookupId).toBeNull();
+    expect("InitiativeLookupId" in outboundFields("task", task as never)).toBe(false);
+  });
+
+  it("honors the `only` filter for a targeted Initiative push", () => {
+    const out = outboundFields("task", task as never, {
+      only: ["bucket"],
+      initiativeLookupId: 5,
+    });
+    expect(Object.keys(out)).toEqual(["InitiativeLookupId"]);
+    expect(out.InitiativeLookupId).toBe(5);
   });
 
   it("honors the `only` filter for targeted pushes", () => {
@@ -198,6 +219,35 @@ describe("inbound direction filtering", () => {
     expect(inboundPatches("task", { Status: "In Progress" })).toEqual({ stage: "progress" });
     expect(inboundPatches("task", { Status: "Blocked-ish nonsense" })).toEqual({});
   });
+
+  it("applies a resolved Initiative bucket id from opts", () => {
+    expect(inboundPatches("task", { Title: "x" }, { bucket: "BKT-INFRA" })).toEqual({
+      title: "x",
+      bucket: "BKT-INFRA",
+    });
+    expect(inboundPatches("task", {}, { bucket: null })).toEqual({ bucket: null });
+  });
+});
+
+describe("inboundBucketPatches (Roadmap Gantt)", () => {
+  it("maps Title/Health/dates and skips unknown health", () => {
+    expect(
+      inboundBucketPatches({
+        Title: "Ops",
+        Health: "At risk",
+        StartDate: dueToIso("Jun 11")!,
+        TargetDate: dueToIso("Jul 20")!,
+        PercentComplete: 40,
+      })
+    ).toEqual({
+      name: "Ops",
+      health: "risk",
+      started: "Jun 11",
+      target: "Jul 20",
+      progress: 40,
+    });
+    expect(inboundBucketPatches({ Health: "Nope" })).toEqual({});
+  });
 });
 
 describe("date round-trip", () => {
@@ -242,5 +292,53 @@ describe("parseFieldValue (keep-SharePoint resolution)", () => {
     expect(parseFieldValue("task", "stage", "Blocked · due Jun 20")).toBeUndefined();
     expect(parseFieldValue("risk", "like", "Med")).toBe("Medium");
     expect(parseFieldValue("risk", "like", "Catastrophic")).toBeUndefined();
+  });
+});
+
+describe("project + bucket outbound (P2 / EN-005 push mirrors)", () => {
+  it("maps project health + dates and sets ProjectID on create", () => {
+    const fields = projectOutboundFields(
+      {
+        id: "PRJ-X",
+        name: "Portal",
+        owner: "vince",
+        health: "risk",
+        target: "Oct 01",
+        started: "2026.06.11",
+        desc: "Umbrella",
+        repos: [],
+        sync: { state: "pending", ts: "—", sp: "Projects · unprovisioned" },
+        prd: null,
+      },
+      { creating: true }
+    );
+    expect(fields.ProjectID).toBe("PRJ-X");
+    expect(fields.Health).toBe("At risk");
+    expect(fields.StartDate).toBeTruthy();
+  });
+
+  it("maps bucket fields and optional lookup ids including PercentComplete", () => {
+    const fields = bucketOutboundFields(
+      {
+        id: "BKT-X",
+        name: "Sync",
+        owner: "vince",
+        health: "track",
+        target: "Jul 20",
+        started: "2026.06.11",
+        desc: "",
+        repos: [],
+        sync: { state: "pending", ts: "—", sp: "Roadmap · unprovisioned" },
+        prd: null,
+        project: "PRJ-X",
+        progress: 25,
+      },
+      { creating: true, ownerLookupId: 42, projectLookupId: 7 }
+    );
+    expect(fields.InitiativeID).toBe("BKT-X");
+    expect(fields.OwnerLookupId).toBe(42);
+    expect(fields.ProjectLookupId).toBe(7);
+    expect(fields.PercentComplete).toBe(25);
+    expect(mcDateToIso("Jul 20")).toBeTruthy();
   });
 });

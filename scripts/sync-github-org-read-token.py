@@ -25,7 +25,7 @@ import boto3
 AWS_SECRETS = ("staging/ec2-secrets", "prod/ec2-secrets")
 VERCEL_TEAM = "petralabx"
 VERCEL_PROJECT = "plx-mission-control"
-VERIFY_REPOS = ("taylorvalton/PLX_MC", "petralabx/furgenics")
+VERIFY_REPOS = ("petralabx/PLX_MC", "petralabx/furgenics")
 
 
 def resolve_token(explicit: str | None) -> str:

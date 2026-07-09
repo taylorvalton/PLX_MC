@@ -58,7 +58,7 @@ function loadKeyFromAws() {
 }
 
 setDefault("MC_BASE_URL", "https://mc.plxcustomer.io");
-setDefault("MC_REPO", "taylorvalton/PLX_MC");
+setDefault("MC_REPO", "petralabx/PLX_MC");
 setDefault("MC_RUNTIME", "cursor");
 setDefault("PLX_MC_MCP_ENABLED", "0");
 setDefault("SWARM_API_URL", "http://127.0.0.1:8900");

@@ -40,7 +40,7 @@ them from the entry. Keep slugs lowercase kebab‑case.
 
 | | |
 |---|---|
-| **Status** | Aligned |
+| **Status** | Done |
 | **Type** | Enhancement |
 | **Area** | Repo registry (`src/lib/mc-data/data.ts`), GitHub App, loop ledgers, MCP/compliance slugs, consumer repos |
 | **Screenshot** | _none (infra / policy)_ |
@@ -48,9 +48,10 @@ them from the entry. Keep slugs lowercase kebab‑case.
 
 **Observed / current behavior**
 
-All MC registry rows defaulted to `owner: taylorvalton`. New brand and inference
-repos should not be created under a personal account; platform repos (`plx-customer-portal`,
-`PLX_MC`, `agentic-swarm`) remain on `taylorvalton` until a scheduled transfer.
+Platform trio transferred to [`petralabx`](https://github.com/petralabx) on 2026-07-09
+(`PLX_MC`, `plx-customer-portal`, `agentic-swarm`). Registries, MCP `MC_REPO`,
+`GEN_REPO`, DB `repos.owner`, and fleet scripts updated. Brand/inference repos
+were already on the PLX org.
 
 **Desired behavior / requirement**
 
@@ -65,13 +66,16 @@ repos should not be created under a personal account; platform repos (`plx-custo
 **Aligned decisions**
 
 - Constants: `REPO_ORG_LEGACY`, `REPO_ORG_PLX`, `ALLOWED_REPO_ORGS`, `DEFAULT_NEW_REPO_ORG`.
-- Seeded owners: platform → legacy; inference + brands → PLX org.
+- Seeded owners: platform → PLX org (post-transfer); inference + brands → PLX org.
 - Runbook: `docs/runbooks/github-org-phased-migration.md`.
 
 **Deferred (honestly)**
 
-- Actual GitHub org provisioning and repo transfers (operator/infra).
-- Removing `REPO_ORG_LEGACY` from `ALLOWED_REPO_ORGS` after migration completes.
+- Org required-workflow rulesets + private-repo branch protection need GitHub Team
+  (API still reports `petralabx` plan `free` as of 2026-07-09).
+- Removing `REPO_ORG_LEGACY` from `ALLOWED_REPO_ORGS` after confirming no remaining
+  legacy consumers.
+- Vercel project reconnect to new GitHub paths (operator).
 
 <!-- ENTRY TEMPLATE — copy this block for each new item
 ### EN‑NNN — <short title>
@@ -528,7 +532,8 @@ The four items WS‑1…WS‑3 explicitly deferred are now resolved, in two PRs:
 | 4 | EN‑001 bucket‑comment durability (store‑only, lost on reload) | Bucket comments persisted (migration `006`, `PATCH /api/buckets/{id}/comments`) + hydrated; app‑only (never pushed to SharePoint). | PR‑B `feat/bucket-comment-durability` |
 
 Still deferred (honestly): Teams/email notification delivery, Graph change
-webhooks, the Initiative lookup column, and Project Documents (driveItem) sync.
+webhooks, and Project Documents (driveItem) sync. Initiative lookup on ToDos
+and Roadmap Gantt inbound landed with the leftovers Track A work.
 
 ### EN‑005 — Flexible buckets (create/edit initiatives) · 2026‑06‑18
 
@@ -542,4 +547,4 @@ files with no create path. EN‑005 makes them first‑class and dynamic.
 | **Dynamic consumers** | `allBuckets()` / `bucketById()` are the single source of truth; every fixture consumer (sidebar, command palette, board/list/timeline + helpers, task/bucket detail, new‑task modal, files, traceability, meeting intake) reads them reactively. Pure helpers (insights, board helpers) take an injected `buckets` param (default = fixture) to stay deterministic. |
 | **UI** | "New initiative" modal mounted in the shell, triggered from a sidebar "+ New initiative" affordance and the command palette. |
 | **Verify** | Store create/edit reconcile+rollback + allow‑list tests, dynamic‑column helper test, create‑flow E2E; `typecheck` + 363 unit + `build` + `preflight --mode pre-push`; independent auditor ACCEPT. | PR `feat/enh-buckets-flexible` |
-| **Deferred (honestly)** | The buckets ↔ Roadmap SharePoint two‑way mirror + the Initiative lookup on ToDos (the engine does not mirror the Roadmap list yet) — buckets are app‑persistent for now, like the repo registry shipped DB‑first. Bucket DELETE/archive is also out of v1. |
+| **Deferred (honestly)** | Bucket DELETE/archive is out of v1. Roadmap outbound + Gantt inbound and ToDos Initiative lookup are landed (leftovers Track A). |

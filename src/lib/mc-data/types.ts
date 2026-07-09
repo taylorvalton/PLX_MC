@@ -156,6 +156,8 @@ export interface Bucket {
   // are valid; compliance auto-create still targets a bucket, never a project.
   project?: string | null;
   empty?: boolean;
+  // Gantt % Complete (Roadmap PercentComplete) — optional; mirrored when set.
+  progress?: number;
   // Bucket-level discussion thread (EN-001 / WS-3). Optional + app-only; the
   // runtime authority is the store's bucket-comment map (buckets have no
   // server persistence layer yet).

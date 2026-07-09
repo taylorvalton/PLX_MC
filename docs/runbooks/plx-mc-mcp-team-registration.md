@@ -14,7 +14,7 @@ Register **one** MCP server for the team at [cursor.com/agents](https://cursor.c
 | `MC_BASE_URL` | `https://mc.plxcustomer.io` |
 | `MC_MCP_API_KEY` | from AWS Secrets Manager (`PLX_MC_MCP_API_KEY` in `prod/ec2-secrets`) |
 | `MC_OPERATOR_EMAIL` | allowlisted `@petrasoap.com` operator — **agents:** `cos@petrasoap.com`; **human:** `vince@petrasoap.com` |
-| `MC_REPO` | target repo slug (e.g. `taylorvalton/plx-customer-portal`) |
+| `MC_REPO` | target repo slug (e.g. `petralabx/plx-customer-portal`) |
 | `PLX_MC_MCP_ENABLED` | `1` |
 | `SWARM_DISPATCH_ENABLED` | `0` until swarm is needed |
 
@@ -54,7 +54,7 @@ Register at [cursor.com/agents](https://cursor.com/agents) → MCP servers → A
 | URL | `https://mc.plxcustomer.io/api/cursor/mcp` |
 | Header `x-api-key` | `PLX_MC_MCP_API_KEY` from `prod/ec2-secrets` (AWS Secrets Manager) |
 | Header `x-mc-operator-email` | `cos@petrasoap.com` (agents) or `vince@petrasoap.com` (human operator) |
-| Header `x-mc-repo` | Target repo slug, e.g. `taylorvalton/plx-customer-portal` or `taylorvalton/PLX_MC` |
+| Header `x-mc-repo` | Target repo slug, e.g. `petralabx/plx-customer-portal` or `taylorvalton/PLX_MC` |
 | Header `x-mc-runtime` | `cursor` |
 
 Requires `PLX_MC_MCP_ENABLED=1` on the Vercel production deployment (already live).

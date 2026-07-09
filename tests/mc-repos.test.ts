@@ -64,9 +64,9 @@ describe("registry shape", () => {
   });
 
   it("keeps legacy platform repos on taylorvalton until EN-008 migration", () => {
-    expect(REPOS["portal-web"].owner).toBe(REPO_ORG_LEGACY);
-    expect(REPOS["plx-mc"].owner).toBe(REPO_ORG_LEGACY);
-    expect(REPOS["agentic-swarm"].owner).toBe(REPO_ORG_LEGACY);
+    expect(REPOS["portal-web"].owner).toBe(REPO_ORG_PLX);
+    expect(REPOS["plx-mc"].owner).toBe(REPO_ORG_PLX);
+    expect(REPOS["agentic-swarm"].owner).toBe(REPO_ORG_PLX);
   });
 
   it("registers new repos on the PLX org slug", () => {
