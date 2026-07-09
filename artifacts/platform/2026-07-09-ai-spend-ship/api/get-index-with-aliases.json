@@ -1,0 +1,247 @@
+{
+  "data": {
+    "period": {
+      "period": "mtd",
+      "start": "2026-07-01",
+      "end": "2026-07-10"
+    },
+    "rows": [
+      {
+        "vendor": {
+          "id": "aws",
+          "name": "Amazon Web Services",
+          "category": "cloud",
+          "adapter": "aws",
+          "billing": "usage",
+          "console_url": "https://console.aws.amazon.com/costmanagement/home",
+          "notes": "Cost Explorer daily unblended cost. Recent days are estimates until AWS closes the books."
+        },
+        "sourceStatus": "live",
+        "spendCents": 49946,
+        "estimated": true,
+        "snapshotCount": 9,
+        "budget": {
+          "vendorId": "aws",
+          "monthlyBudgetCents": 200000,
+          "warnPct": 0.8,
+          "criticalPct": 0.95,
+          "updatedBy": "vince@petrasoap.com",
+          "updatedAt": "2026-07-09T09:50:03.299Z"
+        },
+        "periodBudgetCents": 200000,
+        "utilization": 0.24973,
+        "alert": "ok",
+        "lastRefresh": {
+          "id": "vcr-7ad3cf14-b8e2-4026-abbd-acc131bcd98a",
+          "vendorId": "aws",
+          "status": "ok",
+          "snapshotCount": 9,
+          "createdAt": "2026-07-09T10:13:23.954Z"
+        }
+      },
+      {
+        "vendor": {
+          "id": "cursor",
+          "name": "Cursor",
+          "category": "ai",
+          "adapter": "cursor",
+          "billing": "usage",
+          "console_url": "https://cursor.com/dashboard",
+          "notes": "Team spend via the Admin API (Enterprise). Usage-reported for the current billing cycle \u2014 not invoice-final."
+        },
+        "sourceStatus": "degraded",
+        "degradedReason": "http_error",
+        "degradedNote": "[unauthorized] Cursor Admin API rejected the key (HTTP 401) \u2014 verify CURSOR_ADMIN_API_KEY is a team admin key on an Enterprise plan.",
+        "spendCents": 0,
+        "estimated": false,
+        "snapshotCount": 0,
+        "budget": null,
+        "periodBudgetCents": null,
+        "utilization": null,
+        "alert": "none",
+        "lastRefresh": {
+          "id": "vcr-891ff02d-c3ad-43b3-a4ce-9e54e4822894",
+          "vendorId": "cursor",
+          "status": "degraded",
+          "message": "[unauthorized] Cursor Admin API rejected the key (HTTP 401) \u2014 verify CURSOR_ADMIN_API_KEY is a team admin key on an Enterprise plan.",
+          "snapshotCount": 0,
+          "createdAt": "2026-07-09T10:13:25.844Z"
+        }
+      },
+      {
+        "vendor": {
+          "id": "anthropic",
+          "name": "Anthropic (Claude)",
+          "category": "ai",
+          "adapter": "anthropic",
+          "billing": "usage",
+          "console_url": "https://console.anthropic.com/settings/billing",
+          "notes": "Org cost report via the Admin API. Requires ANTHROPIC_ADMIN_API_KEY (sk-ant-admin01-\u2026); a standard API key cannot read costs."
+        },
+        "sourceStatus": "live",
+        "spendCents": 200268,
+        "estimated": false,
+        "snapshotCount": 8,
+        "budget": null,
+        "periodBudgetCents": null,
+        "utilization": null,
+        "alert": "none",
+        "lastRefresh": {
+          "id": "vcr-4ad9423c-57bb-439e-9c51-94108e8c7cc9",
+          "vendorId": "anthropic",
+          "status": "ok",
+          "snapshotCount": 8,
+          "createdAt": "2026-07-09T10:13:25.722Z"
+        }
+      },
+      {
+        "vendor": {
+          "id": "adobe",
+          "name": "Adobe",
+          "category": "creative",
+          "adapter": "manual",
+          "billing": "subscription",
+          "console_url": "https://account.adobe.com/plans",
+          "notes": "No reliable spend API \u2014 manual entry is the required path."
+        },
+        "sourceStatus": "manual",
+        "spendCents": 1597,
+        "estimated": false,
+        "snapshotCount": 1,
+        "budget": null,
+        "periodBudgetCents": null,
+        "utilization": null,
+        "alert": "none",
+        "lastRefresh": null
+      },
+      {
+        "vendor": {
+          "id": "docusign",
+          "name": "DocuSign",
+          "category": "operations",
+          "adapter": "manual",
+          "billing": "subscription",
+          "console_url": "https://account.docusign.com",
+          "notes": "No reliable spend API \u2014 manual entry is the required path."
+        },
+        "sourceStatus": "manual",
+        "spendCents": 0,
+        "estimated": false,
+        "snapshotCount": 0,
+        "budget": null,
+        "periodBudgetCents": null,
+        "utilization": null,
+        "alert": "none",
+        "lastRefresh": null
+      },
+      {
+        "vendor": {
+          "id": "godaddy",
+          "name": "GoDaddy",
+          "category": "domains",
+          "adapter": "manual",
+          "billing": "subscription",
+          "console_url": "https://account.godaddy.com/billing",
+          "notes": "No reliable spend API \u2014 manual entry is the required path."
+        },
+        "sourceStatus": "manual",
+        "spendCents": 0,
+        "estimated": false,
+        "snapshotCount": 0,
+        "budget": null,
+        "periodBudgetCents": null,
+        "utilization": null,
+        "alert": "none",
+        "lastRefresh": null
+      },
+      {
+        "vendor": {
+          "id": "google",
+          "name": "Google Workspace",
+          "category": "productivity",
+          "adapter": "manual",
+          "billing": "subscription",
+          "console_url": "https://admin.google.com/ac/billing",
+          "notes": "Manual entry in v1."
+        },
+        "sourceStatus": "manual",
+        "spendCents": 0,
+        "estimated": false,
+        "snapshotCount": 0,
+        "budget": null,
+        "periodBudgetCents": null,
+        "utilization": null,
+        "alert": "none",
+        "lastRefresh": null
+      },
+      {
+        "vendor": {
+          "id": "azure",
+          "name": "Microsoft Azure",
+          "category": "cloud",
+          "adapter": "manual",
+          "billing": "usage",
+          "console_url": "https://portal.azure.com/#view/Microsoft_Azure_CostManagement/Menu/~/overview",
+          "notes": "Manual entry in v1 (Cost Management API adapter is a v2 candidate)."
+        },
+        "sourceStatus": "manual",
+        "spendCents": 0,
+        "estimated": false,
+        "snapshotCount": 0,
+        "budget": null,
+        "periodBudgetCents": null,
+        "utilization": null,
+        "alert": "none",
+        "lastRefresh": null
+      },
+      {
+        "vendor": {
+          "id": "resend",
+          "name": "Resend",
+          "category": "email",
+          "adapter": "manual",
+          "billing": "subscription",
+          "console_url": "https://resend.com/settings/billing",
+          "notes": "Manual entry in v1."
+        },
+        "sourceStatus": "manual",
+        "spendCents": 0,
+        "estimated": false,
+        "snapshotCount": 0,
+        "budget": null,
+        "periodBudgetCents": null,
+        "utilization": null,
+        "alert": "none",
+        "lastRefresh": null
+      },
+      {
+        "vendor": {
+          "id": "vercel",
+          "name": "Vercel",
+          "category": "hosting",
+          "adapter": "manual",
+          "billing": "mixed",
+          "console_url": "https://vercel.com/account/billing",
+          "notes": "Manual entry in v1."
+        },
+        "sourceStatus": "manual",
+        "spendCents": 0,
+        "estimated": false,
+        "snapshotCount": 0,
+        "budget": null,
+        "periodBudgetCents": null,
+        "utilization": null,
+        "alert": "none",
+        "lastRefresh": null
+      }
+    ],
+    "totals": {
+      "spendCents": 251811,
+      "budgetedSpendCents": 49946,
+      "periodBudgetCents": 200000,
+      "warn": 0,
+      "critical": 0,
+      "over": 0
+    }
+  }
+}

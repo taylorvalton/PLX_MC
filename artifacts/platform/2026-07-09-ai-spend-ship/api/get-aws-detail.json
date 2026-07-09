@@ -1,0 +1,154 @@
+{
+  "data": {
+    "row": {
+      "vendor": {
+        "id": "aws",
+        "name": "Amazon Web Services",
+        "category": "cloud",
+        "adapter": "aws",
+        "billing": "usage",
+        "console_url": "https://console.aws.amazon.com/costmanagement/home",
+        "notes": "Cost Explorer daily unblended cost. Recent days are estimates until AWS closes the books."
+      },
+      "sourceStatus": "live",
+      "spendCents": 49946,
+      "estimated": true,
+      "snapshotCount": 9,
+      "budget": null,
+      "periodBudgetCents": null,
+      "utilization": null,
+      "alert": "none",
+      "lastRefresh": {
+        "id": "vcr-4e3d5a68-1232-4733-8935-c5330d526a8b",
+        "vendorId": "aws",
+        "status": "ok",
+        "snapshotCount": 9,
+        "createdAt": "2026-07-09T09:49:23.781Z"
+      }
+    },
+    "snapshots": [
+      {
+        "id": "vcs-f0d53b7f-204e-4284-8691-951b3b996e43",
+        "vendorId": "aws",
+        "periodStart": "2026-07-09",
+        "periodEnd": "2026-07-10",
+        "amountCents": 0,
+        "currency": "USD",
+        "source": "api",
+        "estimated": true,
+        "createdAt": "2026-07-09T09:49:23.756Z"
+      },
+      {
+        "id": "vcs-b6ec8835-f5fe-42c0-8e8a-4349330c558d",
+        "vendorId": "aws",
+        "periodStart": "2026-07-08",
+        "periodEnd": "2026-07-09",
+        "amountCents": 4836,
+        "currency": "USD",
+        "source": "api",
+        "estimated": true,
+        "createdAt": "2026-07-09T09:49:23.730Z"
+      },
+      {
+        "id": "vcs-2ec17c68-bd79-4049-a133-315058e2fdca",
+        "vendorId": "aws",
+        "periodStart": "2026-07-07",
+        "periodEnd": "2026-07-08",
+        "amountCents": 5737,
+        "currency": "USD",
+        "source": "api",
+        "estimated": true,
+        "createdAt": "2026-07-09T09:49:23.704Z"
+      },
+      {
+        "id": "vcs-d728c34d-899b-4029-9ef2-9703202562aa",
+        "vendorId": "aws",
+        "periodStart": "2026-07-06",
+        "periodEnd": "2026-07-07",
+        "amountCents": 5764,
+        "currency": "USD",
+        "source": "api",
+        "estimated": true,
+        "createdAt": "2026-07-09T09:49:23.678Z"
+      },
+      {
+        "id": "vcs-3f5d4d6c-2b1d-4695-aa8e-4db963475ece",
+        "vendorId": "aws",
+        "periodStart": "2026-07-05",
+        "periodEnd": "2026-07-06",
+        "amountCents": 5676,
+        "currency": "USD",
+        "source": "api",
+        "estimated": true,
+        "createdAt": "2026-07-09T09:49:23.653Z"
+      },
+      {
+        "id": "vcs-1710818b-ea7f-4135-a1de-c4c1b3d23909",
+        "vendorId": "aws",
+        "periodStart": "2026-07-04",
+        "periodEnd": "2026-07-05",
+        "amountCents": 5548,
+        "currency": "USD",
+        "source": "api",
+        "estimated": true,
+        "createdAt": "2026-07-09T09:49:23.627Z"
+      },
+      {
+        "id": "vcs-ffa8e73c-0709-497e-9fc1-a4cc298e2173",
+        "vendorId": "aws",
+        "periodStart": "2026-07-03",
+        "periodEnd": "2026-07-04",
+        "amountCents": 5551,
+        "currency": "USD",
+        "source": "api",
+        "estimated": true,
+        "createdAt": "2026-07-09T09:49:23.601Z"
+      },
+      {
+        "id": "vcs-1417cd5e-e890-497c-9f15-d7105a787071",
+        "vendorId": "aws",
+        "periodStart": "2026-07-02",
+        "periodEnd": "2026-07-03",
+        "amountCents": 5547,
+        "currency": "USD",
+        "source": "api",
+        "estimated": true,
+        "createdAt": "2026-07-09T09:49:23.575Z"
+      },
+      {
+        "id": "vcs-04e23e3d-6b39-4aed-af93-ed62c296ec3d",
+        "vendorId": "aws",
+        "periodStart": "2026-07-01",
+        "periodEnd": "2026-07-02",
+        "amountCents": 11287,
+        "currency": "USD",
+        "source": "api",
+        "estimated": true,
+        "createdAt": "2026-07-09T09:49:23.549Z"
+      }
+    ],
+    "refreshLog": [
+      {
+        "id": "vcr-4e3d5a68-1232-4733-8935-c5330d526a8b",
+        "vendorId": "aws",
+        "status": "ok",
+        "snapshotCount": 9,
+        "createdAt": "2026-07-09T09:49:23.781Z"
+      },
+      {
+        "id": "vcr-9bd76ad1-4531-4bf9-a14d-52845deb3768",
+        "vendorId": "aws",
+        "status": "ok",
+        "snapshotCount": 9,
+        "createdAt": "2026-07-09T09:49:16.744Z"
+      },
+      {
+        "id": "vcr-1f3fd908-0398-429a-9188-38828c15dc19",
+        "vendorId": "aws",
+        "status": "ok",
+        "snapshotCount": 9,
+        "createdAt": "2026-07-09T09:49:15.876Z"
+      }
+    ]
+  }
+}

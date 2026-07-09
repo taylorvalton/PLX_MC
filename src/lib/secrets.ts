@@ -12,6 +12,15 @@ function requireSecret(name: string): string {
   return value;
 }
 
+/** First non-empty env value among `names` (canonical first, then aliases). */
+function firstSecret(...names: string[]): string | undefined {
+  for (const name of names) {
+    const value = process.env[name];
+    if (value) return value;
+  }
+  return undefined;
+}
+
 export function databaseUrl(): string {
   return requireSecret("PLX_MC_DATABASE_URL");
 }
@@ -176,4 +185,73 @@ export function complianceCiTokenConfigured(): boolean {
 
 export function complianceCiToken(): string {
   return requireSecret("COMPLIANCE_CI_TOKEN");
+}
+
+// Vendor spend (AI Spend) adapter credentials. Each automated adapter is
+// default-off: when its key is absent the adapter returns a visible degraded
+// result and the vendor stays manual-entry — never fabricated spend.
+//
+// AWS Cost Explorer uses the standard AWS credential chain (env keys on the
+// box, or an instance role) rather than a bespoke env var, so its presence
+// check looks for either an explicit access key or the ambient-credential
+// opt-in flag set where an IAM role is known to exist.
+export function awsCostExplorerConfigured(): boolean {
+  return !!(
+    (process.env.AWS_ACCESS_KEY_ID && process.env.AWS_SECRET_ACCESS_KEY) ||
+    process.env.AWS_COST_EXPLORER_USE_AMBIENT === "1"
+  );
+}
+
+export interface AwsCostExplorerCredentials {
+  accessKeyId: string;
+  secretAccessKey: string;
+  sessionToken?: string;
+  region: string;
+}
+
+/** Explicit env credentials, or null to let the SDK use its ambient chain. */
+export function awsCostExplorerCredentials(): AwsCostExplorerCredentials | null {
+  if (!(process.env.AWS_ACCESS_KEY_ID && process.env.AWS_SECRET_ACCESS_KEY)) {
+    return null;
+  }
+  return {
+    accessKeyId: requireSecret("AWS_ACCESS_KEY_ID"),
+    secretAccessKey: requireSecret("AWS_SECRET_ACCESS_KEY"),
+    sessionToken: process.env.AWS_SESSION_TOKEN || undefined,
+    region: process.env.AWS_REGION ?? "us-east-1",
+  };
+}
+
+// Anthropic org cost report needs an ADMIN key (sk-ant-admin01-…); the
+// standard ANTHROPIC_API_KEY cannot read /v1/organizations/cost_report.
+// Canonical env: ANTHROPIC_ADMIN_API_KEY. Alias accepted: ANTHROPIC_ADMIN_KEY
+// (name used in prod/ec2-secrets / staging/ec2-secrets).
+export function anthropicAdminConfigured(): boolean {
+  return !!firstSecret("ANTHROPIC_ADMIN_API_KEY", "ANTHROPIC_ADMIN_KEY");
+}
+
+export function anthropicAdminApiKey(): string {
+  const value = firstSecret("ANTHROPIC_ADMIN_API_KEY", "ANTHROPIC_ADMIN_KEY");
+  if (!value) {
+    throw new Error(
+      "missing secret ANTHROPIC_ADMIN_API_KEY (or alias ANTHROPIC_ADMIN_KEY) — run the secrets loader (see TOOLS.md)"
+    );
+  }
+  return value;
+}
+
+// Cursor team spend needs an Enterprise Admin API key (/teams/spend).
+// Canonical env: CURSOR_ADMIN_API_KEY. Alias accepted: CURSOR_ADMIN_KEY.
+export function cursorAdminConfigured(): boolean {
+  return !!firstSecret("CURSOR_ADMIN_API_KEY", "CURSOR_ADMIN_KEY");
+}
+
+export function cursorAdminApiKey(): string {
+  const value = firstSecret("CURSOR_ADMIN_API_KEY", "CURSOR_ADMIN_KEY");
+  if (!value) {
+    throw new Error(
+      "missing secret CURSOR_ADMIN_API_KEY (or alias CURSOR_ADMIN_KEY) — run the secrets loader (see TOOLS.md)"
+    );
+  }
+  return value;
 }

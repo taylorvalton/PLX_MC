@@ -1,0 +1,95 @@
+{
+  "schema_version": "plx-vendor-costs-registry/v1",
+  "vendors": [
+    {
+      "id": "aws",
+      "name": "Amazon Web Services",
+      "category": "cloud",
+      "adapter": "aws",
+      "billing": "usage",
+      "console_url": "https://console.aws.amazon.com/costmanagement/home",
+      "notes": "Cost Explorer daily unblended cost. Recent days are estimates until AWS closes the books."
+    },
+    {
+      "id": "anthropic",
+      "name": "Anthropic (Claude)",
+      "category": "ai",
+      "adapter": "anthropic",
+      "billing": "usage",
+      "console_url": "https://console.anthropic.com/settings/billing",
+      "notes": "Org cost report via the Admin API. Requires ANTHROPIC_ADMIN_API_KEY (sk-ant-admin01-…); a standard API key cannot read costs."
+    },
+    {
+      "id": "cursor",
+      "name": "Cursor",
+      "category": "ai",
+      "adapter": "cursor",
+      "billing": "usage",
+      "console_url": "https://cursor.com/dashboard",
+      "notes": "Team spend via the Admin API (Enterprise). Usage-reported for the current billing cycle — not invoice-final."
+    },
+    {
+      "id": "azure",
+      "name": "Microsoft Azure",
+      "category": "cloud",
+      "adapter": "manual",
+      "billing": "usage",
+      "console_url": "https://portal.azure.com/#view/Microsoft_Azure_CostManagement/Menu/~/overview",
+      "notes": "Manual entry in v1 (Cost Management API adapter is a v2 candidate)."
+    },
+    {
+      "id": "google",
+      "name": "Google Workspace",
+      "category": "productivity",
+      "adapter": "manual",
+      "billing": "subscription",
+      "console_url": "https://admin.google.com/ac/billing",
+      "notes": "Manual entry in v1."
+    },
+    {
+      "id": "vercel",
+      "name": "Vercel",
+      "category": "hosting",
+      "adapter": "manual",
+      "billing": "mixed",
+      "console_url": "https://vercel.com/account/billing",
+      "notes": "Manual entry in v1."
+    },
+    {
+      "id": "resend",
+      "name": "Resend",
+      "category": "email",
+      "adapter": "manual",
+      "billing": "subscription",
+      "console_url": "https://resend.com/settings/billing",
+      "notes": "Manual entry in v1."
+    },
+    {
+      "id": "docusign",
+      "name": "DocuSign",
+      "category": "operations",
+      "adapter": "manual",
+      "billing": "subscription",
+      "console_url": "https://account.docusign.com",
+      "notes": "No reliable spend API — manual entry is the required path."
+    },
+    {
+      "id": "godaddy",
+      "name": "GoDaddy",
+      "category": "domains",
+      "adapter": "manual",
+      "billing": "subscription",
+      "console_url": "https://account.godaddy.com/billing",
+      "notes": "No reliable spend API — manual entry is the required path."
+    },
+    {
+      "id": "adobe",
+      "name": "Adobe",
+      "category": "creative",
+      "adapter": "manual",
+      "billing": "subscription",
+      "console_url": "https://account.adobe.com/plans",
+      "notes": "No reliable spend API — manual entry is the required path."
+    }
+  ]
+}

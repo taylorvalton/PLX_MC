@@ -5,7 +5,7 @@ subscription and API cost tracking with budgets, period filters, and in-app warn
 
 - **Date:** 2026-06-30
 - **Domain:** platform
-- **Status:** Approved for later execution (placeholder UI shipped; full build deferred)
+- **Status:** Executed 2026-07-07 — module shipped (see `docs/modules/vendor-spend/README.md`; migration landed as `014_vendor_spend.sql`, not `011` as drafted)
 - **Orchestrator slug:** `vendor-spend`
 - **UI screen:** `ai-spend` (sidebar label: **AI Spend**)
 

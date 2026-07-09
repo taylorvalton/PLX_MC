@@ -55,6 +55,45 @@ integrations:
       - Graph change-notification subscription wiring (needs a public webhook
         endpoint) — capture entrypoints accept payloads directly until then.
 
+  - id: vendor-spend
+    name: AI Spend — vendor cost adapters (AWS / Anthropic / Cursor)
+    owner: Vince (vince@petrasoap.com)
+    criticality: Medium
+    # Read-only cost pulls from three vendor billing APIs; manual entry covers
+    # every other registry vendor. Runtime feature, but each adapter is
+    # key-gated and ships dormant until its credential exists.
+    scope: runtime (read-only pulls; per-adapter key gating)
+    autonomous: false # reads billing data only; never sends/posts/changes vendor config
+    default_state: off (per adapter — dormant until its key is configured)
+    feature_flag: >-
+      Per-adapter presence checks in src/lib/secrets.ts —
+      awsCostExplorerConfigured(), anthropicAdminConfigured(),
+      cursorAdminConfigured(). Scheduled refresh additionally rides CRON_SECRET
+      (unset → /api/cron/vendor-spend-refresh returns 503).
+    kill_switch: >-
+      Remove the vendor's key from the environment/secrets manager — the
+      adapter degrades visibly on the next pull. Unset CRON_SECRET (or drop the
+      vercel.json cron entry) to stop scheduled refreshes entirely.
+    auth_source:
+      - AWS Cost Explorer — standard AWS credential chain via awsCostExplorerCredentials() (AWS_ACCESS_KEY_ID/AWS_SECRET_ACCESS_KEY, or ambient role with AWS_COST_EXPLORER_USE_AMBIENT=1)
+      - Anthropic Admin API — ANTHROPIC_ADMIN_API_KEY via anthropicAdminApiKey() (admin key, sk-ant-admin01-…; alias ANTHROPIC_ADMIN_KEY)
+      - Cursor Enterprise Admin API — CURSOR_ADMIN_API_KEY via cursorAdminApiKey() (alias CURSOR_ADMIN_KEY)
+    health_check: >-
+      Every pull writes a vendor_cost_refresh_log row (ok/degraded/error) and
+      the UI renders per-vendor source status (API · LIVE / API · DEGRADED /
+      MANUAL) with the degraded reason and missing secret named — visible
+      state, never fabricated spend.
+    fallback_path: >-
+      Manual cost snapshots (POST /api/vendor-spend/snapshots) work for every
+      vendor regardless of adapter health; a degraded adapter never blocks
+      budgets or manual tracking.
+    data_audit_boundary: >-
+      Reads aggregate cost figures only (no prompts, no per-user content;
+      Cursor per-user spend is summed to a team total before persistence).
+      Secrets never leave the accessor; refresh outcomes are logged per vendor
+      with timestamps. In-app alerts only in v1 — email/Teams delivery is
+      deferred to artifacts/platform/2026-06-30-vendor-spend-alerts-followup/.
+
   - id: repo-registry-mirror
     name: Repo Registry → SharePoint mirror
     resolves: EN-002 (Item 2)

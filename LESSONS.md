@@ -16,6 +16,24 @@
 
 ## Lessons
 
+### 2026-07-09 (ET) — Vendor-spend migration collided with main's 014 after a clean rebase
+
+- **What happened:** `feat/ai-spend-observatory` rebased cleanly onto `origin/main`
+  at `a1317bf` with `014_vendor_spend.sql`, then `#108` landed
+  `014_bucket_dirty_fields.sql` on main. A second rebase produced a duplicate
+  `014` prefix; the migration gate failed, and staging briefly recorded both
+  filenames in `schema_migrations`.
+- **Root cause:** Migration prefixes are globally serialized across the whole
+  repo, not per-feature. A clean rebase onto yesterday's main is not proof the
+  next number is still free at ship time.
+- **Rule going forward:** Immediately before opening a PR that adds a numbered
+  migration, `git fetch origin main` and re-check
+  `python scripts/check-migrations.py` against the rebased tree. If main took
+  the prefix, renumber (and update module README + rollback) before push. If
+  staging already applied the old filename via `CREATE IF NOT EXISTS`, apply
+  the new filename then delete only the orphan `schema_migrations` row — never
+  drop the live tables.
+
 ### 2026-07-02 (ET) — Six agent PRs merged without MC task checkout; work was invisible in Mission Control
 
 - **What happened:** PRs #89–#95 (brand parity, ui-ux loops, token migration,

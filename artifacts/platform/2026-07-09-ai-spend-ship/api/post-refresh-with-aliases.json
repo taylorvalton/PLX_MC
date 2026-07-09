@@ -1,0 +1,1 @@
+{"data":{"outcomes":[{"vendorId":"aws","status":"ok","snapshotCount":9},{"vendorId":"anthropic","status":"ok","snapshotCount":8},{"vendorId":"cursor","status":"degraded","message":"[unauthorized] Cursor Admin API rejected the key (HTTP 401) — verify CURSOR_ADMIN_API_KEY is a team admin key on an Enterprise plan.","snapshotCount":0}]}}
