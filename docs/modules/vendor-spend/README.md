@@ -27,7 +27,7 @@ engineering ops and finance the true cost posture at a glance.
    (`plx-vendor-costs-registry/v1`) lists the ten vendors with adapter kind
    (`aws` | `anthropic` | `cursor` | `manual`), category, billing model, and
    console URL. Parsed/validated by `parseVendorRegistry` (Zod, never throws).
-2. **Persistence** — Postgres tables from `db/migrations/014_vendor_spend.sql`:
+2. **Persistence** — Postgres tables from `db/migrations/015_vendor_spend.sql`:
    `vendor_cost_budgets` (one monthly budget + thresholds per vendor),
    `vendor_cost_snapshots` (cost observations over `[period_start,
    period_end)`; api-sourced rows are unique per vendor+day so re-pulls upsert
@@ -99,7 +99,7 @@ only. Depended on by: nothing yet.
 
 - `src/lib/vendor-spend/` — domain module (types, registry, period math, alerts, store, adapters, loader, refresh, barrel `index.ts`)
 - `config/vendor-costs-registry.json` — ten-vendor registry (no secrets)
-- `db/migrations/014_vendor_spend.sql` (+ `db/rollback/014_vendor_spend_rollback.sql`)
+- `db/migrations/015_vendor_spend.sql` (+ `db/rollback/015_vendor_spend_rollback.sql`)
 - `src/app/api/vendor-spend/` — read + mutating routes; `src/app/api/cron/vendor-spend-refresh/` — scheduled refresh
 - `src/components/mc/ai-spend.tsx`, `src/components/mc/vendor-spend/` — screen
 - `src/styles/mc-vendor-spend.css` — screen styles (`--p-*` tokens only)

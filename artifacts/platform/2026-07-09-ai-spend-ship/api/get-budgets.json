@@ -1,0 +1,12 @@
+{
+  "data": [
+    {
+      "vendorId": "aws",
+      "monthlyBudgetCents": 40000,
+      "warnPct": 0.8,
+      "criticalPct": 0.95,
+      "updatedBy": "vince@petrasoap.com",
+      "updatedAt": "2026-07-09T09:49:49.237Z"
+    }
+  ]
+}

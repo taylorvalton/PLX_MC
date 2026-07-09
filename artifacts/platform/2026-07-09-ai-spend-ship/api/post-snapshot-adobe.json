@@ -1,0 +1,15 @@
+{
+  "data": {
+    "id": "vcs-c6be4f1f-bd74-4d57-8377-6572ba393db0",
+    "vendorId": "adobe",
+    "periodStart": "2026-07-01",
+    "periodEnd": "2026-08-01",
+    "amountCents": 5500,
+    "currency": "USD",
+    "source": "manual",
+    "estimated": false,
+    "enteredBy": "vince@petrasoap.com",
+    "note": "ship smoke manual snapshot",
+    "createdAt": "2026-07-09T09:49:49.269Z"
+  }
+}

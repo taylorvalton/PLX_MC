@@ -1,0 +1,22 @@
+assert_staging: PASS
+db_host=plx-postgres-staging.c2b8m8isksqt.us-east-1.rds.amazonaws.com
+db_name=plx_mc
+not_production_host: PASS
+
+# First apply (pre-renumber, during smoke — tables created under temporary name)
+# apply  014_vendor_spend.sql
+# migrations complete — 1 applied, 13 already in place.
+
+# After rebase collision fix (renumber to 015; CREATE IF NOT EXISTS no-ops tables)
+# apply  015_vendor_spend.sql
+# migrations complete — 1 applied, 14 already in place.
+# orphan schema_migrations row 014_vendor_spend.sql deleted; tables retained
+
+final_schema_migrations:
+  014_bucket_dirty_fields.sql
+  015_vendor_spend.sql
+
+tables:
+  vendor_cost_budgets
+  vendor_cost_snapshots
+  vendor_cost_refresh_log

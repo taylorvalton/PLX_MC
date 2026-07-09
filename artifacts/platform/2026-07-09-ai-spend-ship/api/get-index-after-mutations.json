@@ -1,0 +1,250 @@
+{
+  "data": {
+    "period": {
+      "period": "mtd",
+      "start": "2026-07-01",
+      "end": "2026-07-10"
+    },
+    "rows": [
+      {
+        "vendor": {
+          "id": "aws",
+          "name": "Amazon Web Services",
+          "category": "cloud",
+          "adapter": "aws",
+          "billing": "usage",
+          "console_url": "https://console.aws.amazon.com/costmanagement/home",
+          "notes": "Cost Explorer daily unblended cost. Recent days are estimates until AWS closes the books."
+        },
+        "sourceStatus": "live",
+        "spendCents": 49946,
+        "estimated": true,
+        "snapshotCount": 9,
+        "budget": {
+          "vendorId": "aws",
+          "monthlyBudgetCents": 40000,
+          "warnPct": 0.8,
+          "criticalPct": 0.95,
+          "updatedBy": "vince@petrasoap.com",
+          "updatedAt": "2026-07-09T09:49:49.237Z"
+        },
+        "periodBudgetCents": 40000,
+        "utilization": 1.24865,
+        "alert": "over",
+        "lastRefresh": {
+          "id": "vcr-4e3d5a68-1232-4733-8935-c5330d526a8b",
+          "vendorId": "aws",
+          "status": "ok",
+          "snapshotCount": 9,
+          "createdAt": "2026-07-09T09:49:23.781Z"
+        }
+      },
+      {
+        "vendor": {
+          "id": "anthropic",
+          "name": "Anthropic (Claude)",
+          "category": "ai",
+          "adapter": "anthropic",
+          "billing": "usage",
+          "console_url": "https://console.anthropic.com/settings/billing",
+          "notes": "Org cost report via the Admin API. Requires ANTHROPIC_ADMIN_API_KEY (sk-ant-admin01-\u2026); a standard API key cannot read costs."
+        },
+        "sourceStatus": "degraded",
+        "degradedReason": "key_missing",
+        "degradedNote": "Anthropic (Claude) adapter credentials are not configured \u2014 spend shown from manual entries only.",
+        "spendCents": 0,
+        "estimated": false,
+        "snapshotCount": 0,
+        "budget": null,
+        "periodBudgetCents": null,
+        "utilization": null,
+        "alert": "none",
+        "lastRefresh": {
+          "id": "vcr-bbf7c745-3cee-4238-ae6d-59e8fc8669d4",
+          "vendorId": "anthropic",
+          "status": "degraded",
+          "message": "[key_missing] ANTHROPIC_ADMIN_API_KEY is not configured \u2014 the cost report needs an Admin key (sk-ant-admin01-\u2026), not a standard API key.",
+          "snapshotCount": 0,
+          "createdAt": "2026-07-09T09:49:23.810Z"
+        }
+      },
+      {
+        "vendor": {
+          "id": "cursor",
+          "name": "Cursor",
+          "category": "ai",
+          "adapter": "cursor",
+          "billing": "usage",
+          "console_url": "https://cursor.com/dashboard",
+          "notes": "Team spend via the Admin API (Enterprise). Usage-reported for the current billing cycle \u2014 not invoice-final."
+        },
+        "sourceStatus": "degraded",
+        "degradedReason": "key_missing",
+        "degradedNote": "Cursor adapter credentials are not configured \u2014 spend shown from manual entries only.",
+        "spendCents": 0,
+        "estimated": false,
+        "snapshotCount": 0,
+        "budget": null,
+        "periodBudgetCents": null,
+        "utilization": null,
+        "alert": "none",
+        "lastRefresh": {
+          "id": "vcr-78be6cbd-d4ef-4953-97ab-ca1a40fa85b2",
+          "vendorId": "cursor",
+          "status": "degraded",
+          "message": "[key_missing] CURSOR_ADMIN_API_KEY is not configured \u2014 team spend needs an Enterprise Admin API key.",
+          "snapshotCount": 0,
+          "createdAt": "2026-07-09T09:49:23.836Z"
+        }
+      },
+      {
+        "vendor": {
+          "id": "adobe",
+          "name": "Adobe",
+          "category": "creative",
+          "adapter": "manual",
+          "billing": "subscription",
+          "console_url": "https://account.adobe.com/plans",
+          "notes": "No reliable spend API \u2014 manual entry is the required path."
+        },
+        "sourceStatus": "manual",
+        "spendCents": 1597,
+        "estimated": false,
+        "snapshotCount": 1,
+        "budget": null,
+        "periodBudgetCents": null,
+        "utilization": null,
+        "alert": "none",
+        "lastRefresh": null
+      },
+      {
+        "vendor": {
+          "id": "docusign",
+          "name": "DocuSign",
+          "category": "operations",
+          "adapter": "manual",
+          "billing": "subscription",
+          "console_url": "https://account.docusign.com",
+          "notes": "No reliable spend API \u2014 manual entry is the required path."
+        },
+        "sourceStatus": "manual",
+        "spendCents": 0,
+        "estimated": false,
+        "snapshotCount": 0,
+        "budget": null,
+        "periodBudgetCents": null,
+        "utilization": null,
+        "alert": "none",
+        "lastRefresh": null
+      },
+      {
+        "vendor": {
+          "id": "godaddy",
+          "name": "GoDaddy",
+          "category": "domains",
+          "adapter": "manual",
+          "billing": "subscription",
+          "console_url": "https://account.godaddy.com/billing",
+          "notes": "No reliable spend API \u2014 manual entry is the required path."
+        },
+        "sourceStatus": "manual",
+        "spendCents": 0,
+        "estimated": false,
+        "snapshotCount": 0,
+        "budget": null,
+        "periodBudgetCents": null,
+        "utilization": null,
+        "alert": "none",
+        "lastRefresh": null
+      },
+      {
+        "vendor": {
+          "id": "google",
+          "name": "Google Workspace",
+          "category": "productivity",
+          "adapter": "manual",
+          "billing": "subscription",
+          "console_url": "https://admin.google.com/ac/billing",
+          "notes": "Manual entry in v1."
+        },
+        "sourceStatus": "manual",
+        "spendCents": 0,
+        "estimated": false,
+        "snapshotCount": 0,
+        "budget": null,
+        "periodBudgetCents": null,
+        "utilization": null,
+        "alert": "none",
+        "lastRefresh": null
+      },
+      {
+        "vendor": {
+          "id": "azure",
+          "name": "Microsoft Azure",
+          "category": "cloud",
+          "adapter": "manual",
+          "billing": "usage",
+          "console_url": "https://portal.azure.com/#view/Microsoft_Azure_CostManagement/Menu/~/overview",
+          "notes": "Manual entry in v1 (Cost Management API adapter is a v2 candidate)."
+        },
+        "sourceStatus": "manual",
+        "spendCents": 0,
+        "estimated": false,
+        "snapshotCount": 0,
+        "budget": null,
+        "periodBudgetCents": null,
+        "utilization": null,
+        "alert": "none",
+        "lastRefresh": null
+      },
+      {
+        "vendor": {
+          "id": "resend",
+          "name": "Resend",
+          "category": "email",
+          "adapter": "manual",
+          "billing": "subscription",
+          "console_url": "https://resend.com/settings/billing",
+          "notes": "Manual entry in v1."
+        },
+        "sourceStatus": "manual",
+        "spendCents": 0,
+        "estimated": false,
+        "snapshotCount": 0,
+        "budget": null,
+        "periodBudgetCents": null,
+        "utilization": null,
+        "alert": "none",
+        "lastRefresh": null
+      },
+      {
+        "vendor": {
+          "id": "vercel",
+          "name": "Vercel",
+          "category": "hosting",
+          "adapter": "manual",
+          "billing": "mixed",
+          "console_url": "https://vercel.com/account/billing",
+          "notes": "Manual entry in v1."
+        },
+        "sourceStatus": "manual",
+        "spendCents": 0,
+        "estimated": false,
+        "snapshotCount": 0,
+        "budget": null,
+        "periodBudgetCents": null,
+        "utilization": null,
+        "alert": "none",
+        "lastRefresh": null
+      }
+    ],
+    "totals": {
+      "spendCents": 51543,
+      "budgetedSpendCents": 49946,
+      "periodBudgetCents": 40000,
+      "warn": 0,
+      "critical": 0,
+      "over": 1
+    }
+  }
+}
