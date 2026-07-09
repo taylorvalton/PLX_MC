@@ -91,3 +91,11 @@ npx vitest run tests/compliance-github-oidc.test.ts tests/compliance-verify-rout
 - Production deploy: `dpl_52pkPJFHcRoNy1ZeSZkW4KHC1VZ4` READY → `mc.plxcustomer.io`
 - Env (booleans/config only): `COMPLIANCE_OIDC_ENABLED=1`, audience + allowlist set, `COMPLIANCE_CI_TOKEN` still present
 - Live probes: missing/bad auth → 401; valid bearer → 200 pass
+
+## Dogfood (SC 8) — PASS via OIDC
+
+- PR: https://github.com/petralabx/PLX_MC/pull/113
+- Workflow run: https://github.com/petralabx/PLX_MC/actions/runs/29023940656
+- Log: `auth=oidc`
+- Verdict: `pass` (TASK-297 agent bundle complete)
+- Bearer still present as break-glass; **not retired**
