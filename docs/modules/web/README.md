@@ -44,6 +44,11 @@ pixel-precisely in `docs/product/README.md` §6 and
   (`src/components/mc/route.ts`) and navigates with `nav(screen, extra?)` where
   `extra` may carry `projectId`, `bucketId`, `taskId`, or an Insights
   `filter`. The shell renders `SCREENS[route.screen]` from the registry.
+- Screens are URL-addressable: `nav()` mirrors the route to query params on `/`
+  (`/?screen=task&taskId=…`) via shallow `history.pushState`; a `popstate`
+  listener replays back/forward and the shell adopts the URL post-mount, so
+  reloads and deep links restore the screen. The transient Insights `filter`
+  is deliberately not serialized (see `routeToUrl`/`urlToRoute` in `route.ts`).
 - The screens live in `src/components/mc/`; they read the typed data layer in
   `src/lib/mc-data/` (faithful to `docs/product/DATA_MODEL.md`) whose store is
   now API-backed; fixtures remain the SSR/offline baseline. Each new screen is rebuilt
