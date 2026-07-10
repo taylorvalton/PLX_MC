@@ -4,7 +4,7 @@ import { useState, type CSSProperties } from "react";
 
 import { ACTORS, PROJECTS, STAGES, STAGE_IDX, type Project } from "@/lib/mc-data";
 import { useMcVersion } from "@/lib/mc-data/hooks";
-import { allTasks, bucketsForProject, projectById, updateProject } from "@/lib/mc-data/store";
+import { allTasks, bucketsForProject, projectById, pushNotice, updateProject } from "@/lib/mc-data/store";
 
 import { Avatar, HealthPill, SyncTick } from "./atoms";
 import { PeoplePicker } from "./people-picker";
@@ -34,8 +34,8 @@ export function ProjectDetail({ route, nav }: ScreenProps) {
   // optimistic local apply, reconcile to server truth on success, rollback +
   // non-silent notice on failure — the same contract as updateBucket.
   const commitTarget = (raw: string) => {
-    const target = raw.trim();
-    if (target && target !== project.target) updateProject(project.id, { target });
+    const target = raw.trim() || "—";
+    if (target !== project.target) updateProject(project.id, { target });
   };
 
   return (
@@ -144,8 +144,12 @@ export function ProjectDetail({ route, nav }: ScreenProps) {
                   current={project.owner}
                   onPick={(actorId) => {
                     // A project always carries a human accountable owner —
-                    // ignore the picker's Unassign affordance.
-                    if (actorId) updateProject(project.id, { owner: actorId });
+                    // an "Unassign" click is blocked with a visible notice.
+                    if (actorId) {
+                      updateProject(project.id, { owner: actorId });
+                      return;
+                    }
+                    pushNotice("Projects require a human accountable owner.");
                   }}
                   onClose={() => setOwnerPickerOpen(false)}
                   style={{ top: "calc(100% + 6px)", left: 0 }}
