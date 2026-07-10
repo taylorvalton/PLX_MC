@@ -179,41 +179,6 @@
   }
 }
 
-/* Bucket facts strip: 5-up → 2-up → 1-up down the tiers (RESPONSIVE.md §2). */
-@media (max-width: 1024px) {
-  .mc .bk .bkfacts {
-    grid-template-columns: repeat(2, 1fr);
-  }
-
-  .mc .bk .bkfacts .f {
-    border-bottom: 1px solid var(--p-grid-2);
-  }
-
-  .mc .bk .bkbody {
-    grid-template-columns: 1fr;
-  }
-
-  .mc .bk .bkbody .c + .c {
-    border-left: 0;
-    border-top: 1px solid var(--p-grid);
-  }
-
-  /* Initiative card grid rides the same tiers: 3-up → 2-up → 1-up. */
-  .mc .init-grid {
-    grid-template-columns: repeat(2, 1fr);
-  }
-}
-
-@media (max-width: 640px) {
-  .mc .bk .bkfacts {
-    grid-template-columns: 1fr;
-  }
-
-  .mc .init-grid {
-    grid-template-columns: 1fr;
-  }
-}
-
 /* Bucket detail */
 .mc .bk {
   padding: 0 0 80px;
@@ -281,6 +246,35 @@
 .mc .bk .bkbody .c + .c {
   border-left: 1px solid var(--p-grid);
   background: var(--p-paper);
+}
+
+/* Bucket facts strip: 5-up → 2-up → 1-up down the tiers (RESPONSIVE.md §2).
+   These blocks must come AFTER the base .bk rules above: the overrides share
+   the base selectors' specificity, so source order is what makes them win
+   inside the media ranges. */
+@media (max-width: 1024px) {
+  .mc .bk .bkfacts {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .mc .bk .bkfacts .f {
+    border-bottom: 1px solid var(--p-grid-2);
+  }
+
+  .mc .bk .bkbody {
+    grid-template-columns: 1fr;
+  }
+
+  .mc .bk .bkbody .c + .c {
+    border-left: 0;
+    border-top: 1px solid var(--p-grid);
+  }
+}
+
+@media (max-width: 640px) {
+  .mc .bk .bkfacts {
+    grid-template-columns: 1fr;
+  }
 }
 
 /* Project detail — initiative card grid. One card per bucket: mono id +
@@ -388,6 +382,21 @@
   text-transform: uppercase;
   color: var(--p-muted);
   white-space: nowrap;
+}
+
+/* Initiative card grid rides the same tiers as the facts strip: 3-up → 2-up →
+   1-up. Must sit AFTER the base .init-grid rule — equal specificity, so source
+   order is what lets the media override win. */
+@media (max-width: 1024px) {
+  .mc .init-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 640px) {
+  .mc .init-grid {
+    grid-template-columns: 1fr;
+  }
 }
 
 /* Project detail — inline edit parity (P2). The owner cell reuses the New-Task
