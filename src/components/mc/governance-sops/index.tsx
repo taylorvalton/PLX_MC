@@ -3,20 +3,22 @@
 // MC-SOP-Guide screen — a read-only governance-doctrine lens.
 // Wired into the MC shell as Screen "governance-sops" (System of record group).
 // Index ↔ detail; the repo markdown is the source, MC is the lens (no mutation).
+// Deep link: `/?screen=governance-sops&sop=<slug>` opens the detail view.
 
 import { useEffect, useState } from "react";
 
 import { api } from "@/lib/api";
 import type { SopDetailResult, SopSummaryRow } from "@/lib/governance-sops";
 
+import type { ScreenProps } from "../route";
 import { DetailView, IndexView } from "./views";
 
-export function GovernanceSopsView() {
+export function GovernanceSopsView({ route, nav }: ScreenProps) {
   const [rows, setRows] = useState<SopSummaryRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const [view, setView] = useState<"index" | "detail">("index");
+  const [view, setView] = useState<"index" | "detail">(route.sop ? "detail" : "index");
   const [detail, setDetail] = useState<SopDetailResult | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
   const [detailError, setDetailError] = useState<string | null>(null);
@@ -39,27 +41,45 @@ export function GovernanceSopsView() {
     };
   }, []);
 
-  async function handleSelect(row: SopSummaryRow) {
+  // Adopt / clear detail from the `sop` query param (deep link + back/forward).
+  useEffect(() => {
+    const slug = route.sop?.trim();
+    if (!slug) {
+      setView("index");
+      setDetail(null);
+      setDetailError(null);
+      setDetailLoading(false);
+      return;
+    }
+
+    let cancelled = false;
     setView("detail");
     setDetailLoading(true);
     setDetailError(null);
     setDetail(null);
-    try {
-      const data = await api<SopDetailResult>(
-        "/governance-sops/" + encodeURIComponent(row.meta.slug)
-      );
-      setDetail(data);
-    } catch (err) {
-      setDetailError((err as Error).message);
-    } finally {
-      setDetailLoading(false);
-    }
+    api<SopDetailResult>("/governance-sops/" + encodeURIComponent(slug))
+      .then((data) => {
+        if (cancelled) return;
+        setDetail(data);
+      })
+      .catch((err: Error) => {
+        if (cancelled) return;
+        setDetailError(err.message);
+      })
+      .finally(() => {
+        if (!cancelled) setDetailLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [route.sop]);
+
+  function handleSelect(row: SopSummaryRow) {
+    nav("governance-sops", { sop: row.meta.slug });
   }
 
   function handleBack() {
-    setView("index");
-    setDetail(null);
-    setDetailError(null);
+    nav("governance-sops");
   }
 
   return (

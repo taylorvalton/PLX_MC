@@ -21,6 +21,9 @@ describe("routeToUrl (P3)", () => {
     expect(routeToUrl({ screen: "task", taskId: "TASK-221" })).toBe("/?screen=task&taskId=TASK-221");
     expect(routeToUrl({ screen: "bucket", bucketId: "BKT-UAT" })).toBe("/?screen=bucket&bucketId=BKT-UAT");
     expect(routeToUrl({ screen: "project", projectId: "PRJ-1" })).toBe("/?screen=project&projectId=PRJ-1");
+    expect(routeToUrl({ screen: "governance-sops", sop: "mc-sop-human-mc" })).toBe(
+      "/?screen=governance-sops&sop=mc-sop-human-mc"
+    );
   });
 
   it("does NOT serialize the transient filter field", () => {
