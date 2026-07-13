@@ -33,8 +33,19 @@ def main() -> None:
         )["SecretString"]
     )
 
+    # Prefer the petralabx fine-grained PAT for org automation (portal + skills
+    # + PLX_MC). Keep a separate export so callers can opt in without clobbering
+    # a machine-local Secret_Github.txt used for personal taylorvalton work.
+    petra = (
+        sec.get("PETRALABX_GITHUB_TOKEN")
+        or sec.get("PETRALABX_GITHUB")
+        or ""
+    )
     values = {
-        "GITHUB_TOKEN": read_txt("Secret_Github.txt") or sec.get("GITHUB_TOKEN", ""),
+        "PETRALABX_GITHUB_TOKEN": petra,
+        "GITHUB_TOKEN": read_txt("Secret_Github.txt")
+        or petra
+        or sec.get("GITHUB_TOKEN", ""),
         "MICROSOFT_GRAPH_TENANT_ID": read_txt("PLX_FORMS_DIRECTORY_TENANT_ID.txt")
         or sec.get("MICROSOFT_GRAPH_TENANT_ID", ""),
         "MICROSOFT_GRAPH_CLIENT_ID": read_txt("PLX_FORMS_APPICATION_ID.txt")
