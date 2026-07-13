@@ -47,11 +47,7 @@ def main() -> None:
 
     # Prefer the petralabx fine-grained PAT for org automation (portal + skills
     # + PLX_MC). Secret_Github.txt may already hold the org PAT after rotation.
-    petra = (
-        sec.get("PETRALABX_GITHUB_TOKEN")
-        or sec.get("PETRALABX_GITHUB")
-        or ""
-    )
+    petra = sec.get("PETRALABX_GITHUB_TOKEN") or sec.get("PETRALABX_GITHUB") or ""
     github = read_txt("Secret_Github.txt") or petra or sec.get("GITHUB_TOKEN", "")
 
     values = {
