@@ -14,11 +14,13 @@ import type { ScreenProps } from "../route";
 import { DetailView, IndexView } from "./views";
 
 export function GovernanceSopsView({ route, nav }: ScreenProps) {
+  const slug = route.sop?.trim() ?? "";
+  const view = slug ? "detail" : "index";
+
   const [rows, setRows] = useState<SopSummaryRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const [view, setView] = useState<"index" | "detail">(route.sop ? "detail" : "index");
   const [detail, setDetail] = useState<SopDetailResult | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
   const [detailError, setDetailError] = useState<string | null>(null);
@@ -41,38 +43,37 @@ export function GovernanceSopsView({ route, nav }: ScreenProps) {
     };
   }, []);
 
-  // Adopt / clear detail from the `sop` query param (deep link + back/forward).
+  // Load detail when the `sop` query param is present (deep link + in-app select).
   useEffect(() => {
-    const slug = route.sop?.trim();
-    if (!slug) {
-      setView("index");
-      setDetail(null);
-      setDetailError(null);
-      setDetailLoading(false);
-      return;
-    }
+    if (!slug) return;
 
     let cancelled = false;
-    setView("detail");
-    setDetailLoading(true);
-    setDetailError(null);
-    setDetail(null);
-    api<SopDetailResult>("/governance-sops/" + encodeURIComponent(slug))
-      .then((data) => {
-        if (cancelled) return;
-        setDetail(data);
-      })
-      .catch((err: Error) => {
-        if (cancelled) return;
-        setDetailError(err.message);
-      })
-      .finally(() => {
-        if (!cancelled) setDetailLoading(false);
-      });
+    // Defer setState so the effect does not synchronously cascade renders
+    // (react-hooks/set-state-in-effect).
+    const kick = window.setTimeout(() => {
+      if (cancelled) return;
+      setDetailLoading(true);
+      setDetailError(null);
+      setDetail(null);
+      api<SopDetailResult>("/governance-sops/" + encodeURIComponent(slug))
+        .then((data) => {
+          if (cancelled) return;
+          setDetail(data);
+        })
+        .catch((err: Error) => {
+          if (cancelled) return;
+          setDetailError(err.message);
+        })
+        .finally(() => {
+          if (!cancelled) setDetailLoading(false);
+        });
+    }, 0);
+
     return () => {
       cancelled = true;
+      window.clearTimeout(kick);
     };
-  }, [route.sop]);
+  }, [slug]);
 
   function handleSelect(row: SopSummaryRow) {
     nav("governance-sops", { sop: row.meta.slug });
