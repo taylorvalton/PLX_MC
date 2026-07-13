@@ -134,6 +134,15 @@ test.describe("MC-SOP-Guide (governance-sops)", () => {
     await expect(panel).toContainText("config/governance-sops-registry.json");
   });
 
+  test("deep link opens a specific SOP detail", async ({ page }) => {
+    await page.goto("/?screen=governance-sops&sop=mc-sop-human-mc");
+    await waitForHydration(page);
+    const detail = page.locator("[data-testid='gs-detail-view']");
+    await expect(detail).toBeVisible();
+    await expect(detail.locator(".gs-doc-title")).toContainText("Human — How to Use Mission Control");
+    await expect(page).toHaveURL(/sop=mc-sop-human-mc/);
+  });
+
   test("read-only lens — no editing affordances", async ({ page }) => {
     const screen = page.locator("[data-testid='gs-screen']");
     await expect(screen.locator("textarea")).toHaveCount(0);
