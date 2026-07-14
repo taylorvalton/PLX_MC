@@ -37,14 +37,38 @@ export {
 export {
   allocateNextTaskId,
   appendWorkLink,
+  consumeRoutingSession,
   getProposalByIdentity,
   insertCreationIntent,
   lockProposalForUpdate,
   recordDecision,
+  resolveProposal,
   upsertProposalRevision,
   upsertRoutingProposal,
   upsertRoutingSession,
 } from "./repo";
+
+export {
+  confirmExistingTask,
+  attachCheckoutLink,
+  createConfirmedTask,
+  type ConfirmExistingInput,
+  type AttachCheckoutInput,
+  type CreateRoutedTaskInput,
+  type RoutingMutationResult,
+} from "./service";
+
+export {
+  requireSessionActor,
+  requireMcpActor,
+  type AuthorizedActor,
+} from "./mutations/actors";
+
+export {
+  routingConfirmEnabled,
+  assertMutableTrust,
+  creationIntentHash,
+} from "./mutations/preconditions";
 
 export {
   MC_TASK_ID_SEQUENCE,

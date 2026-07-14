@@ -336,3 +336,61 @@ export async function allocateNextTaskId(runQuery: RoutingQuery): Promise<string
   if (raw == null) throw new Error("allocateNextTaskId: sequence returned empty");
   return formatTaskId(raw);
 }
+
+export interface ResolveProposalInput {
+  proposalId: string;
+  state: "resolved" | "rejected";
+  selectedTaskId: string | null;
+  selectedBucketId: string | null;
+  derivedProjectId: string | null;
+  failureReason?: RoutingProposalRecord["failureReason"];
+}
+
+/** Mark a locked proposal resolved/rejected inside the caller's transaction. */
+export async function resolveProposal(
+  input: ResolveProposalInput,
+  runQuery: RoutingQuery
+): Promise<RoutingProposalRecord> {
+  const rows = await runQuery<Record<string, unknown>>(
+    `UPDATE routing_proposals
+        SET state = $2,
+            selected_task_id = $3,
+            selected_bucket_id = $4,
+            derived_project_id = $5,
+            failure_reason = $6,
+            resolved_at = now(),
+            updated_at = now()
+      WHERE id = $1
+      RETURNING id, repo_id, change_id, session_id, state, title, body_content_hash,
+                markers, derived_project_id, failure_reason, selected_task_id, selected_bucket_id`,
+    [
+      input.proposalId,
+      input.state,
+      input.selectedTaskId,
+      input.selectedBucketId,
+      input.derivedProjectId,
+      input.failureReason ?? null,
+    ]
+  );
+  const row = rows[0];
+  if (!row) throw new Error(`resolveProposal: proposal ${input.proposalId} not found`);
+  return mapProposal(row);
+}
+
+/** Consume an active routing session after a confirmed decision. */
+export async function consumeRoutingSession(
+  sessionId: string,
+  proposalId: string,
+  runQuery: RoutingQuery
+): Promise<void> {
+  await runQuery(
+    `UPDATE routing_sessions
+        SET status = 'consumed',
+            consumed_at = now(),
+            consumed_proposal_id = $2,
+            last_activity_at = now()
+      WHERE id = $1
+        AND status = 'active'`,
+    [sessionId, proposalId]
+  );
+}

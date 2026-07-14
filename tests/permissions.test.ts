@@ -195,8 +195,10 @@ describe("service-principal separation", () => {
         "task.checkout",
         "task.progress",
         "task.complete",
+        "task.link",
         "routing.suggest",
         "routing.propose",
+        "routing.resolve",
       ])
     );
     expect(mcpCaps).not.toContain("task.create");
@@ -205,6 +207,8 @@ describe("service-principal separation", () => {
 
     const actor = service("sp_mcp_cursor");
     expect(authorize({ actor, capability: "routing.suggest" }).allowed).toBe(true);
+    expect(authorize({ actor, capability: "routing.resolve" }).allowed).toBe(true);
+    expect(authorize({ actor, capability: "task.link" }).allowed).toBe(true);
     expect(authorize({ actor, capability: "task.create" }).allowed).toBe(false);
     expect(authorize({ actor, capability: "repo.approve" }).allowed).toBe(false);
   });
@@ -279,13 +283,28 @@ describe("contextual denial", () => {
   });
 
   it("denies service principals from human-only contextual actions", () => {
-    const decision = authorize({
-      actor: service("sp_mcp_cursor"),
-      capability: "task.link",
-      resource: { type: "task", id: "TASK-1" },
-    });
-    expect(decision.allowed).toBe(false);
-    expect(decision.reasonCode).toBe("capability_not_granted");
+    // MCP may task.link for routing confirm/attach (P8) but still cannot create
+    // Tasks via task.create or mutate planning hierarchy.
+    expect(
+      authorize({
+        actor: service("sp_mcp_cursor"),
+        capability: "task.create",
+        resource: { type: "task", id: "TASK-1" },
+      })
+    ).toMatchObject({ allowed: false, reasonCode: "capability_not_granted" });
+    expect(
+      authorize({
+        actor: service("sp_mcp_cursor"),
+        capability: "bucket.create",
+        resource: { type: "bucket", id: "BKT-1" },
+      })
+    ).toMatchObject({ allowed: false, reasonCode: "capability_not_granted" });
+    expect(
+      authorize({
+        actor: service("sp_mcp_cursor"),
+        capability: "project.create",
+      })
+    ).toMatchObject({ allowed: false, reasonCode: "capability_not_granted" });
   });
 
   it("denies sync.service.write for humans", () => {

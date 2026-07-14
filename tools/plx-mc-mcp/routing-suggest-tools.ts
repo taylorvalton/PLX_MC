@@ -66,7 +66,7 @@ export function registerRoutingSuggestTools(opts: {
 
 /**
  * Modular routing tool registration seam for the stdio client.
- * P5: suggestions only. P8 will call registerRoutingMutationTools here.
+ * P5: suggestions. P8: confirm/attach/create-task mutations.
  */
 export function registerRoutingTools(opts: {
   server: ToolServer;
@@ -75,6 +75,11 @@ export function registerRoutingTools(opts: {
   printResult: PrintResult;
   disabledTool: DisabledTool;
 }): void {
+  // Inline import keeps this file the stable seam index.ts already imports.
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const { registerRoutingMutationTools } = require("./routing-mutation-tools") as {
+    registerRoutingMutationTools: (o: typeof opts) => void;
+  };
   registerRoutingSuggestTools(opts);
-  // P8: registerRoutingMutationTools(opts);
+  registerRoutingMutationTools(opts);
 }
