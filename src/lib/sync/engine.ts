@@ -777,7 +777,7 @@ async function pullRoadmap(ctx: SiteContext): Promise<InboundResult> {
     for (const c of conflicts) {
       await repo.insertConflict({
         id: `cf-${row.bucket.id.toLowerCase()}-${c.field}-${Date.now()}`,
-        entityType: "project",
+        entityType: "bucket",
         entityId: row.bucket.id,
         field: displayFieldFor("bucket", c.field) ?? c.field,
         mcVal: c.mcVal,
@@ -892,7 +892,7 @@ async function pullProjects(ctx: SiteContext): Promise<InboundResult> {
     for (const c of conflicts) {
       await repo.insertConflict({
         id: `cf-${row.project.id.toLowerCase()}-${c.field}-${Date.now()}`,
-        entityType: "bucket",
+        entityType: "project",
         entityId: row.project.id,
         field: c.field,
         mcVal: c.mcVal,
