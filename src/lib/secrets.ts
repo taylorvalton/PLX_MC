@@ -173,6 +173,29 @@ export function cronSecret(): string {
   return requireSecret("CRON_SECRET");
 }
 
+// Graph change-notification webhooks (P11). Default-off: unset kill switch or
+// missing clientState / notification URL keeps subscriptions/processing idle
+// while the five-minute delta sweep remains the recovery path.
+export function graphWebhookEnabled(): boolean {
+  const raw = process.env.PLX_MC_GRAPH_WEBHOOK_ENABLED ?? "";
+  return raw === "1" || raw.toLowerCase() === "true";
+}
+
+export function graphWebhookConfigured(): boolean {
+  return !!(
+    process.env.PLX_MC_GRAPH_WEBHOOK_CLIENT_STATE &&
+    process.env.PLX_MC_GRAPH_NOTIFICATION_URL
+  );
+}
+
+export function graphWebhookClientState(): string {
+  return requireSecret("PLX_MC_GRAPH_WEBHOOK_CLIENT_STATE");
+}
+
+export function graphNotificationUrl(): string {
+  return requireSecret("PLX_MC_GRAPH_NOTIFICATION_URL");
+}
+
 // CI auth for the compliance verify endpoint (EN-007 review #3). The GitHub
 // status-check workflow calls POST /api/compliance/verify with
 // `Authorization: Bearer $COMPLIANCE_CI_TOKEN`; the route rejects anything that

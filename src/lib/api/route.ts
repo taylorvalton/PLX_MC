@@ -20,10 +20,18 @@ export class ApiError extends Error {
 type RouteContext = { params: Promise<Record<string, string>> };
 type Handler = (req: Request, ctx: RouteContext) => Promise<unknown>;
 
+/**
+ * Shared API wrapper. Handlers normally return plain data → `{ data }` JSON.
+ * Returning a `Response` (including `NextResponse`) is an explicit pass-through
+ * seam (e.g. Graph webhook validationToken must be plaintext, not enveloped).
+ */
 export function route(handler: Handler) {
-  return async (req: Request, ctx: RouteContext): Promise<NextResponse> => {
+  return async (req: Request, ctx: RouteContext): Promise<Response> => {
     try {
       const data = await handler(req, ctx);
+      if (data instanceof Response) {
+        return data;
+      }
       return NextResponse.json({ data });
     } catch (err) {
       if (err instanceof ApiError) {
