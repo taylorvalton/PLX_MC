@@ -41,6 +41,9 @@ export default defineConfig({
   timeout: 45_000,
   expect: { timeout: 10_000 },
   fullyParallel: false,
+  // One shared Next server; parallel workers on Windows starve navigation/clicks
+  // under Turbopack compile load (goto/action timeouts that pass in isolation).
+  workers: 1,
   retries: 0,
   reporter: [["list"]],
   use: {
