@@ -7,6 +7,9 @@
 - mc_task: TASK-446
 - checkout: dsp_mrl609cknmvxqu
 - claim: central_runtime_ready
+- hardener_tip: 20b97ca
+- hardener_status: no_unresolved_critical_or_high
+- residual: windows_playwright_full_suite_flake_medium
 - not_claimed: downstream_pilot_activation
 - follow_up_tasks:
   - TASK-447 (plx-customer-portal activation)

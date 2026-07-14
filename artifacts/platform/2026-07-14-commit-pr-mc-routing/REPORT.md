@@ -51,7 +51,7 @@ npx vitest run tests/routing-rollout.test.ts tests/routing-retention.test.ts
 python scripts/check-repo-hygiene.py
 ```
 
-**Attempt 1 evidence:** vitest (16) + hygiene + typecheck + full unit suite (1153) + production build **pass**. Preflight Playwright routing-inbox residual documented in orchestrator `P10/NOTES.md` (NEXT_PUBLIC static access fix applied; e2e rebuild hung on Windows — re-verify).
+**Hardener (integration tip `20b97ca`):** session-brain hygiene exemption, Playwright routing-inbox env flags, brand-parity `__file__` repo-root, and `workers: 1` landed. Policy/lint/typecheck/pytest/vitest/build green. Routing-inbox e2e 4/4. Full Windows Playwright suite: **201 passed / 1 flaky** (`tablet` cmdk `page.goto` timeout) that **passed in isolation** — documented as Medium irreducible residual in `.orchestrator/commit-pr-mc-routing/hardener/RESIDUALS.md` (not Critical/High; not routing-invariant).
 
 ## Follow-up MC tasks (downstream activation)
 
