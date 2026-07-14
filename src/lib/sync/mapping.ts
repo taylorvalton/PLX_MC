@@ -20,6 +20,8 @@ import { evidenceComplete } from "@/lib/mc-data/helpers";
 import type { Bucket, Project, Repo, Risk, StageKey, Subtask, Task } from "@/lib/mc-data/types";
 
 export type EntityType = "task" | "risk" | "file" | "bucket";
+/** Subjects persisted in sync_conflicts; Projects live outside entities. */
+export type SyncConflictSubject = EntityType | "project";
 export type EntityData = Record<string, unknown>;
 
 export const LIST_KEY_FOR: Record<EntityType, string> = {
@@ -513,18 +515,42 @@ const FIELD_DISPLAY: Record<EntityType, Record<string, string>> = {
   },
 };
 
-export function displayFieldFor(type: EntityType, mcField: string): string | undefined {
+const PROJECT_FIELD_DISPLAY: Record<string, string> = {
+  name: "Title",
+  health: "Health",
+  started: "Start Date",
+  target: "Target Date",
+  desc: "Description",
+};
+
+export const CONFLICT_LIST_KEY_FOR: Record<SyncConflictSubject, string> = {
+  task: "todos",
+  risk: "risks",
+  file: "documents",
+  bucket: "roadmap",
+  project: "projects",
+};
+
+export function displayFieldFor(type: SyncConflictSubject, mcField: string): string | undefined {
+  if (type === "project") return PROJECT_FIELD_DISPLAY[mcField];
   return FIELD_DISPLAY[type][mcField];
 }
 
-export function mcFieldFor(type: EntityType, displayField: string): string | undefined {
+export function mcFieldFor(type: SyncConflictSubject, displayField: string): string | undefined {
+  if (type === "project") {
+    return Object.entries(PROJECT_FIELD_DISPLAY).find(([, d]) => d === displayField)?.[0];
+  }
   return Object.entries(FIELD_DISPLAY[type]).find(([, d]) => d === displayField)?.[0];
 }
 
 // Validating parse of a display-string value back into a typed MC field value
 // (used when a human keeps the SharePoint side of a conflict). Returns
 // undefined when the value cannot be applied safely — never guess.
-export function parseFieldValue(type: EntityType, mcField: string, raw: string): unknown | undefined {
+export function parseFieldValue(
+  type: SyncConflictSubject,
+  mcField: string,
+  raw: string
+): unknown | undefined {
   if (type === "task") {
     switch (mcField) {
       case "title":
@@ -572,7 +598,68 @@ export function parseFieldValue(type: EntityType, mcField: string, raw: string):
         return undefined;
     }
   }
+  if (type === "bucket" || type === "project") {
+    switch (mcField) {
+      case "name":
+      case "desc":
+        return raw;
+      case "health":
+        return raw === "track" || raw === "risk" || raw === "off"
+          ? raw
+          : SP_TO_HEALTH[raw];
+      case "started":
+      case "target":
+        return /^(?:[A-Z][a-z]{2}\s+\d{1,2}|\d{4}\.\d{2}\.\d{2})$/.test(raw)
+          ? raw
+          : (isoToDue(raw) ?? undefined);
+      case "progress": {
+        const n = Number(raw);
+        return Number.isFinite(n) && n >= 0 && n <= 100 ? n : undefined;
+      }
+      case "project":
+        if (raw === "—" || raw === "") return null;
+        return PROJECT_ID_RE.test(raw) ? raw : undefined;
+      default:
+        return undefined;
+    }
+  }
   return undefined;
+}
+
+/**
+ * Serialize one routing-relevant planning field for conflict keep-MC.
+ * Person ownership and PRD are intentionally excluded (MC-push-only but not
+ * conflict subjects); Project lookup requires a pre-resolved item id.
+ */
+export function planningOutboundField(
+  type: "bucket" | "project",
+  data: Bucket | Project,
+  mcField: string,
+  opts: { projectLookupId?: number | null } = {}
+): Record<string, unknown> | null {
+  if (mcField === "name") return { Title: data.name };
+  if (mcField === "health") {
+    return { Health: HEALTH_TO_SP[data.health] ?? "On track" };
+  }
+  if (mcField === "started" || mcField === "target") {
+    const value = mcDateToIso(data[mcField]);
+    if (!value) return null;
+    return { [mcField === "started" ? "StartDate" : "TargetDate"]: value };
+  }
+  if (type === "project" && mcField === "desc") {
+    return { Description: (data as Project).desc ?? "" };
+  }
+  if (type === "bucket" && mcField === "progress") {
+    const progress = (data as Bucket).progress;
+    return typeof progress === "number" ? { PercentComplete: progress } : null;
+  }
+  if (type === "bucket" && mcField === "project") {
+    if ((data as Bucket).project == null) return { ProjectLookupId: null };
+    return opts.projectLookupId !== undefined
+      ? { ProjectLookupId: opts.projectLookupId }
+      : null;
+  }
+  return null;
 }
 
 // Human-readable serialization used for conflict rows (mcVal/spVal) so both

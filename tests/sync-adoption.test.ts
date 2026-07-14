@@ -9,6 +9,8 @@ import {
   numericTaskId,
   validateInboundAdoptionRow,
 } from "@/lib/sync/mapping";
+import * as syncRepo from "@/lib/sync/repo";
+import type { TxQuery } from "@/lib/db";
 
 describe("validateInboundAdoptionRow", () => {
   it("accepts a valid unknown SharePoint Task", () => {
@@ -88,5 +90,99 @@ describe("numericTaskId sequence input", () => {
     expect(numericTaskId("TASK-9001")).toBe(9001);
     expect(numericTaskId("TASK-1")).toBe(1);
     expect(numericTaskId("BKT-X")).toBeNull();
+  });
+});
+
+describe("atomic adopted Task persistence", () => {
+  it("uses one injected transaction for insert/bind and sequence reconciliation", async () => {
+    type InsertAdoptedTask = (
+      task: ReturnType<typeof buildAdoptedTask>,
+      spItemId: string,
+      runTransaction: <T>(fn: (tx: TxQuery) => Promise<T>) => Promise<T>
+    ) => Promise<boolean>;
+    const insertAdoptedTask = (
+      syncRepo as typeof syncRepo & { insertAdoptedTask?: InsertAdoptedTask }
+    ).insertAdoptedTask;
+    expect(typeof insertAdoptedTask).toBe("function");
+
+    const task = buildAdoptedTask("TASK-750", {
+      Title: "Adopt atomically",
+      Status: "Backlog",
+    });
+    const sql: string[] = [];
+    let transactionCount = 0;
+    const q: TxQuery = async (text) => {
+      sql.push(text);
+      if (/INSERT INTO entities/.test(text)) return [{ id: task.id }] as never;
+      if (/setval/.test(text)) return [{ setval: "750" }] as never;
+      return [] as never;
+    };
+    const runTransaction = async <T>(fn: (tx: TxQuery) => Promise<T>): Promise<T> => {
+      transactionCount += 1;
+      return fn(q);
+    };
+
+    await expect(
+      insertAdoptedTask!(task, "sp-750", runTransaction)
+    ).resolves.toBe(true);
+    expect(transactionCount).toBe(1);
+    expect(sql.some((text) => /INSERT INTO entities/.test(text))).toBe(true);
+    expect(sql.some((text) => /sp_item_id/.test(text))).toBe(true);
+    expect(sql.some((text) => /mc_task_id_seq/.test(text) && /GREATEST/.test(text))).toBe(true);
+  });
+
+  it("rolls back the adoption contract when sequence reconciliation fails", async () => {
+    const task = buildAdoptedTask("TASK-751", {
+      Title: "Rollback me",
+      Status: "Backlog",
+    });
+    const staged: string[] = [];
+    const committed: string[] = [];
+    const runTransaction = async <T>(fn: (tx: TxQuery) => Promise<T>): Promise<T> => {
+      const q: TxQuery = async (text) => {
+        if (/INSERT INTO entities/.test(text)) {
+          staged.push(task.id);
+          return [{ id: task.id }] as never;
+        }
+        if (/setval/.test(text)) throw new Error("sequence failure");
+        return [] as never;
+      };
+      try {
+        const result = await fn(q);
+        committed.push(...staged);
+        return result;
+      } catch (err) {
+        staged.length = 0;
+        throw err;
+      }
+    };
+
+    await expect(
+      syncRepo.insertAdoptedTask(task, "sp-751", runTransaction)
+    ).rejects.toThrow("sequence failure");
+    expect(committed).toEqual([]);
+    expect(staged).toEqual([]);
+  });
+
+  it("reconciles an imported ID before an overlapping allocator can issue the next ID", async () => {
+    const task = buildAdoptedTask("TASK-900", {
+      Title: "Race-safe import",
+      Status: "Backlog",
+    });
+    let sequence = 899;
+    const issued: number[] = [];
+    const q: TxQuery = async (text, params = []) => {
+      if (/INSERT INTO entities/.test(text)) return [{ id: task.id }] as never;
+      if (/setval/.test(text)) {
+        sequence = Math.max(sequence, Number(params[0]));
+        return [{ setval: String(sequence) }] as never;
+      }
+      return [] as never;
+    };
+    const runTransaction = async <T>(fn: (tx: TxQuery) => Promise<T>): Promise<T> => fn(q);
+
+    await syncRepo.insertAdoptedTask(task, "sp-900", runTransaction);
+    issued.push(++sequence);
+    expect(issued).toEqual([901]);
   });
 });

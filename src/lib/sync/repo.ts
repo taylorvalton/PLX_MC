@@ -3,7 +3,7 @@
 // its SyncRef; the relational sync columns are updated in the same statement
 // so there is exactly one write path and no drift.
 
-import { query, withTransaction } from "@/lib/db";
+import { query, withTransaction, type TxQuery } from "@/lib/db";
 import type {
   AuditRow,
   Bucket,
@@ -16,9 +16,15 @@ import type {
   SpConflict,
   SpError,
   SyncState,
+  Task,
 } from "@/lib/mc-data/types";
-import type { EntityData, EntityType, FieldAttribution } from "./mapping";
-import { LIST_KEY_FOR, numericTaskId } from "./mapping";
+import type {
+  EntityData,
+  EntityType,
+  FieldAttribution,
+  SyncConflictSubject,
+} from "./mapping";
+import { CONFLICT_LIST_KEY_FOR, LIST_KEY_FOR, numericTaskId } from "./mapping";
 
 export interface EntityRow {
   entity_type: EntityType;
@@ -266,6 +272,53 @@ export async function reconcileTaskIdSequence(adoptedTaskId: string): Promise<vo
   );
 }
 
+export type TransactionRunner = <T>(fn: (q: TxQuery) => Promise<T>) => Promise<T>;
+
+/**
+ * Atomically adopt an unknown SharePoint Task, bind its item id, and advance
+ * the global Task allocator. The same TxQuery owns every statement; callers
+ * must not split insertion and sequence reconciliation.
+ */
+export async function insertAdoptedTask(
+  task: Task,
+  spItemId: string,
+  runTransaction: TransactionRunner = withTransaction
+): Promise<boolean> {
+  const imported = numericTaskId(task.id);
+  if (imported == null || imported < 1) {
+    throw new Error(`invalid adopted Task id ${task.id}`);
+  }
+  return runTransaction(async (q) => {
+    const inserted = await q<{ id: string }>(
+      `INSERT INTO entities (
+         entity_type, id, data, sync_state, sync_ts, sp_item_id,
+         dirty_fields, field_attribution
+       )
+       VALUES ('task', $1, $2, 'synced', now(), $3, '[]'::jsonb, '{}'::jsonb)
+       ON CONFLICT (entity_type, id) DO NOTHING
+       RETURNING id`,
+      [task.id, JSON.stringify(task), spItemId]
+    );
+    if (!inserted[0]) return false;
+
+    // GREATEST makes reconciliation monotonic. PostgreSQL serializes sequence
+    // state changes; the next allocator observes at least imported + 1.
+    await q(
+      `SELECT setval(
+         'mc_task_id_seq',
+         GREATEST(
+           $1::bigint,
+           CASE WHEN is_called THEN last_value ELSE last_value - 1 END
+         ),
+         true
+       )
+       FROM mc_task_id_seq`,
+      [imported]
+    );
+    return true;
+  });
+}
+
 // The last-sweep heartbeat. Every sweep re-stamps each list's delta cursor
 // (saveDeltaLink above), so max(updated_at) is "when a sweep last ran" —
 // independent of whether that sweep wrote an audit row. The snapshot uses this
@@ -283,7 +336,7 @@ export async function lastSweepAt(): Promise<string | null> {
 interface ConflictRow {
   id: string;
   list_key: string;
-  entity_type: EntityType;
+  entity_type: SyncConflictSubject;
   entity_id: string;
   field: string;
   mc_val: string | null;
@@ -296,7 +349,16 @@ interface ConflictRow {
 const toConflict = (r: ConflictRow): SpConflict => ({
   id: r.id,
   list: r.list_key,
-  entity: r.entity_type === "task" ? "Task" : r.entity_type === "risk" ? "Risk" : "File",
+  entity:
+    r.entity_type === "task"
+      ? "Task"
+      : r.entity_type === "risk"
+        ? "Risk"
+        : r.entity_type === "bucket"
+          ? "Bucket"
+          : r.entity_type === "project"
+            ? "Project"
+            : "File",
   entityId: r.entity_id,
   field: r.field,
   mcVal: r.mc_val ?? "—",
@@ -315,7 +377,9 @@ export async function openConflicts(): Promise<SpConflict[]> {
   return rows.map(toConflict);
 }
 
-export async function getConflict(id: string): Promise<(SpConflict & { entityType: EntityType }) | null> {
+export async function getConflict(
+  id: string
+): Promise<(SpConflict & { entityType: SyncConflictSubject }) | null> {
   const rows = await query<ConflictRow>(
     `SELECT id, list_key, entity_type, entity_id, field, mc_val, sp_val,
             detected_at, detected_by, note
@@ -327,7 +391,7 @@ export async function getConflict(id: string): Promise<(SpConflict & { entityTyp
 
 export async function insertConflict(c: {
   id: string;
-  entityType: EntityType;
+  entityType: SyncConflictSubject;
   entityId: string;
   field: string;
   mcVal: string;
@@ -339,7 +403,17 @@ export async function insertConflict(c: {
     `INSERT INTO sync_conflicts (id, list_key, entity_type, entity_id, field, mc_val, sp_val, detected_by, note)
      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
      ON CONFLICT (id) DO NOTHING`,
-    [c.id, LIST_KEY_FOR[c.entityType], c.entityType, c.entityId, c.field, c.mcVal, c.spVal, c.by, c.note]
+    [
+      c.id,
+      CONFLICT_LIST_KEY_FOR[c.entityType],
+      c.entityType,
+      c.entityId,
+      c.field,
+      c.mcVal,
+      c.spVal,
+      c.by,
+      c.note,
+    ]
   );
 }
 

@@ -39,6 +39,7 @@ import {
   mcFieldFor,
   outboundFields,
   parseFieldValue,
+  planningOutboundField,
   planTaskPersons,
   projectOutboundFields,
   reconcileInbound,
@@ -51,11 +52,13 @@ import {
   type EntityData,
   type EntityType,
   type FieldAttribution,
+  type SyncConflictSubject,
   type TaskPersonMc,
 } from "./mapping";
 import { evaluateSyncFreshness, type SyncFreshnessResult } from "./freshness";
 import * as repo from "./repo";
 import { authorize, SYNC_INBOUND_SERVICE_PRINCIPAL_ID, type PermissionActor } from "@/lib/permissions";
+import { findServicePrincipalById } from "@/lib/permissions/repository";
 import { ApiError } from "@/lib/api/route";
 import { auth, hydrateMcUserByOid, permissionActorFromMcUser, permissionsEnforcementEnabled } from "@/lib/auth";
 import type { Project } from "@/lib/mc-data/types";
@@ -568,9 +571,8 @@ async function adoptUnknownTask(ctx: SiteContext, item: SpListItem): Promise<"ad
     assignee = email ? actorIdByEmail(email) : null;
   }
   const task = buildAdoptedTask(validation.id, item.fields, { bucket, assignee });
-  await repo.insertEntity("task", task.id, task as unknown as EntityData, "synced", []);
-  await repo.updateEntity("task", task.id, { spItemId: item.id, syncState: "synced", dirtyFields: [] });
-  await repo.reconcileTaskIdSequence(task.id);
+  const inserted = await repo.insertAdoptedTask(task, item.id);
+  if (!inserted) return "skipped";
   await repo.appendAudit(
     SYNC_ACTOR,
     `Inbound ToDos adoption — ${task.id} imported from SharePoint (spItem=${item.id}).`,
@@ -775,7 +777,7 @@ async function pullRoadmap(ctx: SiteContext): Promise<InboundResult> {
     for (const c of conflicts) {
       await repo.insertConflict({
         id: `cf-${row.bucket.id.toLowerCase()}-${c.field}-${Date.now()}`,
-        entityType: "bucket",
+        entityType: "project",
         entityId: row.bucket.id,
         field: displayFieldFor("bucket", c.field) ?? c.field,
         mcVal: c.mcVal,
@@ -1066,12 +1068,32 @@ export async function requireSyncMutateActor(): Promise<{ oid: string; actor: Pe
   return { oid, actor };
 }
 
-/** Cron / inbound service gate — durable sp_sync_inbound + sync.service.write. */
-export function requireSyncServiceWrite(): PermissionActor {
+/**
+ * Cron / inbound service gate — durable sp_sync_inbound +
+ * sync.service.write. Operator context is audit-only and never grants.
+ * Enforcement-off intentionally remains DB-free.
+ */
+export async function requireSyncServiceWrite(
+  _context: { operatorContext?: string } = {}
+): Promise<PermissionActor> {
+  let status: "active" | "revoked" = "active";
+  if (permissionsEnforcementEnabled()) {
+    const persisted = await findServicePrincipalById(
+      SYNC_INBOUND_SERVICE_PRINCIPAL_ID
+    );
+    if (!persisted) {
+      throw new ApiError(
+        "forbidden",
+        "Durable sp_sync_inbound service principal is missing.",
+        403
+      );
+    }
+    status = persisted.status;
+  }
   const actor: PermissionActor = {
     kind: "service",
     id: SYNC_INBOUND_SERVICE_PRINCIPAL_ID,
-    status: "active",
+    status,
   };
   const decision = authorize({
     actor,
@@ -1117,43 +1139,189 @@ async function pushSingleField(ctx: SiteContext, type: EntityType, row: repo.Ent
   return true;
 }
 
+interface PlanningConflictRow {
+  subject: "bucket" | "project";
+  id: string;
+  data: Bucket | Project;
+  syncState: SyncState;
+  spItemId: string | null;
+  dirtyFields: string[];
+  fieldAttribution: Record<string, FieldAttribution>;
+}
+
+async function loadPlanningConflictRow(
+  subject: "bucket" | "project",
+  id: string
+): Promise<PlanningConflictRow | null> {
+  if (subject === "bucket") {
+    const row = (await repo.getBucketRows()).find((candidate) => candidate.bucket.id === id);
+    return row
+      ? {
+          subject,
+          id,
+          data: row.bucket,
+          syncState: row.syncState,
+          spItemId: row.spItemId,
+          dirtyFields: row.dirtyFields,
+          fieldAttribution: row.fieldAttribution ?? {},
+        }
+      : null;
+  }
+  const row = (await repo.getProjectRows()).find((candidate) => candidate.project.id === id);
+  return row
+    ? {
+        subject,
+        id,
+        data: row.project,
+        syncState: row.syncState,
+        spItemId: row.spItemId,
+        dirtyFields: row.dirtyFields,
+        fieldAttribution: row.fieldAttribution ?? {},
+      }
+    : null;
+}
+
+async function updatePlanningConflictRow(
+  row: PlanningConflictRow,
+  opts: {
+    patch?: Partial<Bucket> | Partial<Project>;
+    syncState: SyncState;
+    dirtyFields: string[];
+    fieldAttribution: Record<string, FieldAttribution>;
+  }
+): Promise<void> {
+  if (row.subject === "bucket") {
+    await repo.updateBucket(row.id, {
+      patch: opts.patch as Partial<Bucket> | undefined,
+      syncState: opts.syncState,
+      dirtyFields: opts.dirtyFields,
+      fieldAttribution: opts.fieldAttribution,
+    });
+    return;
+  }
+  await repo.updateProject(row.id, {
+    patch: opts.patch as Partial<Project> | undefined,
+    syncState: opts.syncState,
+    dirtyFields: opts.dirtyFields,
+    fieldAttribution: opts.fieldAttribution,
+  });
+}
+
+async function pushPlanningSingleField(
+  ctx: SiteContext,
+  row: PlanningConflictRow,
+  mcField: string
+): Promise<boolean> {
+  if (!row.spItemId) return false;
+  const listKey = row.subject === "bucket" ? ROADMAP_KEY : PROJECTS_KEY;
+  if (!ctx.listIds[listKey]) return false;
+
+  let projectLookupId: number | null | undefined;
+  if (row.subject === "bucket" && mcField === "project") {
+    const projectId = (row.data as Bucket).project;
+    if (projectId) {
+      const project = (await repo.getProjectRows()).find(
+        (candidate) => candidate.project.id === projectId
+      );
+      if (!project?.spItemId) return false;
+      projectLookupId = Number(project.spItemId);
+      if (!Number.isFinite(projectLookupId)) return false;
+    } else {
+      projectLookupId = null;
+    }
+  }
+  const fields = planningOutboundField(row.subject, row.data, mcField, {
+    projectLookupId,
+  });
+  if (!fields) return false;
+  await patchListItemFields(ctx, listKey, row.spItemId, fields);
+  return true;
+}
+
 export async function resolveConflict(conflictId: string, winner: "mc" | "sp", actor: string): Promise<boolean> {
   const conflict = await repo.getConflict(conflictId);
   if (!conflict) return false;
-  const type = conflict.entityType;
-  const mcField = mcFieldFor(type, conflict.field) ?? conflict.field;
-  const row = await repo.getEntity(type, conflict.entityId);
+  const subject = conflict.entityType as SyncConflictSubject;
+  const mcField = mcFieldFor(subject, conflict.field) ?? conflict.field;
+  const entityRow =
+    subject === "task" || subject === "risk" || subject === "file"
+      ? await repo.getEntity(subject, conflict.entityId)
+      : null;
+  const planningRow =
+    subject === "bucket" || subject === "project"
+      ? await loadPlanningConflictRow(subject, conflict.entityId)
+      : null;
+  if (!entityRow && !planningRow) return false;
 
-  if (row && winner === "sp") {
-    const value = parseFieldValue(type, mcField, conflict.spVal);
-    await repo.updateEntity(type, conflict.entityId, {
-      patch: value !== undefined ? { [mcField]: value } : {},
-      syncState: "synced",
-    });
-  } else if (row && winner === "mc") {
-    // Push MC's value to the loser. No item yet (or an unresolved person column)
-    // → re-queue for the next sweep rather than claim a sync that didn't happen.
-    const ctx = row.sp_item_id ? await siteContext() : null;
-    const pushed = ctx ? await pushSingleField(ctx, type, row, mcField) : false;
-    if (pushed) {
-      await repo.updateEntity(type, conflict.entityId, { syncState: "synced", dirtyFields: [] });
-    } else {
-      await repo.updateEntity(type, conflict.entityId, { syncState: "pending" });
-      if (row.sp_item_id) {
-        await repo.appendAudit(
-          actor,
-          `Kept Mission Control on ${conflict.entityId} · ${conflict.field}, but its person isn't resolvable to a site user yet — re-queued for the next sweep.`,
-          "pending"
-        );
-      }
+  const dirtyFields = entityRow?.dirty_fields ?? planningRow?.dirtyFields ?? [];
+  const attribution = {
+    ...(entityRow?.field_attribution ?? planningRow?.fieldAttribution ?? {}),
+  };
+  const remainingDirty = dirtyFields.filter((field) => field !== mcField);
+  delete attribution[mcField];
+
+  let finalState: SyncState = "synced";
+  if (winner === "sp") {
+    const value = parseFieldValue(subject, mcField, conflict.spVal);
+    if (value === undefined) return false;
+    if (entityRow) {
+      await repo.updateEntity(subject as EntityType, conflict.entityId, {
+        patch: { [mcField]: value },
+        syncState: remainingDirty.length > 0 ? "pending" : "synced",
+        dirtyFields: remainingDirty,
+        fieldAttribution: attribution,
+      });
+    } else if (planningRow) {
+      await updatePlanningConflictRow(planningRow, {
+        patch: { [mcField]: value },
+        syncState: remainingDirty.length > 0 ? "pending" : "synced",
+        dirtyFields: remainingDirty,
+        fieldAttribution: attribution,
+      });
+    }
+  } else {
+    const spItemId = entityRow?.sp_item_id ?? planningRow?.spItemId ?? null;
+    const ctx = spItemId ? await siteContext() : null;
+    const pushed = ctx
+      ? entityRow
+        ? await pushSingleField(ctx, subject as EntityType, entityRow, mcField)
+        : await pushPlanningSingleField(ctx, planningRow!, mcField)
+      : false;
+    finalState = pushed && remainingDirty.length === 0 ? "synced" : "pending";
+    if (entityRow) {
+      await repo.updateEntity(subject as EntityType, conflict.entityId, {
+        syncState: finalState,
+        dirtyFields: remainingDirty,
+        fieldAttribution: attribution,
+      });
+    } else if (planningRow) {
+      await updatePlanningConflictRow(planningRow, {
+        syncState: finalState,
+        dirtyFields: remainingDirty,
+        fieldAttribution: attribution,
+      });
+    }
+    if (!pushed) {
+      const unresolvedPerson =
+        subject === "task" &&
+        TASK_PERSON_FIELDS.some((field) => field.mc === mcField);
+      await repo.appendAudit(
+        actor,
+        unresolvedPerson
+          ? `Kept Mission Control on ${conflict.entityId} · ${conflict.field}, but its person isn't resolvable to a site user yet — re-queued for the next sweep.`
+          : `Kept Mission Control on ${conflict.entityId} · ${conflict.field}, but the field could not be pushed yet — re-queued for the next sweep.`,
+        "pending"
+      );
     }
   }
 
+  // Resolve only after the selected value was applied locally, pushed, or
+  // durably queued on the correct subject table.
   await repo.resolveConflictRow(conflictId, winner);
   await repo.appendAudit(
     actor,
     `Resolved conflict on ${conflict.entityId} · ${conflict.field} — kept ${winner === "mc" ? "Mission Control" : "SharePoint"} ("${winner === "mc" ? conflict.mcVal : conflict.spVal}").`,
-    "synced"
+    finalState
   );
   return true;
 }

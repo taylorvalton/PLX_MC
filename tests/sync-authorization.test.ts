@@ -7,6 +7,8 @@ const authState = vi.hoisted(() => ({
   session: null as { user?: { oid?: string | null; email?: string | null } } | null,
   enforcement: false,
   user: null as { entraOid: string; accessRole: "owner" | "admin" | "member"; status: "active" | "revoked" } | null,
+  service: null as { id: string; name: string; status: "active" | "revoked" } | null,
+  serviceLookups: 0,
 }));
 
 vi.mock("@/lib/auth", () => ({
@@ -35,12 +37,21 @@ vi.mock("@/lib/auth", () => ({
   }),
 }));
 
+vi.mock("@/lib/permissions/repository", () => ({
+  findServicePrincipalById: async (id: string) => {
+    authState.serviceLookups += 1;
+    return authState.service?.id === id ? authState.service : null;
+  },
+}));
+
 import { requireSyncMutateActor, requireSyncServiceWrite } from "@/lib/sync/engine";
 
 beforeEach(() => {
   authState.session = null;
   authState.enforcement = false;
   authState.user = null;
+  authState.service = null;
+  authState.serviceLookups = 0;
 });
 
 describe("requireSyncMutateActor (session)", () => {
@@ -85,8 +96,14 @@ describe("requireSyncMutateActor (session)", () => {
 });
 
 describe("requireSyncServiceWrite (cron / inbound)", () => {
-  it("allows durable sp_sync_inbound for sync.service.write", () => {
-    const actor = requireSyncServiceWrite();
+  it("allows active durable sp_sync_inbound when enforcement is enabled", async () => {
+    authState.enforcement = true;
+    authState.service = {
+      id: SYNC_INBOUND_SERVICE_PRINCIPAL_ID,
+      name: "SharePoint inbound sync",
+      status: "active",
+    };
+    const actor = await requireSyncServiceWrite({ operatorContext: "ignored@example.com" });
     expect(actor).toEqual({
       kind: "service",
       id: SYNC_INBOUND_SERVICE_PRINCIPAL_ID,
@@ -97,8 +114,35 @@ describe("requireSyncServiceWrite (cron / inbound)", () => {
     ).toBe(true);
   });
 
-  it("service principal cannot use sync.mutate", () => {
-    const actor = requireSyncServiceWrite();
+  it("denies missing or revoked persisted service principal when enforcement is enabled", async () => {
+    authState.enforcement = true;
+    await expect(requireSyncServiceWrite()).rejects.toMatchObject({
+      code: "forbidden",
+      status: 403,
+    });
+
+    authState.service = {
+      id: SYNC_INBOUND_SERVICE_PRINCIPAL_ID,
+      name: "SharePoint inbound sync",
+      status: "revoked",
+    };
+    await expect(requireSyncServiceWrite()).rejects.toMatchObject({
+      code: "forbidden",
+      status: 403,
+    });
+  });
+
+  it("flag-off remains DB-free and operator context cannot affect grants", async () => {
+    authState.enforcement = false;
+    const actor = await requireSyncServiceWrite({
+      operatorContext: "owner@petrasoap.com",
+    });
+    expect(actor.id).toBe(SYNC_INBOUND_SERVICE_PRINCIPAL_ID);
+    expect(authState.serviceLookups).toBe(0);
+  });
+
+  it("service principal cannot use sync.mutate", async () => {
+    const actor = await requireSyncServiceWrite();
     expect(authorize({ actor, capability: "sync.mutate", resource: { type: "sync" } }).allowed).toBe(
       false
     );

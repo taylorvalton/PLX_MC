@@ -9,7 +9,6 @@
 import { ApiError, route } from "@/lib/api/route";
 import { cronConfigured, cronSecret } from "@/lib/secrets";
 import { requireSyncServiceWrite, runSweep } from "@/lib/sync/engine";
-import { SYNC_INBOUND_SERVICE_PRINCIPAL_ID } from "@/lib/permissions";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -21,8 +20,8 @@ export const GET = route(async (req) => {
   if (req.headers.get("authorization") !== `Bearer ${cronSecret()}`) {
     throw new ApiError("unauthorized", "Invalid or missing cron authorization.", 401);
   }
-  requireSyncServiceWrite();
-  const result = await runSweep(SYNC_INBOUND_SERVICE_PRINCIPAL_ID);
+  const service = await requireSyncServiceWrite();
+  const result = await runSweep(service.id);
   console.log(
     `[sync] sweep ok — pushed=${result.pushed} pulled=${result.pulled} conflicts=${result.conflicts} errors=${result.pushErrors}`
   );
