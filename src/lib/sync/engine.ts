@@ -17,6 +17,7 @@ import {
   findItemByField,
   GraphError,
   listDelta,
+  normalizeLastModified,
   patchListItemFields,
   PROJECTS_KEY,
   REPO_REGISTRY_KEY,
@@ -25,6 +26,7 @@ import {
   resolveSiteUserLookupId,
   siteContext,
   type SiteContext,
+  type SpListItem,
 } from "./graph";
 import {
   actorIdByEmail,
@@ -33,6 +35,7 @@ import {
   displayValue,
   inboundBucketPatches,
   inboundPatches,
+  inboundProjectPatches,
   mcFieldFor,
   outboundFields,
   parseFieldValue,
@@ -40,12 +43,22 @@ import {
   projectOutboundFields,
   reconcileInbound,
   repoOutboundFields,
+  ROUTING_BUCKET_FIELDS,
+  ROUTING_PROJECT_FIELDS,
+  ROUTING_TASK_FIELDS,
   TASK_PERSON_FIELDS,
+  validateInboundAdoptionRow,
   type EntityData,
   type EntityType,
+  type FieldAttribution,
   type TaskPersonMc,
 } from "./mapping";
+import { evaluateSyncFreshness, type SyncFreshnessResult } from "./freshness";
 import * as repo from "./repo";
+import { authorize, SYNC_INBOUND_SERVICE_PRINCIPAL_ID, type PermissionActor } from "@/lib/permissions";
+import { ApiError } from "@/lib/api/route";
+import { auth, hydrateMcUserByOid, permissionActorFromMcUser, permissionsEnforcementEnabled } from "@/lib/auth";
+import type { Project } from "@/lib/mc-data/types";
 
 const SYNC_ACTOR = "scribe"; // the ops agent persona attributed to engine sweeps
 
@@ -425,10 +438,90 @@ const DELTA_LISTS: { listKey: string; type: EntityType }[] = [
   { listKey: "risks", type: "risk" },
 ];
 
+function attributionFromItem(item: SpListItem): {
+  source: FieldAttribution["source"];
+  at: string;
+} {
+  const n = normalizeLastModified(item);
+  return {
+    source: n.source,
+    at: n.at ?? new Date().toISOString(),
+  };
+}
+
+/** Build a minimal adopted Task from validated SharePoint fields (no fabricated owners). */
+export function buildAdoptedTask(
+  id: string,
+  fields: Record<string, unknown>,
+  opts: { bucket?: string | null; assignee?: string | null } = {}
+): Task {
+  const patches = inboundPatches("task", fields, { bucket: opts.bucket });
+  return {
+    id,
+    title: String(fields.Title ?? id),
+    description: typeof patches.description === "string" ? patches.description : "",
+    bucket: typeof patches.bucket === "string" ? patches.bucket : opts.bucket ?? "",
+    stage: (patches.stage as Task["stage"]) ?? "backlog",
+    priority: (patches.priority as Task["priority"]) ?? "medium",
+    assignee: opts.assignee ?? null,
+    coassignees: [],
+    reporter: "",
+    accountableOwner: null,
+    reqs: [],
+    repos: [],
+    estimate: "M",
+    labels: [],
+    prs: [],
+    due: typeof patches.due === "string" ? patches.due : "—",
+    sync: { state: "synced", ts: repo.stamp(), sp: "ToDos" },
+    subtasks: [],
+    activity: [],
+    evidence: { summary: "", items: [] },
+  };
+}
+
+export function buildAdoptedBucket(
+  id: string,
+  fields: Record<string, unknown>,
+  opts: { project?: string | null } = {}
+): Bucket {
+  const patches = inboundBucketPatches(fields, { project: opts.project });
+  return {
+    id,
+    name: String(fields.Title ?? id),
+    owner: "", // never fabricate — leave empty until a human/resolvable owner lands
+    health: patches.health ?? "track",
+    target: patches.target ?? "—",
+    started: patches.started ?? "—",
+    desc: "",
+    repos: [],
+    sync: { state: "synced", ts: repo.stamp(), sp: "Roadmap" },
+    prd: null,
+    project: opts.project ?? null,
+    progress: patches.progress,
+  };
+}
+
+export function buildAdoptedProject(id: string, fields: Record<string, unknown>): Project {
+  const patches = inboundProjectPatches(fields);
+  return {
+    id,
+    name: String(fields.Title ?? id),
+    owner: "",
+    health: patches.health ?? "track",
+    target: patches.target ?? "—",
+    started: patches.started ?? "—",
+    desc: typeof patches.desc === "string" ? patches.desc : "",
+    repos: [],
+    sync: { state: "synced", ts: repo.stamp(), sp: "Projects" },
+    prd: null,
+  };
+}
+
 async function matchEntity(
   type: EntityType,
   rows: repo.EntityRow[],
-  item: { id: string; fields?: Record<string, unknown> }
+  item: SpListItem
 ): Promise<repo.EntityRow | null> {
   const bySpId = rows.find((r) => r.sp_item_id === item.id);
   if (bySpId) return bySpId;
@@ -446,26 +539,71 @@ interface InboundResult {
   pulled: number;
   conflicts: number;
   skipped: number;
+  adopted: number;
+}
+
+async function adoptUnknownTask(ctx: SiteContext, item: SpListItem): Promise<"adopted" | "invalid" | "skipped"> {
+  if (!item.fields) return "skipped";
+  const validation = validateInboundAdoptionRow("task", item.fields);
+  if (!validation.ok || !validation.id) {
+    await repo.appendAudit(
+      SYNC_ACTOR,
+      `Inbound ToDos row skipped (invalid adoption) — spItem=${item.id} errors=${validation.errors.join(",")}.`,
+      "error"
+    );
+    return "invalid";
+  }
+  let bucket: string | null | undefined;
+  const initRaw = item.fields.InitiativeLookupId;
+  if (initRaw !== undefined && initRaw !== null && initRaw !== "") {
+    const hit = await repo.getBucketBySpItemId(String(initRaw));
+    bucket = hit?.bucket.id ?? undefined;
+  } else if (initRaw === null || initRaw === "") {
+    bucket = null;
+  }
+  let assignee: string | null = null;
+  const rawId = item.fields.AssignedToLookupId;
+  if (rawId !== undefined && rawId !== null && rawId !== "") {
+    const email = await resolveEmailByLookupId(ctx, Number(rawId));
+    assignee = email ? actorIdByEmail(email) : null;
+  }
+  const task = buildAdoptedTask(validation.id, item.fields, { bucket, assignee });
+  await repo.insertEntity("task", task.id, task as unknown as EntityData, "synced", []);
+  await repo.updateEntity("task", task.id, { spItemId: item.id, syncState: "synced", dirtyFields: [] });
+  await repo.reconcileTaskIdSequence(task.id);
+  await repo.appendAudit(
+    SYNC_ACTOR,
+    `Inbound ToDos adoption — ${task.id} imported from SharePoint (spItem=${item.id}).`,
+    "synced"
+  );
+  return "adopted";
 }
 
 async function pullList(ctx: SiteContext, listKey: string, type: EntityType): Promise<InboundResult> {
   const stored = await repo.getDeltaLink(listKey);
   const { items, deltaLink } = await listDelta(ctx, listKey, stored);
-  const result: InboundResult = { pulled: 0, conflicts: 0, skipped: 0 };
+  const result: InboundResult = { pulled: 0, conflicts: 0, skipped: 0, adopted: 0 };
   const rows = await repo.getEntities(type);
 
   for (const item of items) {
     if (item.deleted || !item.fields) continue; // engine never deletes (TOOLS.md guardrail)
-    const row = await matchEntity(type, rows, item);
+    let row = await matchEntity(type, rows, item);
+    if (!row && type === "task") {
+      const outcome = await adoptUnknownTask(ctx, item);
+      if (outcome === "adopted") {
+        result.adopted += 1;
+        row = await repo.getEntity("task", String(item.fields.TaskID));
+      } else {
+        result.skipped += 1;
+        continue;
+      }
+    }
     if (!row) {
       result.skipped += 1;
       continue;
     }
     const patches = inboundPatches(type, item.fields);
-    // Assigned To is two-way: resolve the inbound site-user lookup id back to an
-    // MC actor before reconciliation, so a SharePoint reassignment pulls in (and
-    // a both-sides edit raises a conflict, never an overwrite). Owner + Reporter
-    // are push-only and are never read back.
+    const inboundAttr = attributionFromItem(item);
     if (type === "task") {
       const rawId = item.fields.AssignedToLookupId;
       if (rawId !== undefined && rawId !== null && rawId !== "") {
@@ -473,7 +611,6 @@ async function pullList(ctx: SiteContext, listKey: string, type: EntityType): Pr
         const actorId = email ? actorIdByEmail(email) : null;
         if (actorId) patches.assignee = actorId;
       }
-      // Initiative lookup → bucket id (match Roadmap sp_item_id).
       const initRaw = item.fields.InitiativeLookupId;
       if (initRaw !== undefined && initRaw !== null && initRaw !== "") {
         const hit = await repo.getBucketBySpItemId(String(initRaw));
@@ -482,7 +619,24 @@ async function pullList(ctx: SiteContext, listKey: string, type: EntityType): Pr
         patches.bucket = null;
       }
     }
-    const { apply, conflicts } = reconcileInbound(row.data, row.dirty_fields, patches);
+    const { apply, conflicts, clearedDirty, attributionEvents } = reconcileInbound(
+      row.data,
+      row.dirty_fields,
+      patches,
+      {
+        inboundSource: inboundAttr.source,
+        inboundAt: inboundAttr.at,
+        localAttribution: row.field_attribution,
+        routingFields: type === "task" ? ROUTING_TASK_FIELDS : undefined,
+      }
+    );
+    for (const ev of attributionEvents) {
+      await repo.appendAudit(
+        SYNC_ACTOR,
+        `Human SharePoint edit beat service pending on ${row.id} · ${ev.field} (sp=${ev.inboundAt} > service=${ev.localAt}).`,
+        "synced"
+      );
+    }
     for (const c of conflicts) {
       const display = displayFieldFor(type, c.field) ?? c.field;
       await repo.insertConflict({
@@ -502,29 +656,39 @@ async function pullList(ctx: SiteContext, listKey: string, type: EntityType): Pr
       await repo.appendAudit(SYNC_ACTOR, `Conflict detected on ${row.id} · ${display} (edited both sides).`, "conflict");
       result.conflicts += 1;
     }
-    if (Object.keys(apply).length > 0) {
-      await repo.updateEntity(type, row.id, { patch: apply });
-      await repo.appendAudit(
-        SYNC_ACTOR,
-        `Inbound change pulled — ${row.id} ${Object.keys(apply)
-          .map((f) => displayFieldFor(type, f) ?? f)
-          .join(", ")} updated from SharePoint.`,
-        "synced"
-      );
-      result.pulled += 1;
+    if (Object.keys(apply).length > 0 || clearedDirty.length > 0) {
+      const nextDirty = row.dirty_fields.filter((f) => !clearedDirty.includes(f) && !(f in apply));
+      const nextAttr = { ...row.field_attribution };
+      for (const f of clearedDirty) delete nextAttr[f];
+      for (const f of Object.keys(apply)) delete nextAttr[f];
+      await repo.updateEntity(type, row.id, {
+        patch: apply,
+        dirtyFields: nextDirty,
+        fieldAttribution: nextAttr,
+      });
+      if (Object.keys(apply).length > 0) {
+        await repo.appendAudit(
+          SYNC_ACTOR,
+          `Inbound change pulled — ${row.id} ${Object.keys(apply)
+            .map((f) => displayFieldFor(type, f) ?? f)
+            .join(", ")} updated from SharePoint.`,
+          "synced"
+        );
+        result.pulled += 1;
+      }
     }
   }
   await repo.saveDeltaLink(listKey, deltaLink);
+  await repo.markRegisterInboundComplete(listKey);
   return result;
 }
 
-// Roadmap inbound (Gantt minimum): pull name/health/started/target into buckets.
 async function pullRoadmap(ctx: SiteContext): Promise<InboundResult> {
-  const result: InboundResult = { pulled: 0, conflicts: 0, skipped: 0 };
+  const result: InboundResult = { pulled: 0, conflicts: 0, skipped: 0, adopted: 0 };
   if (!ctx.listIds[ROADMAP_KEY]) return result;
   const stored = await repo.getDeltaLink(ROADMAP_KEY);
   const { items, deltaLink } = await listDelta(ctx, ROADMAP_KEY, stored);
-  const rows = await repo.getBucketRows();
+  let rows = await repo.getBucketRows();
 
   for (const item of items) {
     if (item.deleted || !item.fields) continue;
@@ -534,7 +698,6 @@ async function pullRoadmap(ctx: SiteContext): Promise<InboundResult> {
         ? rows.find((r) => r.bucket.id === item.fields?.InitiativeID)
         : undefined);
     if (!row && typeof item.fields.InitiativeID === "string") {
-      // Adopt: first sighting of a known bucket by InitiativeID.
       const byKey = rows.find((r) => r.bucket.id === item.fields?.InitiativeID);
       if (byKey) {
         await repo.updateBucket(byKey.bucket.id, { spItemId: item.id });
@@ -542,15 +705,73 @@ async function pullRoadmap(ctx: SiteContext): Promise<InboundResult> {
       }
     }
     if (!row) {
-      result.skipped += 1;
-      continue;
+      const validation = validateInboundAdoptionRow("bucket", item.fields);
+      if (!validation.ok || !validation.id) {
+        await repo.appendAudit(
+          SYNC_ACTOR,
+          `Inbound Roadmap row skipped (invalid adoption) — spItem=${item.id} errors=${validation.errors.join(",")}.`,
+          "error"
+        );
+        result.skipped += 1;
+        continue;
+      }
+      let project: string | null | undefined;
+      const projRaw = item.fields.ProjectLookupId;
+      if (projRaw !== undefined && projRaw !== null && projRaw !== "") {
+        const hit = (await repo.getProjectRows()).find((p) => p.spItemId === String(projRaw));
+        project = hit?.project.id ?? undefined;
+      } else if (projRaw === null || projRaw === "") {
+        project = null;
+      }
+      const bucket = buildAdoptedBucket(validation.id, item.fields, { project });
+      const inserted = await repo.insertAdoptedBucket(bucket, item.id);
+      if (!inserted) {
+        result.skipped += 1;
+        continue;
+      }
+      await repo.appendAudit(
+        SYNC_ACTOR,
+        `Inbound Roadmap adoption — ${bucket.id} imported from SharePoint (spItem=${item.id}).`,
+        "synced"
+      );
+      result.adopted += 1;
+      rows = await repo.getBucketRows();
+      row = rows.find((r) => r.bucket.id === bucket.id);
+      if (!row) {
+        result.skipped += 1;
+        continue;
+      }
     }
-    const patches = inboundBucketPatches(item.fields) as EntityData;
-    const { apply, conflicts } = reconcileInbound(
+    let projectOpt: string | null | undefined;
+    const projRaw = item.fields.ProjectLookupId;
+    if (projRaw !== undefined && projRaw !== null && projRaw !== "") {
+      const hit = (await repo.getProjectRows()).find((p) => p.spItemId === String(projRaw));
+      if (hit) projectOpt = hit.project.id;
+    } else if (projRaw === null || projRaw === "") {
+      projectOpt = null;
+    }
+    const patches = inboundBucketPatches(item.fields, {
+      project: projectOpt,
+    }) as EntityData;
+    const inboundAttr = attributionFromItem(item);
+    const { apply, conflicts, clearedDirty, attributionEvents } = reconcileInbound(
       row.bucket as unknown as EntityData,
       row.dirtyFields,
-      patches
+      patches,
+      {
+        inboundSource: inboundAttr.source,
+        inboundAt: inboundAttr.at,
+        localAttribution: row.fieldAttribution ?? {},
+        routingFields: ROUTING_BUCKET_FIELDS,
+      }
     );
+    for (const ev of attributionEvents) {
+      await repo.appendAudit(
+        SYNC_ACTOR,
+        `Human SharePoint edit beat service pending on ${row.bucket.id} · ${ev.field} (sp=${ev.inboundAt} > service=${ev.localAt}).`,
+        "synced"
+      );
+    }
     for (const c of conflicts) {
       await repo.insertConflict({
         id: `cf-${row.bucket.id.toLowerCase()}-${c.field}-${Date.now()}`,
@@ -570,20 +791,143 @@ async function pullRoadmap(ctx: SiteContext): Promise<InboundResult> {
       );
       result.conflicts += 1;
     }
-    if (Object.keys(apply).length > 0) {
+    if (Object.keys(apply).length > 0 || clearedDirty.length > 0) {
+      const nextDirty = row.dirtyFields.filter((f) => !clearedDirty.includes(f) && !(f in apply));
+      const nextAttr = { ...(row.fieldAttribution ?? {}) };
+      for (const f of clearedDirty) delete nextAttr[f];
+      for (const f of Object.keys(apply)) delete nextAttr[f];
       await repo.updateBucket(row.bucket.id, {
         patch: apply as Partial<Bucket>,
-        dirtyFields: row.dirtyFields.filter((f) => !(f in apply)),
+        dirtyFields: nextDirty,
+        fieldAttribution: nextAttr,
       });
-      await repo.appendAudit(
-        SYNC_ACTOR,
-        `Inbound Roadmap change pulled — ${row.bucket.id} ${Object.keys(apply).join(", ")} updated from SharePoint.`,
-        "synced"
-      );
-      result.pulled += 1;
+      if (Object.keys(apply).length > 0) {
+        await repo.appendAudit(
+          SYNC_ACTOR,
+          `Inbound Roadmap change pulled — ${row.bucket.id} ${Object.keys(apply).join(", ")} updated from SharePoint.`,
+          "synced"
+        );
+        result.pulled += 1;
+      }
     }
   }
   await repo.saveDeltaLink(ROADMAP_KEY, deltaLink);
+  await repo.markRegisterInboundComplete(ROADMAP_KEY);
+  return result;
+}
+
+async function pullProjects(ctx: SiteContext): Promise<InboundResult> {
+  const result: InboundResult = { pulled: 0, conflicts: 0, skipped: 0, adopted: 0 };
+  if (!ctx.listIds[PROJECTS_KEY]) return result;
+  const stored = await repo.getDeltaLink(PROJECTS_KEY);
+  const { items, deltaLink } = await listDelta(ctx, PROJECTS_KEY, stored);
+  let rows = await repo.getProjectRows();
+
+  for (const item of items) {
+    if (item.deleted || !item.fields) continue;
+    let row =
+      rows.find((r) => r.spItemId === item.id) ??
+      (typeof item.fields.ProjectID === "string"
+        ? rows.find((r) => r.project.id === item.fields?.ProjectID)
+        : undefined);
+    if (!row && typeof item.fields.ProjectID === "string") {
+      const byKey = rows.find((r) => r.project.id === item.fields?.ProjectID);
+      if (byKey) {
+        await repo.updateProject(byKey.project.id, { spItemId: item.id });
+        row = { ...byKey, spItemId: item.id };
+      }
+    }
+    if (!row) {
+      const validation = validateInboundAdoptionRow("project", item.fields);
+      if (!validation.ok || !validation.id) {
+        await repo.appendAudit(
+          SYNC_ACTOR,
+          `Inbound Projects row skipped (invalid adoption) — spItem=${item.id} errors=${validation.errors.join(",")}.`,
+          "error"
+        );
+        result.skipped += 1;
+        continue;
+      }
+      const project = buildAdoptedProject(validation.id, item.fields);
+      const inserted = await repo.insertAdoptedProject(project, item.id);
+      if (!inserted) {
+        result.skipped += 1;
+        continue;
+      }
+      await repo.appendAudit(
+        SYNC_ACTOR,
+        `Inbound Projects adoption — ${project.id} imported from SharePoint (spItem=${item.id}).`,
+        "synced"
+      );
+      result.adopted += 1;
+      rows = await repo.getProjectRows();
+      row = rows.find((r) => r.project.id === project.id);
+      if (!row) {
+        result.skipped += 1;
+        continue;
+      }
+    }
+    const patches = inboundProjectPatches(item.fields) as EntityData;
+    const inboundAttr = attributionFromItem(item);
+    const { apply, conflicts, clearedDirty, attributionEvents } = reconcileInbound(
+      row.project as unknown as EntityData,
+      row.dirtyFields,
+      patches,
+      {
+        inboundSource: inboundAttr.source,
+        inboundAt: inboundAttr.at,
+        localAttribution: row.fieldAttribution ?? {},
+        routingFields: ROUTING_PROJECT_FIELDS,
+      }
+    );
+    for (const ev of attributionEvents) {
+      await repo.appendAudit(
+        SYNC_ACTOR,
+        `Human SharePoint edit beat service pending on ${row.project.id} · ${ev.field} (sp=${ev.inboundAt} > service=${ev.localAt}).`,
+        "synced"
+      );
+    }
+    for (const c of conflicts) {
+      await repo.insertConflict({
+        id: `cf-${row.project.id.toLowerCase()}-${c.field}-${Date.now()}`,
+        entityType: "bucket",
+        entityId: row.project.id,
+        field: c.field,
+        mcVal: c.mcVal,
+        spVal: c.spVal,
+        by: SYNC_ACTOR,
+        note: "Edited in SharePoint Projects while Mission Control also changed it.",
+      });
+      await repo.updateProject(row.project.id, { syncState: "conflict" });
+      await repo.appendAudit(
+        SYNC_ACTOR,
+        `Conflict detected on ${row.project.id} · ${c.field} (edited both sides on Projects).`,
+        "conflict"
+      );
+      result.conflicts += 1;
+    }
+    if (Object.keys(apply).length > 0 || clearedDirty.length > 0) {
+      const nextDirty = row.dirtyFields.filter((f) => !clearedDirty.includes(f) && !(f in apply));
+      const nextAttr = { ...(row.fieldAttribution ?? {}) };
+      for (const f of clearedDirty) delete nextAttr[f];
+      for (const f of Object.keys(apply)) delete nextAttr[f];
+      await repo.updateProject(row.project.id, {
+        patch: apply as Partial<Project>,
+        dirtyFields: nextDirty,
+        fieldAttribution: nextAttr,
+      });
+      if (Object.keys(apply).length > 0) {
+        await repo.appendAudit(
+          SYNC_ACTOR,
+          `Inbound Projects change pulled — ${row.project.id} ${Object.keys(apply).join(", ")} updated from SharePoint.`,
+          "synced"
+        );
+        result.pulled += 1;
+      }
+    }
+  }
+  await repo.saveDeltaLink(PROJECTS_KEY, deltaLink);
+  await repo.markRegisterInboundComplete(PROJECTS_KEY);
   return result;
 }
 
@@ -595,6 +939,7 @@ export interface SweepResult {
   pulled: number;
   conflicts: number;
   skippedInbound: number;
+  adoptedInbound: number;
   counts: Record<string, repo.ListCounts>;
   lastSweep: string;
 }
@@ -607,21 +952,31 @@ export async function runSweep(actor: string = SYNC_ACTOR): Promise<SweepResult>
   // Inbound FIRST: SharePoint-side edits must be seen — and dirty-field
   // conflicts raised (§5.1) — before any outbound write. Pushing first would
   // silently overwrite the remote edit: last-write-wins, which is forbidden.
-  // Roadmap before ToDos so Initiative lookup resolution sees current buckets.
+  // Projects → Roadmap → ToDos so lookups resolve on the same sweep.
   let pulled = 0;
   let conflicts = 0;
   let skippedInbound = 0;
+  let adoptedInbound = 0;
+  {
+    const r = await pullProjects(ctx);
+    pulled += r.pulled;
+    conflicts += r.conflicts;
+    skippedInbound += r.skipped;
+    adoptedInbound += r.adopted;
+  }
   {
     const r = await pullRoadmap(ctx);
     pulled += r.pulled;
     conflicts += r.conflicts;
     skippedInbound += r.skipped;
+    adoptedInbound += r.adopted;
   }
   for (const { listKey, type } of DELTA_LISTS) {
     const r = await pullList(ctx, listKey, type);
     pulled += r.pulled;
     conflicts += r.conflicts;
     skippedInbound += r.skipped;
+    adoptedInbound += r.adopted;
   }
 
   // Outbound: Projects + Roadmap before tasks so InitiativeLookupId can resolve
@@ -629,11 +984,8 @@ export async function runSweep(actor: string = SYNC_ACTOR): Promise<SweepResult>
   // held back until a human resolves them.
   let pushed = 0;
   let pushErrors = 0;
-  // Push-only repo-registry mirror (Item 2) — counted with the outbound pushes.
   pushed += await pushRepoRegistry(ctx);
-  // Push-only projects mirror (P2) — must run before Roadmap (Project lookup).
   pushed += await pushProjectsMirror(ctx);
-  // Push-only Roadmap / initiatives mirror (EN-005) — before task Initiative lookup.
   pushed += await pushBucketRoadmap(ctx);
   for (const type of PUSHABLE) {
     const rows = await repo.getEntities(type);
@@ -645,23 +997,91 @@ export async function runSweep(actor: string = SYNC_ACTOR): Promise<SweepResult>
   }
 
   const lastSweep = repo.stamp();
-  // Only audit a sweep that actually changed something. Under the scheduled
-  // 5-min cron the common case is a no-op sweep (0 pushed / 0 pulled); writing a
-  // "0 outbound, 0 inbound" row every cadence would flood sync_audit_log. The
-  // "last sync" heartbeat is tracked separately via delta_links.updated_at
-  // (re-stamped on every sweep — see repo.lastSweepAt), so the UI indicator
-  // still advances even when a sweep records nothing.
-  if (pushed > 0 || pulled > 0 || conflicts > 0 || pushErrors > 0) {
+  if (pushed > 0 || pulled > 0 || conflicts > 0 || pushErrors > 0 || adoptedInbound > 0) {
     await repo.appendAudit(
       actor,
       `Sweep completed — ${pushed} outbound push${pushed === 1 ? "" : "es"}, ${pulled} inbound change${pulled === 1 ? "" : "s"}${
-        conflicts ? `, ${conflicts} conflict${conflicts === 1 ? "" : "s"} raised` : ""
-      }${pushErrors ? `, ${pushErrors} push error${pushErrors === 1 ? "" : "s"}` : ""}.`,
+        adoptedInbound ? `, ${adoptedInbound} adopted` : ""
+      }${conflicts ? `, ${conflicts} conflict${conflicts === 1 ? "" : "s"} raised` : ""}${
+        pushErrors ? `, ${pushErrors} push error${pushErrors === 1 ? "" : "s"}` : ""
+      }.`,
       pushErrors > 0 ? "error" : conflicts > 0 ? "conflict" : "synced"
     );
   }
 
-  return { pushed, pushErrors, pulled, conflicts, skippedInbound, counts: await repo.countsByList(), lastSweep };
+  return {
+    pushed,
+    pushErrors,
+    pulled,
+    conflicts,
+    skippedInbound,
+    adoptedInbound,
+    counts: await repo.countsByList(),
+    lastSweep,
+  };
+}
+
+/** Canonical routing freshness check against persisted complete-inbound stamps. */
+export async function checkRoutingFreshness(now?: Date): Promise<SyncFreshnessResult> {
+  return evaluateSyncFreshness({
+    now,
+    loadRegisterTimestamps: async () => repo.getRegisterInboundCompletions(),
+  });
+}
+
+/** Session-authenticated sync.mutate gate — ignores caller-supplied actor authority. */
+export async function requireSyncMutateActor(): Promise<{ oid: string; actor: PermissionActor }> {
+  let session: { user?: { oid?: string | null; email?: string | null } } | null;
+  try {
+    session = (await auth()) as { user?: { oid?: string | null; email?: string | null } } | null;
+  } catch {
+    throw new ApiError("forbidden", "Authenticated session with Entra oid required for sync.mutate.", 403);
+  }
+  const oid = session?.user?.oid?.trim();
+  if (!oid) {
+    throw new ApiError("forbidden", "Authenticated session with Entra oid required for sync.mutate.", 403);
+  }
+
+  let actor: PermissionActor | null = null;
+  if (permissionsEnforcementEnabled()) {
+    const user = await hydrateMcUserByOid(oid);
+    if (!user) {
+      throw new ApiError("forbidden", "No MC identity for session oid.", 403);
+    }
+    actor = permissionActorFromMcUser(user);
+  } else {
+    // Enforcement off: still require oid; grant admin-shaped actor so local
+    // sessions can exercise mutate routes without identity tables.
+    actor = { kind: "human", id: oid, role: "admin", status: "active" };
+  }
+
+  const decision = authorize({
+    actor,
+    capability: "sync.mutate",
+    resource: { type: "sync" },
+  });
+  if (!decision.allowed) {
+    throw new ApiError("forbidden", `sync.mutate denied (${decision.reasonCode}).`, 403);
+  }
+  return { oid, actor };
+}
+
+/** Cron / inbound service gate — durable sp_sync_inbound + sync.service.write. */
+export function requireSyncServiceWrite(): PermissionActor {
+  const actor: PermissionActor = {
+    kind: "service",
+    id: SYNC_INBOUND_SERVICE_PRINCIPAL_ID,
+    status: "active",
+  };
+  const decision = authorize({
+    actor,
+    capability: "sync.service.write",
+    resource: { type: "sync" },
+  });
+  if (!decision.allowed) {
+    throw new ApiError("forbidden", `sync.service.write denied (${decision.reasonCode}).`, 403);
+  }
+  return actor;
 }
 
 // ─── Manual reconciliation (humans decide — SOUL non-negotiable) ─────────────

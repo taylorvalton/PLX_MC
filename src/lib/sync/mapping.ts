@@ -272,9 +272,12 @@ const SP_TO_HEALTH: Record<string, Bucket["health"]> = {
   "Off track": "off",
 };
 
-// Roadmap inbound (Gantt minimum): Title/Health/Start/Target → Bucket patches.
-// Owner/Project/PRD stay push-only for this increment.
-export function inboundBucketPatches(spFields: Record<string, unknown>): Partial<Bucket> {
+// Roadmap inbound (routing-relevant Gantt + optional resolved project).
+// Owner/PRD remain push-only — never applied here.
+export function inboundBucketPatches(
+  spFields: Record<string, unknown>,
+  opts: { project?: string | null } = {}
+): Partial<Bucket> {
   const patches: Partial<Bucket> = {};
   if (typeof spFields.Title === "string" && spFields.Title.trim()) patches.name = spFields.Title;
   if (typeof spFields.Health === "string") {
@@ -292,7 +295,137 @@ export function inboundBucketPatches(spFields: Record<string, unknown>): Partial
   if (typeof spFields.PercentComplete === "number" && Number.isFinite(spFields.PercentComplete)) {
     patches.progress = spFields.PercentComplete;
   }
+  if (opts.project !== undefined) patches.project = opts.project;
   return patches;
+}
+
+/** Projects inbound (routing-relevant). Owner/PRD stay push-only. */
+export function inboundProjectPatches(spFields: Record<string, unknown>): Partial<Project> {
+  const patches: Partial<Project> = {};
+  if (typeof spFields.Title === "string" && spFields.Title.trim()) patches.name = spFields.Title;
+  if (typeof spFields.Health === "string") {
+    const health = SP_TO_HEALTH[spFields.Health];
+    if (health) patches.health = health;
+  }
+  if (typeof spFields.StartDate === "string") {
+    const started = isoToDue(spFields.StartDate) ?? isoToDotted(spFields.StartDate);
+    if (started) patches.started = started;
+  }
+  if (typeof spFields.TargetDate === "string") {
+    const target = isoToDue(spFields.TargetDate) ?? isoToDotted(spFields.TargetDate);
+    if (target) patches.target = target;
+  }
+  if (typeof spFields.Description === "string") patches.desc = spFields.Description;
+  return patches;
+}
+
+function isoToDotted(iso: string): string | null {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return null;
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getUTCFullYear()}.${pad(d.getUTCMonth() + 1)}.${pad(d.getUTCDate())}`;
+}
+
+// ─── Adoption ID + row validation (P4) ───────────────────────────────────────
+
+export const TASK_ID_RE = /^TASK-[0-9]+$/;
+export const BUCKET_ID_RE = /^BKT-[A-Z0-9-]+$/;
+export const PROJECT_ID_RE = /^PRJ-[A-Z0-9-]+$/;
+
+export type FieldSource = "human" | "service" | "unknown";
+
+export interface FieldAttribution {
+  source: FieldSource;
+  at: string;
+  actorId?: string;
+}
+
+/** Routing fields where a newer attributable human SharePoint edit may beat service pending. */
+export const ROUTING_TASK_FIELDS = new Set([
+  "title",
+  "stage",
+  "priority",
+  "due",
+  "description",
+  "assignee",
+  "bucket",
+]);
+export const ROUTING_BUCKET_FIELDS = new Set([
+  "name",
+  "health",
+  "started",
+  "target",
+  "progress",
+  "project",
+]);
+export const ROUTING_PROJECT_FIELDS = new Set(["name", "health", "started", "target", "desc"]);
+
+export interface AdoptionValidation {
+  ok: boolean;
+  id?: string;
+  errors: string[];
+}
+
+export function validateAdoptedTaskId(raw: unknown): AdoptionValidation {
+  if (typeof raw !== "string" || !TASK_ID_RE.test(raw)) {
+    return { ok: false, errors: ["invalid_or_missing_task_id"] };
+  }
+  return { ok: true, id: raw, errors: [] };
+}
+
+export function validateAdoptedBucketId(raw: unknown): AdoptionValidation {
+  if (typeof raw !== "string" || !BUCKET_ID_RE.test(raw)) {
+    return { ok: false, errors: ["invalid_or_missing_initiative_id"] };
+  }
+  return { ok: true, id: raw, errors: [] };
+}
+
+export function validateAdoptedProjectId(raw: unknown): AdoptionValidation {
+  if (typeof raw !== "string" || !PROJECT_ID_RE.test(raw)) {
+    return { ok: false, errors: ["invalid_or_missing_project_id"] };
+  }
+  return { ok: true, id: raw, errors: [] };
+}
+
+/** Validate required identity + enum values for an inbound adoption candidate. */
+export function validateInboundAdoptionRow(
+  kind: "task" | "bucket" | "project",
+  fields: Record<string, unknown>
+): AdoptionValidation {
+  const errors: string[] = [];
+  if (kind === "task") {
+    const idCheck = validateAdoptedTaskId(fields.TaskID);
+    if (!idCheck.ok) return idCheck;
+    if (typeof fields.Title !== "string" || !fields.Title.trim()) errors.push("missing_title");
+    if (typeof fields.Status === "string" && !(fields.Status in STATUS_TO_STAGE)) {
+      errors.push("invalid_status");
+    }
+    if (typeof fields.Priority === "string" && !(fields.Priority.toLowerCase() in PRIORITY)) {
+      errors.push("invalid_priority");
+    }
+    return { ok: errors.length === 0, id: idCheck.id, errors };
+  }
+  if (kind === "bucket") {
+    const idCheck = validateAdoptedBucketId(fields.InitiativeID);
+    if (!idCheck.ok) return idCheck;
+    if (typeof fields.Title !== "string" || !fields.Title.trim()) errors.push("missing_title");
+    if (typeof fields.Health === "string" && !(fields.Health in SP_TO_HEALTH)) {
+      errors.push("invalid_health");
+    }
+    return { ok: errors.length === 0, id: idCheck.id, errors };
+  }
+  const idCheck = validateAdoptedProjectId(fields.ProjectID);
+  if (!idCheck.ok) return idCheck;
+  if (typeof fields.Title !== "string" || !fields.Title.trim()) errors.push("missing_title");
+  if (typeof fields.Health === "string" && !(fields.Health in SP_TO_HEALTH)) {
+    errors.push("invalid_health");
+  }
+  return { ok: errors.length === 0, id: idCheck.id, errors };
+}
+
+export function numericTaskId(taskId: string): number | null {
+  const m = /^TASK-([0-9]+)$/.exec(taskId);
+  return m ? Number(m[1]) : null;
 }
 
 // ─── Inbound (pull + two-way columns) ────────────────────────────────────────
@@ -376,6 +509,7 @@ const FIELD_DISPLAY: Record<EntityType, Record<string, string>> = {
     started: "Start Date",
     target: "Target Date",
     progress: "% Complete",
+    project: "Project",
   },
 };
 
@@ -449,27 +583,101 @@ export function displayValue(value: unknown): string {
   return String(value);
 }
 
-// Pure reconciliation step for one inbound item (unit-tested): a patch
-// applies cleanly unless the same field is locally dirty with a different
-// value — that is a two-sided conflict (§5.1), never an overwrite.
+export interface ReconcileInboundOpts {
+  /** Attribution of the inbound SharePoint edit (from lastModifiedBy). */
+  inboundSource?: FieldSource;
+  inboundAt?: string;
+  /** Per-field local dirty attribution (human/service/unknown). */
+  localAttribution?: Record<string, FieldAttribution>;
+  /** Fields eligible for human-over-service precedence. */
+  routingFields?: Set<string>;
+}
+
+export interface ReconcileInboundResult {
+  apply: EntityData;
+  conflicts: { field: string; mcVal: string; spVal: string }[];
+  /** Dirty fields cleared because a newer human SharePoint edit won. */
+  clearedDirty: string[];
+  attributionEvents: {
+    field: string;
+    action: "human_over_service";
+    inboundAt: string;
+    localAt: string;
+  }[];
+}
+
+function inboundBeatsServicePending(
+  field: string,
+  opts: ReconcileInboundOpts | undefined
+): { beat: boolean; localAt?: string } {
+  if (!opts?.inboundSource || opts.inboundSource !== "human" || !opts.inboundAt) {
+    return { beat: false };
+  }
+  if (opts.routingFields && !opts.routingFields.has(field)) return { beat: false };
+  const local = opts.localAttribution?.[field];
+  if (!local || local.source !== "service") return { beat: false };
+  const inboundMs = Date.parse(opts.inboundAt);
+  const localMs = Date.parse(local.at);
+  if (Number.isNaN(inboundMs) || Number.isNaN(localMs)) return { beat: false };
+  if (inboundMs <= localMs) return { beat: false };
+  return { beat: true, localAt: local.at };
+}
+
+// Pure reconciliation (§5.1 + P4 attribution): a patch applies cleanly unless
+// the same field is locally dirty with a different value. Exception: a newer
+// SharePoint edit attributed to a human beats an older agent/service pending
+// edit on routing fields (audited). Human-vs-human and unknown/ambiguous stay
+// manual conflicts.
 export function reconcileInbound(
   data: EntityData,
   dirtyFields: string[],
-  patches: EntityData
-): {
-  apply: EntityData;
-  conflicts: { field: string; mcVal: string; spVal: string }[];
-} {
+  patches: EntityData,
+  opts?: ReconcileInboundOpts
+): ReconcileInboundResult {
   const apply: EntityData = {};
   const conflicts: { field: string; mcVal: string; spVal: string }[] = [];
+  const clearedDirty: string[] = [];
+  const attributionEvents: ReconcileInboundResult["attributionEvents"] = [];
   for (const [field, spVal] of Object.entries(patches)) {
     const mcVal = data[field];
     if (displayValue(mcVal) === displayValue(spVal)) continue;
     if (dirtyFields.includes(field)) {
-      conflicts.push({ field, mcVal: displayValue(mcVal), spVal: displayValue(spVal) });
+      const { beat, localAt } = inboundBeatsServicePending(field, opts);
+      if (beat && localAt && opts?.inboundAt) {
+        apply[field] = spVal;
+        clearedDirty.push(field);
+        attributionEvents.push({
+          field,
+          action: "human_over_service",
+          inboundAt: opts.inboundAt,
+          localAt,
+        });
+      } else {
+        conflicts.push({ field, mcVal: displayValue(mcVal), spVal: displayValue(spVal) });
+      }
     } else {
       apply[field] = spVal;
     }
   }
-  return { apply, conflicts };
+  return { apply, conflicts, clearedDirty, attributionEvents };
+}
+
+/** Classify Graph lastModifiedBy into human / service / unknown. */
+export function classifyLastModifiedBy(input: {
+  user?: { id?: string; displayName?: string; email?: string | null } | null;
+  application?: { id?: string; displayName?: string } | null;
+} | null | undefined): { source: FieldSource; actorId?: string; email?: string } {
+  if (!input) return { source: "unknown" };
+  if (input.application?.id) {
+    return { source: "service", actorId: input.application.id };
+  }
+  const user = input.user;
+  if (user?.id || user?.email) {
+    return {
+      source: "human",
+      actorId: user.id,
+      email: user.email ?? undefined,
+    };
+  }
+  return { source: "unknown" };
 }

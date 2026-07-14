@@ -117,10 +117,43 @@ export async function siteContext(): Promise<SiteContext> {
 
 // ─── List item operations used by the engine ─────────────────────────────────
 
+export interface SpLastModifiedBy {
+  user?: { id?: string; displayName?: string; email?: string | null };
+  application?: { id?: string; displayName?: string };
+}
+
 export interface SpListItem {
   id: string;
   fields?: Record<string, unknown>;
   deleted?: { state: string };
+  lastModifiedDateTime?: string;
+  lastModifiedBy?: SpLastModifiedBy;
+}
+
+/** Normalize Graph lastModifiedBy (+ timestamp) for inbound attribution. */
+export function normalizeLastModified(item: SpListItem): {
+  source: "human" | "service" | "unknown";
+  at: string | null;
+  actorId?: string;
+  email?: string;
+} {
+  const at =
+    typeof item.lastModifiedDateTime === "string" && item.lastModifiedDateTime
+      ? item.lastModifiedDateTime
+      : null;
+  const lm = item.lastModifiedBy;
+  if (lm?.application?.id) {
+    return { source: "service", at, actorId: lm.application.id };
+  }
+  if (lm?.user?.id || lm?.user?.email) {
+    return {
+      source: "human",
+      at,
+      actorId: lm.user.id,
+      email: lm.user.email ?? undefined,
+    };
+  }
+  return { source: "unknown", at };
 }
 
 export async function createListItem(
@@ -229,9 +262,13 @@ export async function listDelta(
   listKey: string,
   storedDeltaLink: string | null
 ): Promise<{ items: SpListItem[]; deltaLink: string }> {
+  // Request lastModifiedBy + lastModifiedDateTime so inbound can attribute
+  // human vs service edits (P4). Stored delta links already carry the select
+  // shape from the prior walk; first-run URLs request it explicitly.
   let url =
     storedDeltaLink ??
-    `/sites/${ctx.siteId}/lists/${ctx.listIds[listKey]}/items/delta?expand=fields`;
+    `/sites/${ctx.siteId}/lists/${ctx.listIds[listKey]}/items/delta?` +
+      `$select=id,lastModifiedDateTime,lastModifiedBy&$expand=fields`;
   const items: SpListItem[] = [];
   for (;;) {
     const page = await graphFetch<{
