@@ -38,10 +38,13 @@ export type {
   BucketLedgerBinding,
   BucketLedgerMapConfig,
   BucketLedgerMapParseResult,
+  BucketProjection,
+  BucketProjectionSource,
 } from "./projection";
 export {
   bindingsForBucket,
   parseBucketLedgerMapJson,
+  projectBucketFromRows,
   projectMilestones,
   projectTrace,
 } from "./projection";

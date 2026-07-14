@@ -5,6 +5,7 @@
 
 import { z } from "zod";
 import type { Milestone, Trace, TraceRow, TraceStatus } from "@/lib/mc-data";
+import type { LedgerRow, LoaderSummaryRow } from "./loader";
 import type {
   Artifact,
   ArtifactStatus,
@@ -174,4 +175,109 @@ export function projectTrace(ledger: QualityLedger, bucketId: string): Trace {
     status: STATUS_TO_TRACE[a.status],
   }));
   return { bucket: bucketId, rows };
+}
+
+// ─── Bucket projection (GET /api/loop-ledgers/bucket/[bucketId] shape) ────────
+
+/** One binding's provenance in a BucketProjection — valid xor degraded. */
+export interface BucketProjectionSource {
+  repo: string;
+  module: string;
+  generatedAt?: string;
+  /** Human-readable reason this binding produced no rows. Never fabricated rows. */
+  degraded?: string;
+}
+
+/** Response data for the bucket projection endpoint. */
+export type BucketProjection =
+  | { bound: false }
+  | {
+      bound: true;
+      milestones: Milestone[];
+      trace: Trace | null;
+      sources: BucketProjectionSource[];
+    };
+
+/**
+ * Resolve a bucket's bindings against already-loaded loader rows and merge the
+ * per-binding projections into one BucketProjection. Pure — the caller loads
+ * rows (listLedgerSummaries) and reads configs; this only matches and merges.
+ *
+ * Per binding: the first VALID ledger row whose repo+module match contributes
+ * milestones + trace rows; otherwise a degraded source entry explains why
+ * (degraded source, degraded ledger, or module not found). Never throws.
+ */
+export function projectBucketFromRows(
+  bucketId: string,
+  bindings: BucketLedgerBinding[],
+  rows: LoaderSummaryRow[]
+): BucketProjection {
+  if (bindings.length === 0) return { bound: false };
+
+  const milestones: Milestone[] = [];
+  const traceRows: TraceRow[] = [];
+  const sources: BucketProjectionSource[] = [];
+  let hasValidLedger = false;
+
+  for (const binding of bindings) {
+    const ledgerRow = rows.find(
+      (r): r is LedgerRow =>
+        r.kind === "ledger" &&
+        r.repo === binding.repo &&
+        r.validationResult.valid &&
+        r.validationResult.ledger.module === binding.module
+    );
+    if (ledgerRow?.validationResult.valid) {
+      const ledger = ledgerRow.validationResult.ledger;
+      hasValidLedger = true;
+      milestones.push(...projectMilestones(ledger, bucketId));
+      traceRows.push(...projectTrace(ledger, bucketId).rows);
+      sources.push({
+        repo: binding.repo,
+        module: binding.module,
+        generatedAt: ledger.generated_at,
+      });
+      continue;
+    }
+
+    const degradedSource = rows.find(
+      (r) => r.kind === "degraded-source" && r.repo === binding.repo
+    );
+    if (degradedSource && degradedSource.kind === "degraded-source") {
+      sources.push({
+        repo: binding.repo,
+        module: binding.module,
+        degraded: `${degradedSource.reason}: ${degradedSource.note}`,
+      });
+      continue;
+    }
+
+    // Invalid ledgers carry ledger: null, so they cannot be attributed to a
+    // module — report the repo has degraded ledgers rather than "not found".
+    const degradedLedger = rows.find(
+      (r): r is LedgerRow =>
+        r.kind === "ledger" && r.repo === binding.repo && !r.validationResult.valid
+    );
+    if (degradedLedger) {
+      sources.push({
+        repo: binding.repo,
+        module: binding.module,
+        degraded: `no valid ledger for module "${binding.module}" — repo has a degraded ledger (${degradedLedger.validationResult.healthCode})`,
+      });
+      continue;
+    }
+
+    sources.push({
+      repo: binding.repo,
+      module: binding.module,
+      degraded: `no ledger found for module "${binding.module}"`,
+    });
+  }
+
+  return {
+    bound: true,
+    milestones,
+    trace: hasValidLedger ? { bucket: bucketId, rows: traceRows } : null,
+    sources,
+  };
 }
