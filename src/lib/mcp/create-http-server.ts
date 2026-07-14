@@ -21,6 +21,7 @@ import {
   actionSyncSkills,
 } from "./skills-actions";
 import { registerRoutingSuggestTools } from "./routing-suggest-actions";
+import { registerRoutingMutationTools } from "./routing-mutation-actions";
 
 function jsonResult(payload: unknown) {
   return { content: [{ type: "text" as const, text: JSON.stringify(payload, null, 2) }] };
@@ -28,12 +29,11 @@ function jsonResult(payload: unknown) {
 
 /**
  * Modular routing tool registration seam.
- * P5 registers suggestion-only tools; P8 will add mutation tools here without
- * rewriting the HTTP MCP server bootstrap.
+ * P5: suggestion tools. P8: confirmed mutation tools.
  */
 export function registerRoutingTools(server: McpServer, identity: McpIdentity): void {
   registerRoutingSuggestTools(server, identity);
-  // P8: registerRoutingMutationTools(server, identity);
+  registerRoutingMutationTools(server, identity);
 }
 
 export function createPlxMcMcpServer(identity: McpIdentity): McpServer {
@@ -89,7 +89,7 @@ export function createPlxMcMcpServer(identity: McpIdentity): McpServer {
       priority: z.enum(["urgent", "high", "medium", "low"]).optional(),
       repos: z.array(z.string()).optional(),
     },
-    async (body) => jsonResult(await actionCreateTask({ ...body, reporter: body.reporter || identity.operatorEmail }))
+    async (body) => jsonResult(await actionCreateTask(identity, { ...body, reporter: body.reporter || identity.operatorEmail }))
   );
 
   server.tool(
@@ -124,7 +124,7 @@ export function createPlxMcMcpServer(identity: McpIdentity): McpServer {
       verificationCommands: z.array(z.string()).optional(),
       filesChanged: z.array(z.string()).optional(),
     },
-    async (body) => jsonResult(await actionComplete(body))
+    async (body) => jsonResult(await actionComplete(identity, body))
   );
 
   server.tool(

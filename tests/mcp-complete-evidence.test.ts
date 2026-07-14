@@ -37,7 +37,26 @@ vi.mock("@/lib/mcp/sync-meta", () => ({
   syncMetaForTask: vi.fn(async () => ({ status: "queued" })),
 }));
 
+vi.mock("@/lib/routing/mutations/actors", () => ({
+  requireMcpActor: vi.fn((_identity: unknown, _cap: string) => ({
+    actor: { kind: "service", id: "sp_mcp_cursor", status: "active" },
+    actorId: "sp_mcp_cursor",
+    actorKind: "service",
+    auditLabel: "vince@example.com",
+  })),
+}));
+
 import { actionComplete } from "@/lib/mcp/actions";
+import type { McpIdentity } from "@/lib/mcp/auth";
+
+const identity: McpIdentity = {
+  operatorEmail: "vince@example.com",
+  runtime: "cursor",
+  workerId: "test",
+  repo: "petralabx/PLX_MC",
+  servicePrincipalId: "sp_mcp_cursor",
+  actor: { kind: "service", id: "sp_mcp_cursor", status: "active" },
+};
 
 beforeEach(() => {
   db.dispatches.clear();
@@ -47,7 +66,7 @@ beforeEach(() => {
 
 describe("actionComplete evidence (P0d)", () => {
   it("standard bundle: writes summary + done checklist + rollback, no qa", async () => {
-    await actionComplete({
+    await actionComplete(identity, {
       checkoutId: "dsp_test",
       summary: "did the thing",
       verificationCommands: ["npm test"],
@@ -61,7 +80,7 @@ describe("actionComplete evidence (P0d)", () => {
   });
 
   it("high/full bundle: a testRun lands as evidence.qa so a high-risk PR is gate-passable", async () => {
-    const res = await actionComplete({
+    const res = await actionComplete(identity, {
       checkoutId: "dsp_test",
       summary: "migration applied",
       verificationCommands: ["npx vitest run"],
@@ -79,7 +98,7 @@ describe("actionComplete evidence (P0d)", () => {
   });
 
   it("screenshots are accepted as the alternative full-tier proof", async () => {
-    await actionComplete({
+    await actionComplete(identity, {
       checkoutId: "dsp_test",
       summary: "ui change",
       rollback: "revert",

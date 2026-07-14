@@ -6,6 +6,7 @@ import * as complianceRepo from "@/lib/compliance/repo";
 import { createTask, patchTask, snapshot, type CreateTaskInput } from "@/lib/sync";
 import { getEntity } from "@/lib/sync/repo";
 import type { Evidence, Task } from "@/lib/mc-data";
+import { requireMcpActor } from "@/lib/routing/mutations/actors";
 import type { McpIdentity } from "./auth";
 import { taskLink } from "./envelope";
 import { syncMetaForTask } from "./sync-meta";
@@ -18,6 +19,13 @@ export {
   type SuggestWorkInput,
   type SuggestWorkResult,
 } from "./routing-suggest-actions";
+
+export {
+  actionConfirmExisting,
+  actionAttachCheckout,
+  actionCreateRoutedTask,
+  registerRoutingMutationTools,
+} from "./routing-mutation-actions";
 
 export async function actionSelfCheck(identity: McpIdentity) {
   const snap = await snapshot();
@@ -81,17 +89,32 @@ export async function actionSearchTasks(query: {
   return { tasks: tasks.slice(0, limit), total: tasks.length };
 }
 
-export async function actionCreateTask(input: CreateTaskInput) {
-  const task = await createTask(input);
+export async function actionCreateTask(identity: McpIdentity, input: CreateTaskInput) {
+  // MCP service principal intentionally lacks task.create — enforce here.
+  const authorized = requireMcpActor(identity, "task.create", {
+    type: "bucket",
+    id: input.bucket,
+  });
+  const task = await createTask(
+    {
+      ...input,
+      reporter: identity.operatorEmail,
+    },
+    { source: "service", actorId: authorized.actorId }
+  );
   return { task, taskId: task.id, link: taskLink(task.id), sync: await syncMetaForTask(task.id) };
 }
 
 export async function actionCheckout(identity: McpIdentity, taskId: string) {
+  requireMcpActor(identity, "task.checkout", { type: "task", id: taskId }, {
+    repositoryId: identity.repo,
+  });
   const { checkoutId } = await checkout({
     taskId,
     runtime: identity.runtime,
     accountableHuman: identity.operatorEmail,
     repo: identity.repo,
+    actor: identity.actor,
   });
   const stamp = `MC-Checkout: ${checkoutId}`;
   return {
@@ -113,6 +136,10 @@ export async function actionProgress(
     progressPct?: number;
   }
 ) {
+  const authorized = requireMcpActor(identity, "task.progress", {
+    type: "task",
+    id: input.taskId,
+  });
   const patch: Record<string, unknown> = {};
   if (input.stage) patch.stage = input.stage;
   if (input.notes) {
@@ -131,7 +158,12 @@ export async function actionProgress(
   if (!input.stage && !input.notes && !input.subtasks) {
     patch.stage = "progress";
   }
-  const task = await patchTask(input.taskId, patch as Parameters<typeof patchTask>[1], identity.operatorEmail);
+  const task = await patchTask(
+    input.taskId,
+    patch as Parameters<typeof patchTask>[1],
+    identity.operatorEmail,
+    { attribution: { source: "service", actorId: authorized.actorId } }
+  );
   if (!task) throw new ApiError("not_found", `unknown task ${input.taskId}`, 404);
   await complianceRepo.appendEvent({
     kind: "task.progress",
@@ -155,6 +187,7 @@ export async function actionProgress(
 }
 
 export async function actionComplete(
+  identity: McpIdentity,
   input: {
     checkoutId: string;
     summary: string;
@@ -163,28 +196,21 @@ export async function actionComplete(
     verificationCommands?: string[];
     filesChanged?: string[];
     rollback?: string;
-    // High-risk (full-tier) changes — migrations, auth, infra — need
-    // change-appropriate proof: a test run (`testRun`) or screenshots (`shots`).
-    // Without one of these the gate blocks a high-tier PR even with a complete
-    // standard bundle, and there was no MCP path to supply it.
     testRun?: { suite: string; passed: number; failed: number; total?: number };
     shots?: { label: string; cap: string }[];
   }
 ) {
+  requireMcpActor(identity, "task.complete");
   await complete({
     checkoutId: input.checkoutId,
     summary: input.summary,
     commitSha: input.commitSha,
     prUrl: input.prUrl,
+    actor: identity.actor,
   });
   const dispatch = await complianceRepo.getDispatch(input.checkoutId);
   const taskId = dispatch?.taskId ?? "";
 
-  // Write the structured evidence bundle onto the task entity so the compliance
-  // gate (verifyCompliance → task.evidence) is satisfiable through the MCP flow —
-  // completing a task is the agent's evidence hand-in, not just an event. Standard
-  // tier needs summary + done checklist + rollback; high/full tier also needs a
-  // test run or screenshots (qa/shots). Mirrors actionProgress's patchTask path.
   const qa = input.testRun
     ? {
         pass: input.testRun.passed,
@@ -200,14 +226,23 @@ export async function actionComplete(
       summary: input.summary,
       items: [
         { key: "summary", label: "Summary — what changed", done: true },
-        { key: "verification", label: "Verification commands run", done: (input.verificationCommands?.length ?? 0) > 0 },
+        {
+          key: "verification",
+          label: "Verification commands run",
+          done: (input.verificationCommands?.length ?? 0) > 0,
+        },
         { key: "rollback", label: "Rollback plan", done: !!input.rollback?.trim() },
       ],
       rollback: input.rollback?.trim() || null,
       ...(qa ? { qa } : {}),
       ...(input.shots?.length ? { shots: input.shots } : {}),
     };
-    await patchTask(taskId, { evidence } as Parameters<typeof patchTask>[1], dispatch?.accountableHuman ?? "agent");
+    await patchTask(
+      taskId,
+      { evidence } as Parameters<typeof patchTask>[1],
+      dispatch?.accountableHuman ?? identity.operatorEmail,
+      { attribution: { source: "service", actorId: identity.actor.id } }
+    );
   }
 
   return {

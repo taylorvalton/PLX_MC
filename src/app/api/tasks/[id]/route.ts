@@ -1,29 +1,24 @@
-// PATCH /api/tasks/{id} — update task fields (reassign and two-way scalars).
+// PATCH /api/tasks/{id} — update task fields.
+// Actor = Entra oid from session; body.actor is ignored (P8).
 
 import { z } from "zod";
 import { ApiError, parseBody, route } from "@/lib/api/route";
+import { requireSessionActor } from "@/lib/routing/mutations/actors";
 import { patchTask } from "@/lib/sync";
 
 const STAGES = ["backlog", "specced", "approved", "planned", "progress", "qa", "review", "merged", "verified"] as const;
 
-// Exported for unit testing of the validation contract (api-route.test.ts).
-// Next treats only HTTP-method exports (PATCH) as route handlers, so a schema
-// export is inert for routing.
 export const subtaskSchema = z.object({
   id: z.string(),
   t: z.string(),
   done: z.boolean(),
   who: z.string(),
-  // EN-001 / WS-3 sub-task enrichment — all optional (additive over the flat
-  // checklist; the `done` flag stays required, Risk R5).
   description: z.string().optional(),
   assignee: z.string().nullable().optional(),
   due: z.string().optional(),
   status: z.enum(["todo", "doing", "blocked", "done"]).optional(),
 });
 
-// EN-001 / WS-3 discussion comment — app-only (DB-only tier, never pushed to a
-// SharePoint column). `body` is capped to keep a single PATCH payload bounded.
 export const commentSchema = z.object({
   id: z.string(),
   author: z.string(),
@@ -34,29 +29,37 @@ export const commentSchema = z.object({
 });
 
 export const patchTaskSchema = z.object({
-  actor: z.string().min(1),
+  // Deprecated / ignored — authority is session oid only.
+  actor: z.string().min(1).optional(),
   assignee: z.string().nullable().optional(),
   title: z.string().min(1).optional(),
   stage: z.enum(STAGES).optional(),
   priority: z.enum(["urgent", "high", "medium", "low"]).optional(),
   due: z.string().optional(),
   description: z.string().optional(),
-  bucket: z.string().min(1).optional(), // NEW
-  labels: z.array(z.string()).max(25).optional(), // NEW — soft cap (see Risk R6)
-  coassignees: z.array(z.string()).optional(), // NEW
-  subtasks: z.array(subtaskSchema).optional(), // NEW
-  comments: z.array(commentSchema).max(500).optional(), // EN-001 / WS-3 — DB-only
-  accountableOwner: z.string().nullable().optional(), // EN-003
-  humanOnly: z.boolean().optional(), // EN-003
-  repos: z.array(z.string()).max(50).optional(), // EN-005 — pushed, allow-list enforced server-side
-  targetEnv: z.enum(["staging", "production"]).optional(), // pushed target environment
-  agentRunApproved: z.boolean().optional(), // EN-005 — DB-only operator approval of an approve-mode agent run
+  bucket: z.string().min(1).optional(),
+  labels: z.array(z.string()).max(25).optional(),
+  coassignees: z.array(z.string()).optional(),
+  subtasks: z.array(subtaskSchema).optional(),
+  comments: z.array(commentSchema).max(500).optional(),
+  accountableOwner: z.string().nullable().optional(),
+  humanOnly: z.boolean().optional(),
+  repos: z.array(z.string()).max(50).optional(),
+  targetEnv: z.enum(["staging", "production"]).optional(),
+  agentRunApproved: z.boolean().optional(),
 });
 
 export const PATCH = route(async (req, ctx) => {
   const { id } = await ctx.params;
-  const { actor, ...patch } = await parseBody(req, patchTaskSchema);
-  const task = await patchTask(id, patch, actor);
+  const { actor: _ignored, ...patch } = await parseBody(req, patchTaskSchema);
+  const capability =
+    patch.stage === "verified" || patch.stage === "merged"
+      ? "task.complete"
+      : "task.progress";
+  const authorized = await requireSessionActor(capability, { type: "task", id });
+  const task = await patchTask(id, patch, authorized.auditLabel, {
+    attribution: { source: "human", actorId: authorized.actorId },
+  });
   if (!task) throw new ApiError("not_found", `unknown task ${id}`, 404);
   return task;
 });

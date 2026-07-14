@@ -1,13 +1,11 @@
-// POST /api/compliance/checkout — the checkout handshake (EN-007 decision 3).
-// Mints a per-dispatch credential tying the work to {task, accountable human,
-// repo}; the PR gate later resolves the actor from this, not git metadata.
+// POST /api/compliance/checkout — agent handshake.
+// Actor = Entra oid from session; never from request body (P8).
 
 import { z } from "zod";
 import { parseBody, route } from "@/lib/api/route";
 import { checkout } from "@/lib/compliance/service";
+import { requireSessionActor } from "@/lib/routing/mutations/actors";
 
-// No actorKind — a checkout always mints an agent credential server-side
-// (security review CRITICAL #1); the client cannot self-declare as an operator.
 const checkoutSchema = z.object({
   taskId: z.string().min(1),
   runtime: z.string().min(1),
@@ -15,4 +13,15 @@ const checkoutSchema = z.object({
   repo: z.string().min(1),
 });
 
-export const POST = route(async (req) => checkout(await parseBody(req, checkoutSchema)));
+export const POST = route(async (req) => {
+  const body = await parseBody(req, checkoutSchema);
+  const authorized = await requireSessionActor(
+    "task.checkout",
+    { type: "task", id: body.taskId },
+    { repositoryId: body.repo }
+  );
+  return checkout({
+    ...body,
+    actor: authorized.actor,
+  });
+});

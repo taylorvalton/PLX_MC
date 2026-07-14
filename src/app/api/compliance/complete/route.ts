@@ -1,10 +1,10 @@
-// POST /api/compliance/complete — the done marker (mirrors VMC complete_task).
-// Records the completion as an event; the bundle itself (evidence/rollback/PRD)
-// is set on the task through the normal task-edit flow and checked by the gate.
+// POST /api/compliance/complete — done marker.
+// Actor = Entra oid from session; never from request body (P8).
 
 import { z } from "zod";
 import { parseBody, route } from "@/lib/api/route";
 import { complete } from "@/lib/compliance/service";
+import { requireSessionActor } from "@/lib/routing/mutations/actors";
 
 const completeSchema = z.object({
   checkoutId: z.string().min(1),
@@ -13,4 +13,11 @@ const completeSchema = z.object({
   prUrl: z.string().url().optional(),
 });
 
-export const POST = route(async (req) => complete(await parseBody(req, completeSchema)));
+export const POST = route(async (req) => {
+  const body = await parseBody(req, completeSchema);
+  const authorized = await requireSessionActor("task.complete");
+  return complete({
+    ...body,
+    actor: authorized.actor,
+  });
+});

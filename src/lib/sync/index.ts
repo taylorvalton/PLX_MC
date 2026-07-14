@@ -49,6 +49,7 @@ export {
   type CreateBucketInput,
   type CreateProjectInput,
   type CreateTaskInput,
+  type MutationAttribution,
   type PatchBucketInput,
   type PatchProjectInput,
   type PatchTaskInput,

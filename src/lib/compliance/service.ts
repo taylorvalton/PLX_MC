@@ -85,9 +85,33 @@ export interface CheckoutInput {
   runtime: string;
   accountableHuman: string;
   repo: string;
+  /** Durable permission actor — never taken from a caller-supplied body field. */
+  actor?: PermissionActor;
 }
 
 export async function checkout(input: CheckoutInput): Promise<{ checkoutId: string }> {
+  if (input.actor) {
+    const decision = authorize({
+      actor: input.actor,
+      capability: "task.checkout",
+      resource: { type: "task", id: input.taskId },
+      context: { repositoryId: input.repo },
+    });
+    if (!decision.allowed) {
+      throw new ApiError(
+        "forbidden",
+        `task.checkout denied (${decision.reasonCode}).`,
+        403
+      );
+    }
+  } else if (permissionsEnforcementEnabled()) {
+    throw new ApiError(
+      "forbidden",
+      "task.checkout requires a durable authorized actor.",
+      403
+    );
+  }
+
   const checkoutId = genId("dsp");
   // A checkout ALWAYS mints an agent credential — it is the agent handshake.
   // Operators do not check out (their PRs are recorded ungated). The actor kind
@@ -107,7 +131,12 @@ export async function checkout(input: CheckoutInput): Promise<{ checkoutId: stri
     actor: input.runtime,
     repo: input.repo,
     taskId: input.taskId,
-    payload: { checkoutId, accountableHuman: input.accountableHuman, actorKind: "agent" },
+    payload: {
+      checkoutId,
+      accountableHuman: input.accountableHuman,
+      actorKind: "agent",
+      permissionActorId: input.actor?.id ?? null,
+    },
   });
   return { checkoutId };
 }
@@ -119,6 +148,7 @@ export interface CompleteInput {
   summary: string;
   commitSha?: string;
   prUrl?: string;
+  actor?: PermissionActor;
 }
 
 export async function complete(input: CompleteInput): Promise<{ ok: true }> {
@@ -128,6 +158,29 @@ export async function complete(input: CompleteInput): Promise<{ ok: true }> {
   if (!d || d.revoked || new Date(d.expiresAt).getTime() <= Date.now()) {
     throw new ApiError("invalid_checkout", "Unknown, revoked, or expired checkout.", 409);
   }
+
+  if (input.actor) {
+    const decision = authorize({
+      actor: input.actor,
+      capability: "task.complete",
+      resource: { type: "task", id: d.taskId },
+      context: { repositoryId: d.repo },
+    });
+    if (!decision.allowed) {
+      throw new ApiError(
+        "forbidden",
+        `task.complete denied (${decision.reasonCode}).`,
+        403
+      );
+    }
+  } else if (permissionsEnforcementEnabled()) {
+    throw new ApiError(
+      "forbidden",
+      "task.complete requires a durable authorized actor.",
+      403
+    );
+  }
+
   await repo.appendEvent({
     kind: "task.completed",
     actor: d.runtime,
@@ -139,6 +192,7 @@ export async function complete(input: CompleteInput): Promise<{ ok: true }> {
       summary: input.summary,
       commitSha: input.commitSha ?? null,
       prUrl: input.prUrl ?? null,
+      permissionActorId: input.actor?.id ?? null,
     },
   });
   return { ok: true };
