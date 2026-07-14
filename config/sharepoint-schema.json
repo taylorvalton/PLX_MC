@@ -17,7 +17,7 @@
       "key": "projects",
       "displayName": "Projects",
       "template": "genericList",
-      "description": "Umbrella projects above initiatives (P2). Push-only mirror — Mission Control is authoritative.",
+      "description": "Umbrella projects above initiatives (P2). Two-way for routing-relevant fields; Owner/PRD remain MC-push-only. Human-created rows with valid ProjectID are adoptable inbound.",
       "columns": [
         { "name": "ProjectID", "displayName": "Project ID", "type": "text", "required": true, "indexed": true, "unique": true },
         { "name": "Owner", "displayName": "Owner", "type": "person" },
@@ -32,7 +32,7 @@
       "key": "roadmap",
       "displayName": "Roadmap",
       "template": "genericList",
-      "description": "Initiatives / buckets + Gantt source (push-only until inbound increment).",
+      "description": "Initiatives / buckets + Gantt. Two-way for routing-relevant Gantt fields; Owner/PRD remain MC-push-only. Human-created rows with valid InitiativeID are adoptable inbound.",
       "columns": [
         { "name": "InitiativeID", "displayName": "Initiative ID", "type": "text", "required": true, "indexed": true, "unique": true },
         { "name": "Project", "displayName": "Project", "type": "lookup", "lookupList": "projects" },

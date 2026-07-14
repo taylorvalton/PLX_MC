@@ -24,9 +24,9 @@ Provision with PnP PowerShell or the Graph API: create the site, then the lists/
 
 | MC entity | SharePoint object | Kind | Default direction |
 |---|---|---|---|
-| **Project** | `Projects` | List | push → |
+| **Project** | `Projects` | List | two‑way (Owner/PRD push‑only) |
 | **Task** | `ToDos` | List | two‑way |
-| **Initiative** (+ Gantt) | `Roadmap` | List | push → |
+| **Initiative** (+ Gantt) | `Roadmap` | List | two‑way (Owner/PRD push‑only) |
 | **Milestone** | `Milestone Register` | List | two‑way |
 | **Risk** | `Risk Register` | List | two‑way |
 | **File / folder** | `Project Documents` | Document library | two‑way |
@@ -61,31 +61,31 @@ Per‑field direction overrides the list default. Direction semantics:
 | Evidence Complete | Yes/No | `evidence` | → | derived: all evidence items done |
 | Description | Multi line of text | `description` | ↔ | |
 
-### 3.2 `Projects` — Project umbrella  (push-only)
+### 3.2 \Projects\ — Project umbrella  (two‑way; Owner/PRD push‑only)
 
 | SharePoint column | Type | MC field | Dir | Notes |
 |---|---|---|---|---|
-| Title | Single line of text | `name` | → | required |
-| Project ID | Single line of text | `id` | → | required, unique |
-| Owner | Person | `owner` | → | |
-| Health | Choice | `health` | → | On track / At risk / Off track |
-| Start Date | Date and time | `started` | → | |
-| Target Date | Date and time | `target` | → | |
-| Description | Multi line of text | `desc` | → | |
-| PRD Link | Hyperlink | `prd` | → | |
+| Title | Single line of text | ame\ | ↔ | required |
+| Project ID | Single line of text | \id\ | ← | required, unique; human-created rows adoptable inbound |
+| Owner | Person | \owner\ | → | MC-push-only — never fabricate inbound ownership |
+| Health | Choice | \health\ | ↔ | On track / At risk / Off track |
+| Start Date | Date and time | \started\ | ↔ | |
+| Target Date | Date and time | \	arget\ | ↔ | |
+| Description | Multi line of text | \desc\ | ↔ | |
+| PRD Link | Hyperlink | \prd\ | → | MC-push-only |
 
-### 3.3 `Roadmap` — Initiative + Gantt  (push-only until inbound increment)
+### 3.3 \Roadmap\ — Initiative + Gantt  (two‑way; Owner/PRD push‑only)
 | SharePoint column | Type | MC field | Dir | Notes |
 |---|---|---|---|---|
-| Title | Single line of text | `name` | → | required |
-| Initiative ID | Single line of text | `id` | → | required, unique |
-| Project | Lookup → Projects | `project` | → | parent umbrella |
-| Owner | Person | `owner` | → | |
-| Health | Choice | `health` | → | On track / At risk / Off track |
-| Start Date | Date and time | `started` | → | **Gantt bar start** |
-| Target Date | Date and time | `target` | → | **Gantt bar end** |
-| % Complete | Number | `progress` | → | 0–100 |
-| PRD Link | Hyperlink | `prd` | → | |
+| Title | Single line of text | ame\ | ↔ | required |
+| Initiative ID | Single line of text | \id\ | ← | required, unique; human-created rows adoptable inbound |
+| Project | Lookup → Projects | \project\ | ↔ | parent umbrella |
+| Owner | Person | \owner\ | → | MC-push-only — never fabricate inbound ownership |
+| Health | Choice | \health\ | ↔ | On track / At risk / Off track |
+| Start Date | Date and time | \started\ | ↔ | **Gantt bar start** |
+| Target Date | Date and time | \	arget\ | ↔ | **Gantt bar end** |
+| % Complete | Number | \progress\ | ↔ | 0–100 |
+| PRD Link | Hyperlink | \prd\ | → | MC-push-only |
 
 ### 3.4 `Milestone Register` — Milestone  (two‑way, 5 items)
 | SharePoint column | Type | MC field | Dir | Notes |

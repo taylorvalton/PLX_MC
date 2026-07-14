@@ -23,7 +23,7 @@ import type {
   Task,
 } from "@/lib/mc-data/types";
 import { ensureBucketsSeeded, ensureProjectsSeeded, ensureReposSeeded, ensureSeeded } from "./engine";
-import type { EntityData } from "./mapping";
+import type { EntityData, FieldAttribution } from "./mapping";
 import * as repo from "./repo";
 
 export interface StateSnapshot {
@@ -355,14 +355,19 @@ export interface CreateTaskInput {
   due?: string;
 }
 
-export async function createTask(input: CreateTaskInput): Promise<Task> {
+export interface MutationAttribution {
+  source: "human" | "service";
+  actorId: string;
+}
+
+export async function createTask(
+  input: CreateTaskInput,
+  attribution?: MutationAttribution
+): Promise<Task> {
   await ensureSeeded();
   await ensureReposSeeded();
+  await ensureBucketsSeeded();
   // Allow-list enforcement (EN-002): a task may only attach registry repos.
-  // Humans and agents hit this same server gate — an unknown repo is rejected,
-  // never silently accepted (request → approve adds it to the registry first).
-  // Check the PERSISTED registry (canonical seed + approved repos), not the
-  // fixture, so an approved+persisted repo is actually accepted (Item 2).
   const registry = await repo.getRepos();
   const registryMap = Object.fromEntries(registry.map((r) => [r.id, r]));
   const offlist = disallowedRepos(input.repos ?? [], registryMap);
@@ -373,41 +378,83 @@ export async function createTask(input: CreateTaskInput): Promise<Task> {
       422
     );
   }
-  const rows = await repo.getEntities("task");
-  const max = Math.max(0, ...rows.map((r) => parseInt((/(\d+)/.exec(r.id) ?? [])[1] ?? "0", 10)));
-  const id = `TASK-${max + 1}`;
-  // A human-only task can never carry an agent executor (EN-003 policy).
-  const assignee =
-    input.humanOnly && isAgentId(input.assignee ?? null) ? null : (input.assignee ?? null);
-  const task: Task = {
-    id,
-    title: input.title.trim(),
-    description: (input.description ?? "").trim(),
-    bucket: input.bucket,
-    stage: input.stage ?? "backlog",
-    priority: input.priority ?? "medium",
-    assignee,
-    coassignees: input.coassignees ?? [],
-    reporter: input.reporter,
-    accountableOwner: input.accountableOwner ?? null,
-    humanOnly: input.humanOnly,
-    reqs: input.reqs ?? [],
-    repos: input.repos ?? [],
-    targetEnv: input.targetEnv ?? "staging",
-    estimate: input.estimate ?? "M",
-    labels: input.labels ?? [],
-    prs: [],
-    due: input.due || "—",
-    sync: { state: "pending", ts: repo.stamp(), sp: `ToDos · item ${max + 1}` },
-    subtasks: [],
-    activity: [
-      { age: "now", who: input.reporter, kind: "move", what: "created the task" },
-    ],
-    userCreated: true,
-  };
-  await repo.insertEntity("task", id, task as unknown as EntityData, "pending", []);
-  await repo.appendAudit(input.reporter, `Created ${id} — pending first push to ToDos.`, "pending");
-  return task;
+
+  // Bucket must already exist — never invent hierarchy (P8).
+  const buckets = await repo.getBuckets();
+  if (!buckets.some((b) => b.id === input.bucket)) {
+    throw new ApiError("invalid_bucket", `Bucket ${input.bucket} does not exist.`, 422);
+  }
+
+  const { withTransaction } = await import("@/lib/db");
+  const { allocateNextTaskId } = await import("@/lib/routing/repo");
+
+  return withTransaction(async (q) => {
+    const id = await allocateNextTaskId(q);
+    const numeric = Number((/^TASK-(\d+)$/.exec(id) ?? [])[1] ?? 0);
+    // A human-only task can never carry an agent executor (EN-003 policy).
+    const assignee =
+      input.humanOnly && isAgentId(input.assignee ?? null) ? null : (input.assignee ?? null);
+    const task: Task = {
+      id,
+      title: input.title.trim(),
+      description: (input.description ?? "").trim(),
+      bucket: input.bucket,
+      stage: input.stage ?? "backlog",
+      priority: input.priority ?? "medium",
+      assignee,
+      coassignees: input.coassignees ?? [],
+      reporter: input.reporter,
+      accountableOwner: input.accountableOwner ?? null,
+      humanOnly: input.humanOnly,
+      reqs: input.reqs ?? [],
+      repos: input.repos ?? [],
+      targetEnv: input.targetEnv ?? "staging",
+      estimate: input.estimate ?? "M",
+      labels: input.labels ?? [],
+      prs: [],
+      due: input.due || "—",
+      sync: { state: "pending", ts: repo.stamp(), sp: `ToDos · item ${numeric}` },
+      subtasks: [],
+      activity: [
+        { age: "now", who: input.reporter, kind: "move", what: "created the task" },
+      ],
+      userCreated: true,
+    };
+
+    const fieldAttribution =
+      attribution != null
+        ? {
+            title: {
+              source: attribution.source,
+              at: new Date().toISOString(),
+              actorId: attribution.actorId,
+            },
+            bucket: {
+              source: attribution.source,
+              at: new Date().toISOString(),
+              actorId: attribution.actorId,
+            },
+          }
+        : {};
+
+    const inserted = await q<{ id: string }>(
+      `INSERT INTO entities (
+         entity_type, id, data, sync_state, sync_ts, dirty_fields, field_attribution
+       ) VALUES ('task', $1, $2::jsonb, 'pending', now(), '[]'::jsonb, $3::jsonb)
+       ON CONFLICT (entity_type, id) DO NOTHING
+       RETURNING id`,
+      [id, JSON.stringify(task), JSON.stringify(fieldAttribution)]
+    );
+    if (!inserted[0]) {
+      throw new ApiError("conflict", `Task ${id} already exists.`, 409);
+    }
+
+    await q(
+      `INSERT INTO sync_audit_log (actor, body, state) VALUES ($1, $2, $3)`,
+      [input.reporter, `Created ${id} — pending first push to ToDos.`, "pending"]
+    );
+    return task;
+  });
 }
 
 export interface PatchTaskInput {
@@ -435,6 +482,8 @@ export interface PatchTaskInput {
 export interface PatchTaskOptions {
   /** Compliance PR projection may promote to merged without a complete evidence bundle. */
   complianceProjection?: boolean;
+  /** Durable actor attribution for dirty routing fields (P8 / P4 residual). */
+  attribution?: MutationAttribution;
 }
 
 // Persistence tiers:
@@ -529,12 +578,27 @@ export async function patchTask(
     ];
   }
 
+  const fieldAttribution: Record<string, FieldAttribution> | undefined =
+    opts.attribution && pushedDirty.length > 0
+      ? Object.fromEntries(
+          pushedDirty.map((field) => [
+            field,
+            {
+              source: opts.attribution!.source,
+              at: new Date().toISOString(),
+              actorId: opts.attribution!.actorId,
+            } satisfies FieldAttribution,
+          ])
+        )
+      : undefined;
+
   await repo.updateEntity("task", id, {
     patch: dataPatch,
     // Person columns are pushed now (Item 1), so a person-only patch re-queues
     // the entity for the next outbound sweep.
     syncState: pushedDirty.length > 0 ? "pending" : undefined,
     dirtyFields: dirty,
+    fieldAttribution,
   });
 
   if ("assignee" in taskPatch) {

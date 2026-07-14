@@ -1,8 +1,8 @@
-// POST /api/tasks — create a task (spec §6: lands pending until the first
-// successful outbound write).
+// POST /api/tasks — create a task. Actor = Entra oid from session (P8).
 
 import { z } from "zod";
 import { parseBody, route } from "@/lib/api/route";
+import { requireSessionActor } from "@/lib/routing/mutations/actors";
 import { createTask } from "@/lib/sync";
 
 const STAGES = ["backlog", "specced", "approved", "planned", "progress", "qa", "review", "merged", "verified"] as const;
@@ -15,7 +15,8 @@ const createTaskSchema = z.object({
   priority: z.enum(["urgent", "high", "medium", "low"]).optional(),
   assignee: z.string().nullable().optional(),
   coassignees: z.array(z.string()).optional(),
-  reporter: z.string().min(1),
+  // Deprecated — ignored for identity; session oid is authoritative.
+  reporter: z.string().min(1).optional(),
   accountableOwner: z.string().nullable().optional(),
   humanOnly: z.boolean().optional(),
   reqs: z.array(z.string()).optional(),
@@ -26,4 +27,18 @@ const createTaskSchema = z.object({
   due: z.string().optional(),
 });
 
-export const POST = route(async (req) => createTask(await parseBody(req, createTaskSchema)));
+export const POST = route(async (req) => {
+  const body = await parseBody(req, createTaskSchema);
+  const authorized = await requireSessionActor("task.create", {
+    type: "bucket",
+    id: body.bucket,
+  });
+  return createTask(
+    {
+      ...body,
+      reporter: authorized.auditLabel,
+      accountableOwner: body.accountableOwner ?? authorized.actorId,
+    },
+    { source: "human", actorId: authorized.actorId }
+  );
+});

@@ -3,7 +3,7 @@
 // its SyncRef; the relational sync columns are updated in the same statement
 // so there is exactly one write path and no drift.
 
-import { query, withTransaction } from "@/lib/db";
+import { query, withTransaction, type TxQuery } from "@/lib/db";
 import type {
   AuditRow,
   Bucket,
@@ -16,9 +16,15 @@ import type {
   SpConflict,
   SpError,
   SyncState,
+  Task,
 } from "@/lib/mc-data/types";
-import type { EntityData, EntityType } from "./mapping";
-import { LIST_KEY_FOR } from "./mapping";
+import type {
+  EntityData,
+  EntityType,
+  FieldAttribution,
+  SyncConflictSubject,
+} from "./mapping";
+import { CONFLICT_LIST_KEY_FOR, LIST_KEY_FOR, numericTaskId } from "./mapping";
 
 export interface EntityRow {
   entity_type: EntityType;
@@ -27,6 +33,7 @@ export interface EntityRow {
   sync_state: SyncState;
   sp_item_id: string | null;
   dirty_fields: string[];
+  field_attribution: Record<string, FieldAttribution>;
 }
 
 // UTC render of the prototype's timestamp format (SOUL: store/compare UTC).
@@ -37,28 +44,83 @@ export function stamp(date = new Date()): string {
 
 // ─── Entities ────────────────────────────────────────────────────────────────
 
+function parseAttribution(raw: unknown): Record<string, FieldAttribution> {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return {};
+  const out: Record<string, FieldAttribution> = {};
+  for (const [k, v] of Object.entries(raw as Record<string, unknown>)) {
+    if (!v || typeof v !== "object") continue;
+    const src = (v as FieldAttribution).source;
+    const at = (v as FieldAttribution).at;
+    if ((src === "human" || src === "service" || src === "unknown") && typeof at === "string") {
+      out[k] = {
+        source: src,
+        at,
+        actorId: typeof (v as FieldAttribution).actorId === "string" ? (v as FieldAttribution).actorId : undefined,
+      };
+    }
+  }
+  return out;
+}
+
 export async function entityCount(): Promise<number> {
   const rows = await query<{ n: string }>("SELECT count(*) AS n FROM entities");
   return Number(rows[0].n);
 }
 
 export async function getEntities(type?: EntityType): Promise<EntityRow[]> {
-  return query<EntityRow>(
-    `SELECT entity_type, id, data, sync_state, sp_item_id, dirty_fields
+  const rows = await query<{
+    entity_type: EntityType;
+    id: string;
+    data: EntityData;
+    sync_state: SyncState;
+    sp_item_id: string | null;
+    dirty_fields: string[];
+    field_attribution: unknown;
+  }>(
+    `SELECT entity_type, id, data, sync_state, sp_item_id, dirty_fields,
+            COALESCE(field_attribution, '{}'::jsonb) AS field_attribution
        FROM entities
       WHERE $1::text IS NULL OR entity_type = $1
       ORDER BY id`,
     [type ?? null]
   );
+  return rows.map((r) => ({
+    entity_type: r.entity_type,
+    id: r.id,
+    data: r.data,
+    sync_state: r.sync_state,
+    sp_item_id: r.sp_item_id,
+    dirty_fields: r.dirty_fields,
+    field_attribution: parseAttribution(r.field_attribution),
+  }));
 }
 
 export async function getEntity(type: EntityType, id: string): Promise<EntityRow | null> {
-  const rows = await query<EntityRow>(
-    `SELECT entity_type, id, data, sync_state, sp_item_id, dirty_fields
+  const rows = await query<{
+    entity_type: EntityType;
+    id: string;
+    data: EntityData;
+    sync_state: SyncState;
+    sp_item_id: string | null;
+    dirty_fields: string[];
+    field_attribution: unknown;
+  }>(
+    `SELECT entity_type, id, data, sync_state, sp_item_id, dirty_fields,
+            COALESCE(field_attribution, '{}'::jsonb) AS field_attribution
        FROM entities WHERE entity_type = $1 AND id = $2`,
     [type, id]
   );
-  return rows[0] ?? null;
+  const r = rows[0];
+  if (!r) return null;
+  return {
+    entity_type: r.entity_type,
+    id: r.id,
+    data: r.data,
+    sync_state: r.sync_state,
+    sp_item_id: r.sp_item_id,
+    dirty_fields: r.dirty_fields,
+    field_attribution: parseAttribution(r.field_attribution),
+  };
 }
 
 export async function insertEntity(
@@ -86,6 +148,7 @@ export async function updateEntity(
     syncState?: SyncState;
     spItemId?: string;
     dirtyFields?: string[];
+    fieldAttribution?: Record<string, FieldAttribution>;
     syncExtras?: Record<string, string | undefined>; // wsVal / spVal / reason
   }
 ): Promise<void> {
@@ -106,6 +169,23 @@ export async function updateEntity(
     if (v !== undefined) sync[k] = v;
   }
   data.sync = sync;
+
+  let attribution = { ...row.field_attribution };
+  if (opts.fieldAttribution) {
+    attribution = { ...attribution, ...opts.fieldAttribution };
+  }
+  // Default any newly-dirty field without attribution to unknown (ambiguous → manual).
+  if (opts.dirtyFields) {
+    const nowIso = new Date().toISOString();
+    for (const f of opts.dirtyFields) {
+      if (!attribution[f]) attribution[f] = { source: "unknown", at: nowIso };
+    }
+    // Drop attribution for fields no longer dirty.
+    for (const key of Object.keys(attribution)) {
+      if (!opts.dirtyFields.includes(key)) delete attribution[key];
+    }
+  }
+
   await query(
     `UPDATE entities
         SET data = $3,
@@ -113,6 +193,7 @@ export async function updateEntity(
             sync_ts = now(),
             sp_item_id = COALESCE($5, sp_item_id),
             dirty_fields = COALESCE($6, dirty_fields),
+            field_attribution = COALESCE($7, field_attribution),
             updated_at = now()
       WHERE entity_type = $1 AND id = $2`,
     [
@@ -122,6 +203,7 @@ export async function updateEntity(
       nextState,
       opts.spItemId ?? null,
       opts.dirtyFields ? JSON.stringify(opts.dirtyFields) : null,
+      opts.dirtyFields || opts.fieldAttribution ? JSON.stringify(attribution) : null,
     ]
   );
 }
@@ -145,6 +227,98 @@ export async function saveDeltaLink(listKey: string, deltaLink: string): Promise
   );
 }
 
+/** Stamp a complete successful inbound delta for a register (P4 freshness). */
+export async function markRegisterInboundComplete(
+  listKey: string,
+  at: Date = new Date()
+): Promise<void> {
+  await query(
+    `INSERT INTO sync_register_freshness (list_key, last_complete_inbound_at, updated_at)
+     VALUES ($1, $2, now())
+     ON CONFLICT (list_key) DO UPDATE
+       SET last_complete_inbound_at = EXCLUDED.last_complete_inbound_at,
+           updated_at = now()`,
+    [listKey, at.toISOString()]
+  );
+}
+
+export async function getRegisterInboundCompletions(): Promise<Record<string, Date | null>> {
+  const rows = await query<{ list_key: string; last_complete_inbound_at: Date }>(
+    `SELECT list_key, last_complete_inbound_at FROM sync_register_freshness`
+  );
+  const out: Record<string, Date | null> = {};
+  for (const r of rows) out[r.list_key] = r.last_complete_inbound_at;
+  return out;
+}
+
+/**
+ * Advance mc_task_id_seq above an adopted TASK-* id without ever moving
+ * backward (P4 / 018 contract).
+ */
+export async function reconcileTaskIdSequence(adoptedTaskId: string): Promise<void> {
+  const n = numericTaskId(adoptedTaskId);
+  if (n == null || n < 1) return;
+  await query(
+    `SELECT setval(
+       'mc_task_id_seq',
+       GREATEST(
+         $1::bigint,
+         CASE WHEN is_called THEN last_value ELSE last_value - 1 END
+       ),
+       true
+     )
+     FROM mc_task_id_seq`,
+    [n]
+  );
+}
+
+export type TransactionRunner = <T>(fn: (q: TxQuery) => Promise<T>) => Promise<T>;
+
+/**
+ * Atomically adopt an unknown SharePoint Task, bind its item id, and advance
+ * the global Task allocator. The same TxQuery owns every statement; callers
+ * must not split insertion and sequence reconciliation.
+ */
+export async function insertAdoptedTask(
+  task: Task,
+  spItemId: string,
+  runTransaction: TransactionRunner = withTransaction
+): Promise<boolean> {
+  const imported = numericTaskId(task.id);
+  if (imported == null || imported < 1) {
+    throw new Error(`invalid adopted Task id ${task.id}`);
+  }
+  return runTransaction(async (q) => {
+    const inserted = await q<{ id: string }>(
+      `INSERT INTO entities (
+         entity_type, id, data, sync_state, sync_ts, sp_item_id,
+         dirty_fields, field_attribution
+       )
+       VALUES ('task', $1, $2, 'synced', now(), $3, '[]'::jsonb, '{}'::jsonb)
+       ON CONFLICT (entity_type, id) DO NOTHING
+       RETURNING id`,
+      [task.id, JSON.stringify(task), spItemId]
+    );
+    if (!inserted[0]) return false;
+
+    // GREATEST makes reconciliation monotonic. PostgreSQL serializes sequence
+    // state changes; the next allocator observes at least imported + 1.
+    await q(
+      `SELECT setval(
+         'mc_task_id_seq',
+         GREATEST(
+           $1::bigint,
+           CASE WHEN is_called THEN last_value ELSE last_value - 1 END
+         ),
+         true
+       )
+       FROM mc_task_id_seq`,
+      [imported]
+    );
+    return true;
+  });
+}
+
 // The last-sweep heartbeat. Every sweep re-stamps each list's delta cursor
 // (saveDeltaLink above), so max(updated_at) is "when a sweep last ran" —
 // independent of whether that sweep wrote an audit row. The snapshot uses this
@@ -162,7 +336,7 @@ export async function lastSweepAt(): Promise<string | null> {
 interface ConflictRow {
   id: string;
   list_key: string;
-  entity_type: EntityType;
+  entity_type: SyncConflictSubject;
   entity_id: string;
   field: string;
   mc_val: string | null;
@@ -175,7 +349,16 @@ interface ConflictRow {
 const toConflict = (r: ConflictRow): SpConflict => ({
   id: r.id,
   list: r.list_key,
-  entity: r.entity_type === "task" ? "Task" : r.entity_type === "risk" ? "Risk" : "File",
+  entity:
+    r.entity_type === "task"
+      ? "Task"
+      : r.entity_type === "risk"
+        ? "Risk"
+        : r.entity_type === "bucket"
+          ? "Bucket"
+          : r.entity_type === "project"
+            ? "Project"
+            : "File",
   entityId: r.entity_id,
   field: r.field,
   mcVal: r.mc_val ?? "—",
@@ -194,7 +377,9 @@ export async function openConflicts(): Promise<SpConflict[]> {
   return rows.map(toConflict);
 }
 
-export async function getConflict(id: string): Promise<(SpConflict & { entityType: EntityType }) | null> {
+export async function getConflict(
+  id: string
+): Promise<(SpConflict & { entityType: SyncConflictSubject }) | null> {
   const rows = await query<ConflictRow>(
     `SELECT id, list_key, entity_type, entity_id, field, mc_val, sp_val,
             detected_at, detected_by, note
@@ -206,7 +391,7 @@ export async function getConflict(id: string): Promise<(SpConflict & { entityTyp
 
 export async function insertConflict(c: {
   id: string;
-  entityType: EntityType;
+  entityType: SyncConflictSubject;
   entityId: string;
   field: string;
   mcVal: string;
@@ -218,7 +403,17 @@ export async function insertConflict(c: {
     `INSERT INTO sync_conflicts (id, list_key, entity_type, entity_id, field, mc_val, sp_val, detected_by, note)
      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
      ON CONFLICT (id) DO NOTHING`,
-    [c.id, LIST_KEY_FOR[c.entityType], c.entityType, c.entityId, c.field, c.mcVal, c.spVal, c.by, c.note]
+    [
+      c.id,
+      CONFLICT_LIST_KEY_FOR[c.entityType],
+      c.entityType,
+      c.entityId,
+      c.field,
+      c.mcVal,
+      c.spVal,
+      c.by,
+      c.note,
+    ]
   );
 }
 
@@ -583,6 +778,8 @@ export interface BucketWithSync {
   syncState: SyncState;
   spItemId: string | null;
   dirtyFields: string[];
+  /** Present after migration 019; omit/empty means unknown attribution. */
+  fieldAttribution?: Record<string, FieldAttribution>;
 }
 
 export async function getBucketRows(): Promise<BucketWithSync[]> {
@@ -593,12 +790,18 @@ export async function getBucketRows(): Promise<BucketWithSync[]> {
     sp_item_id: string | null;
     project_id: string | null;
     dirty_fields: string[] | null;
-  }>("SELECT id, data, sync_state, sp_item_id, project_id, dirty_fields FROM buckets ORDER BY created_at, id");
+    field_attribution: unknown;
+  }>(
+    `SELECT id, data, sync_state, sp_item_id, project_id, dirty_fields,
+            COALESCE(field_attribution, '{}'::jsonb) AS field_attribution
+       FROM buckets ORDER BY created_at, id`
+  );
   return rows.map((r) => ({
     bucket: r.data.project === undefined ? { ...r.data, project: r.project_id } : r.data,
     syncState: r.sync_state,
     spItemId: r.sp_item_id,
     dirtyFields: Array.isArray(r.dirty_fields) ? r.dirty_fields : [],
+    fieldAttribution: parseAttribution(r.field_attribution),
   }));
 }
 
@@ -610,9 +813,13 @@ export async function getBucketBySpItemId(spItemId: string): Promise<BucketWithS
     sp_item_id: string | null;
     project_id: string | null;
     dirty_fields: string[] | null;
-  }>("SELECT id, data, sync_state, sp_item_id, project_id, dirty_fields FROM buckets WHERE sp_item_id = $1 LIMIT 1", [
-    spItemId,
-  ]);
+    field_attribution: unknown;
+  }>(
+    `SELECT id, data, sync_state, sp_item_id, project_id, dirty_fields,
+            COALESCE(field_attribution, '{}'::jsonb) AS field_attribution
+       FROM buckets WHERE sp_item_id = $1 LIMIT 1`,
+    [spItemId]
+  );
   const r = rows[0];
   if (!r) return null;
   return {
@@ -620,6 +827,7 @@ export async function getBucketBySpItemId(spItemId: string): Promise<BucketWithS
     syncState: r.sync_state,
     spItemId: r.sp_item_id,
     dirtyFields: Array.isArray(r.dirty_fields) ? r.dirty_fields : [],
+    fieldAttribution: parseAttribution(r.field_attribution),
   };
 }
 
@@ -629,6 +837,7 @@ export async function updateBucket(
     patch?: Partial<Bucket>;
     syncState?: SyncState;
     dirtyFields?: string[];
+    fieldAttribution?: Record<string, FieldAttribution>;
     spItemId?: string;
   }
 ): Promise<void> {
@@ -648,6 +857,11 @@ export async function updateBucket(
   if (opts.dirtyFields) {
     sets.push(`dirty_fields = $${n}::jsonb`);
     params.push(JSON.stringify(opts.dirtyFields));
+    n += 1;
+  }
+  if (opts.fieldAttribution) {
+    sets.push(`field_attribution = $${n}::jsonb`);
+    params.push(JSON.stringify(opts.fieldAttribution));
     n += 1;
   }
   if (opts.spItemId !== undefined) {
@@ -698,13 +912,31 @@ export interface ProjectWithSync {
   project: Project;
   syncState: SyncState;
   spItemId: string | null;
+  dirtyFields: string[];
+  fieldAttribution?: Record<string, FieldAttribution>;
 }
 
 export async function getProjectRows(): Promise<ProjectWithSync[]> {
-  const rows = await query<{ id: string; data: Project; sync_state: SyncState; sp_item_id: string | null }>(
-    "SELECT id, data, sync_state, sp_item_id FROM projects ORDER BY created_at, id"
+  const rows = await query<{
+    id: string;
+    data: Project;
+    sync_state: SyncState;
+    sp_item_id: string | null;
+    dirty_fields: string[] | null;
+    field_attribution: unknown;
+  }>(
+    `SELECT id, data, sync_state, sp_item_id,
+            COALESCE(dirty_fields, '[]'::jsonb) AS dirty_fields,
+            COALESCE(field_attribution, '{}'::jsonb) AS field_attribution
+       FROM projects ORDER BY created_at, id`
   );
-  return rows.map((r) => ({ project: r.data, syncState: r.sync_state, spItemId: r.sp_item_id }));
+  return rows.map((r) => ({
+    project: r.data,
+    syncState: r.sync_state,
+    spItemId: r.sp_item_id,
+    dirtyFields: Array.isArray(r.dirty_fields) ? r.dirty_fields : [],
+    fieldAttribution: parseAttribution(r.field_attribution),
+  }));
 }
 
 // Idempotent seed of the fixture projects — mirrors seedBuckets (never disturbs an
@@ -740,6 +972,7 @@ export async function setProjectSync(
     `UPDATE projects
         SET sync_state = $2,
             sp_item_id = COALESCE($3, sp_item_id),
+            dirty_fields = CASE WHEN $2 = 'synced' THEN '[]'::jsonb ELSE dirty_fields END,
             data = jsonb_set(data, '{sync}', data->'sync' || $4::jsonb),
             updated_at = now()
       WHERE id = $1`,
@@ -750,4 +983,72 @@ export async function setProjectSync(
       JSON.stringify({ state: syncState, ts: stamp(), ...(opts.spRef ? { sp: opts.spRef } : {}) }),
     ]
   );
+}
+
+export async function updateProject(
+  id: string,
+  opts: {
+    patch?: Partial<Project>;
+    syncState?: SyncState;
+    dirtyFields?: string[];
+    fieldAttribution?: Record<string, FieldAttribution>;
+    spItemId?: string;
+  }
+): Promise<void> {
+  const sets: string[] = ["updated_at = now()"];
+  const params: unknown[] = [id];
+  let n = 2;
+  if (opts.patch && Object.keys(opts.patch).length > 0) {
+    sets.push(`data = data || $${n}::jsonb`);
+    params.push(JSON.stringify(opts.patch));
+    n += 1;
+  }
+  if (opts.syncState) {
+    sets.push(`sync_state = $${n}`);
+    params.push(opts.syncState);
+    n += 1;
+  }
+  if (opts.dirtyFields) {
+    sets.push(`dirty_fields = $${n}::jsonb`);
+    params.push(JSON.stringify(opts.dirtyFields));
+    n += 1;
+  }
+  if (opts.fieldAttribution) {
+    sets.push(`field_attribution = $${n}::jsonb`);
+    params.push(JSON.stringify(opts.fieldAttribution));
+    n += 1;
+  }
+  if (opts.spItemId !== undefined) {
+    sets.push(`sp_item_id = $${n}`);
+    params.push(opts.spItemId);
+    n += 1;
+  }
+  await query(`UPDATE projects SET ${sets.join(", ")} WHERE id = $1`, params);
+}
+
+/** Insert a newly adopted inbound Project (never overwrites an existing id). */
+export async function insertAdoptedProject(
+  project: Project,
+  spItemId: string
+): Promise<boolean> {
+  const rows = await query<{ id: string }>(
+    `INSERT INTO projects (id, data, sync_state, sp_item_id, dirty_fields)
+     VALUES ($1, $2, 'synced', $3, '[]'::jsonb)
+     ON CONFLICT (id) DO NOTHING
+     RETURNING id`,
+    [project.id, JSON.stringify(project), spItemId]
+  );
+  return rows.length > 0;
+}
+
+/** Insert a newly adopted inbound Bucket. */
+export async function insertAdoptedBucket(bucket: Bucket, spItemId: string): Promise<boolean> {
+  const rows = await query<{ id: string }>(
+    `INSERT INTO buckets (id, data, sync_state, sp_item_id, project_id, dirty_fields)
+     VALUES ($1, $2, 'synced', $3, $4, '[]'::jsonb)
+     ON CONFLICT (id) DO NOTHING
+     RETURNING id`,
+    [bucket.id, JSON.stringify(bucket), spItemId, bucket.project ?? null]
+  );
+  return rows.length > 0;
 }

@@ -12,7 +12,8 @@ const createSchema = z.object({
     .optional(),
   priority: z.enum(["urgent", "high", "medium", "low"]).optional(),
   assignee: z.string().nullable().optional(),
-  reporter: z.string().min(1),
+  // Ignored for identity — MCP service principal + operator email are authoritative.
+  reporter: z.string().min(1).optional(),
   accountableOwner: z.string().nullable().optional(),
   repos: z.array(z.string()).optional(),
   targetEnv: z.enum(["staging", "production"]).optional(),
@@ -31,7 +32,10 @@ export const GET = cursorRoute("mc_search_tasks", async (req) => {
 
 export const POST = cursorRoute("mc_create_task", async (req, _ctx, identity, meta) => {
   const body = await parseCursorBody(req, createSchema);
-  const result = await actionCreateTask(body);
+  const result = await actionCreateTask(identity, {
+    ...body,
+    reporter: identity.operatorEmail,
+  });
   return {
     data: result,
     meta: {

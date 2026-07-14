@@ -24,9 +24,9 @@ const completeSchema = z.object({
   shots: z.array(z.object({ label: z.string(), cap: z.string() })).optional(),
 });
 
-export const POST = cursorRoute("mc_complete_task", async (req, _ctx, _identity, meta) => {
+export const POST = cursorRoute("mc_complete_task", async (req, _ctx, identity, meta) => {
   const body = await parseCursorBody(req, completeSchema);
-  const data = await actionComplete(body);
+  const data = await actionComplete(identity, body);
   return {
     data,
     meta: {

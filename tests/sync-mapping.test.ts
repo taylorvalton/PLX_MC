@@ -7,9 +7,11 @@ import { describe, expect, it } from "vitest";
 import type { Risk, Task } from "@/lib/mc-data";
 import {
   bucketOutboundFields,
+  classifyLastModifiedBy,
   dueToIso,
   inboundBucketPatches,
   inboundPatches,
+  inboundProjectPatches,
   isoToDue,
   mcDateToIso,
   outboundFields,
@@ -248,6 +250,13 @@ describe("inboundBucketPatches (Roadmap Gantt)", () => {
     });
     expect(inboundBucketPatches({ Health: "Nope" })).toEqual({});
   });
+
+  it("applies resolved project id from opts", () => {
+    expect(inboundBucketPatches({ Title: "X" }, { project: "PRJ-A" })).toEqual({
+      name: "X",
+      project: "PRJ-A",
+    });
+  });
 });
 
 describe("date round-trip", () => {
@@ -283,6 +292,88 @@ describe("reconcileInbound (§5.1: conflict, never overwrite)", () => {
     const { apply, conflicts } = reconcileInbound({ stage: "progress" }, ["stage"], { stage: "progress" });
     expect(apply).toEqual({});
     expect(conflicts).toEqual([]);
+  });
+
+  it("newer human SharePoint edit beats older service pending on routing fields", () => {
+    const { apply, conflicts, clearedDirty, attributionEvents } = reconcileInbound(
+      { stage: "progress", title: "Old" },
+      ["stage"],
+      { stage: "merged" },
+      {
+        inboundSource: "human",
+        inboundAt: "2026-07-14T18:00:00.000Z",
+        localAttribution: {
+          stage: { source: "service", at: "2026-07-14T17:00:00.000Z", actorId: "sp_mcp" },
+        },
+        routingFields: new Set(["stage", "title"]),
+      }
+    );
+    expect(apply).toEqual({ stage: "merged" });
+    expect(conflicts).toEqual([]);
+    expect(clearedDirty).toEqual(["stage"]);
+    expect(attributionEvents[0]?.action).toBe("human_over_service");
+  });
+
+  it("retains manual conflict for human-vs-human and unknown local attribution", () => {
+    const human = reconcileInbound(
+      { stage: "progress" },
+      ["stage"],
+      { stage: "merged" },
+      {
+        inboundSource: "human",
+        inboundAt: "2026-07-14T18:00:00.000Z",
+        localAttribution: { stage: { source: "human", at: "2026-07-14T17:00:00.000Z" } },
+        routingFields: new Set(["stage"]),
+      }
+    );
+    expect(human.conflicts).toHaveLength(1);
+    expect(human.apply).toEqual({});
+
+    const unknown = reconcileInbound(
+      { stage: "progress" },
+      ["stage"],
+      { stage: "merged" },
+      {
+        inboundSource: "human",
+        inboundAt: "2026-07-14T18:00:00.000Z",
+        localAttribution: { stage: { source: "unknown", at: "2026-07-14T17:00:00.000Z" } },
+        routingFields: new Set(["stage"]),
+      }
+    );
+    expect(unknown.conflicts).toHaveLength(1);
+  });
+
+  it("does not let an older human edit beat a newer service pending", () => {
+    const { apply, conflicts } = reconcileInbound(
+      { stage: "progress" },
+      ["stage"],
+      { stage: "merged" },
+      {
+        inboundSource: "human",
+        inboundAt: "2026-07-14T16:00:00.000Z",
+        localAttribution: { stage: { source: "service", at: "2026-07-14T17:00:00.000Z" } },
+        routingFields: new Set(["stage"]),
+      }
+    );
+    expect(apply).toEqual({});
+    expect(conflicts).toHaveLength(1);
+  });
+});
+
+describe("inbound project patches + classifyLastModifiedBy", () => {
+  it("maps project Title/Health/desc and skips Owner/PRD", () => {
+    expect(
+      inboundProjectPatches({
+        Title: "Ops",
+        Health: "At risk",
+        Description: "d",
+        OwnerLookupId: 9,
+        PRDLink: "https://evil.example",
+      })
+    ).toEqual({ name: "Ops", health: "risk", desc: "d" });
+    expect(classifyLastModifiedBy({ user: { id: "oid-1", email: "a@b.com" } }).source).toBe("human");
+    expect(classifyLastModifiedBy({ application: { id: "app-1" } }).source).toBe("service");
+    expect(classifyLastModifiedBy(null).source).toBe("unknown");
   });
 });
 

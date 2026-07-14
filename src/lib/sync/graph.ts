@@ -117,10 +117,43 @@ export async function siteContext(): Promise<SiteContext> {
 
 // ─── List item operations used by the engine ─────────────────────────────────
 
+export interface SpLastModifiedBy {
+  user?: { id?: string; displayName?: string; email?: string | null };
+  application?: { id?: string; displayName?: string };
+}
+
 export interface SpListItem {
   id: string;
   fields?: Record<string, unknown>;
   deleted?: { state: string };
+  lastModifiedDateTime?: string;
+  lastModifiedBy?: SpLastModifiedBy;
+}
+
+/** Normalize Graph lastModifiedBy (+ timestamp) for inbound attribution. */
+export function normalizeLastModified(item: SpListItem): {
+  source: "human" | "service" | "unknown";
+  at: string | null;
+  actorId?: string;
+  email?: string;
+} {
+  const at =
+    typeof item.lastModifiedDateTime === "string" && item.lastModifiedDateTime
+      ? item.lastModifiedDateTime
+      : null;
+  const lm = item.lastModifiedBy;
+  if (lm?.application?.id) {
+    return { source: "service", at, actorId: lm.application.id };
+  }
+  if (lm?.user?.id || lm?.user?.email) {
+    return {
+      source: "human",
+      at,
+      actorId: lm.user.id,
+      email: lm.user.email ?? undefined,
+    };
+  }
+  return { source: "unknown", at };
 }
 
 export async function createListItem(
@@ -229,9 +262,13 @@ export async function listDelta(
   listKey: string,
   storedDeltaLink: string | null
 ): Promise<{ items: SpListItem[]; deltaLink: string }> {
+  // Request lastModifiedBy + lastModifiedDateTime so inbound can attribute
+  // human vs service edits (P4). Stored delta links already carry the select
+  // shape from the prior walk; first-run URLs request it explicitly.
   let url =
     storedDeltaLink ??
-    `/sites/${ctx.siteId}/lists/${ctx.listIds[listKey]}/items/delta?expand=fields`;
+    `/sites/${ctx.siteId}/lists/${ctx.listIds[listKey]}/items/delta?` +
+      `$select=id,lastModifiedDateTime,lastModifiedBy&$expand=fields`;
   const items: SpListItem[] = [];
   for (;;) {
     const page = await graphFetch<{
@@ -244,4 +281,69 @@ export async function listDelta(
     if (!page["@odata.nextLink"]) throw new Error(`delta walk for ${listKey} ended without a deltaLink`);
     url = page["@odata.nextLink"];
   }
+}
+
+// ─── Change-notification subscriptions (P11) ─────────────────────────────────
+// Graph subscription max lifetime for list resources is typically ~3 days.
+// Create/renew/delete call Graph; phase acceptance must inject/mocks — never
+// create a live subscription during acceptance gates.
+
+export const GRAPH_SUBSCRIPTION_MAX_MINUTES = 4230; // < 3 days
+
+export interface GraphSubscription {
+  id: string;
+  resource: string;
+  changeType: string;
+  notificationUrl: string;
+  expirationDateTime: string;
+  clientState?: string;
+}
+
+export interface CreateGraphSubscriptionInput {
+  resource: string;
+  notificationUrl: string;
+  clientState: string;
+  expirationDateTime: string;
+  changeType?: string;
+}
+
+export function buildListSubscriptionResource(siteId: string, listId: string): string {
+  return `sites/${siteId}/lists/${listId}`;
+}
+
+export async function createGraphSubscription(
+  input: CreateGraphSubscriptionInput
+): Promise<GraphSubscription> {
+  return graphFetch<GraphSubscription>("/subscriptions", {
+    method: "POST",
+    body: JSON.stringify({
+      changeType: input.changeType ?? "updated",
+      notificationUrl: input.notificationUrl,
+      resource: input.resource,
+      expirationDateTime: input.expirationDateTime,
+      clientState: input.clientState,
+    }),
+  });
+}
+
+export async function renewGraphSubscription(
+  subscriptionId: string,
+  expirationDateTime: string
+): Promise<GraphSubscription> {
+  return graphFetch<GraphSubscription>(`/subscriptions/${encodeURIComponent(subscriptionId)}`, {
+    method: "PATCH",
+    body: JSON.stringify({ expirationDateTime }),
+  });
+}
+
+export async function deleteGraphSubscription(subscriptionId: string): Promise<void> {
+  await graphFetch(`/subscriptions/${encodeURIComponent(subscriptionId)}`, {
+    method: "DELETE",
+  });
+}
+
+/** Default expiry ~2.5 days from `now` (under Graph list-subscription max). */
+export function defaultSubscriptionExpiry(now = new Date()): string {
+  const ms = Math.min(GRAPH_SUBSCRIPTION_MAX_MINUTES, 3600) * 60_000;
+  return new Date(now.getTime() + ms).toISOString();
 }

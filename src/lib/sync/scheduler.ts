@@ -3,7 +3,7 @@
 // force a public deploy. Kill switch (TOOLS.md): PLX_MC_SYNC_ENABLED must be
 // "1" or the engine never starts; default is OFF.
 
-import { runSweep } from "./engine";
+import { requireSyncServiceWrite, runSweep } from "./engine";
 
 // Exported for test visibility only (the cadence test advances fake timers by
 // exactly this interval — see tests/sync-scheduler.test.ts); no behavior change.
@@ -24,7 +24,8 @@ export function startSyncScheduler(): void {
 
   const sweep = async () => {
     try {
-      const result = await runSweep();
+      const service = await requireSyncServiceWrite();
+      const result = await runSweep(service.id);
       console.log(
         `[sync] sweep ok — pushed=${result.pushed} pulled=${result.pulled} conflicts=${result.conflicts} errors=${result.pushErrors}`
       );

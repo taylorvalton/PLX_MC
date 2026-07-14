@@ -50,6 +50,12 @@ All supporting material (screenshots, logs, JSON, raw markdown) lives inside
 the same bundle folder. Prohibited: loose files directly under `artifacts/`,
 multiple layered summaries for one effort, status-adjective filenames.
 
+**Exception — session-artifact offline queue:** `artifacts/session-brain/` is
+gitignored, fail-open capture scratch documented in
+`.cursor/rules/session-knowledge-artifact.mdc` (`<yyyy-mm-dd>/<session_id>.json`).
+It follows that contract, not the dated-bundle/REPORT.md shape above, and is
+exempt from the bundle-shape checks in `check-repo-hygiene.py`.
+
 ## Archive Rules
 
 Archive when a document is superseded, historical only, or past its retention

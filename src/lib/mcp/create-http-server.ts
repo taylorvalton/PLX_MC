@@ -20,9 +20,20 @@ import {
   actionSubmitSkill,
   actionSyncSkills,
 } from "./skills-actions";
+import { registerRoutingSuggestTools } from "./routing-suggest-actions";
+import { registerRoutingMutationTools } from "./routing-mutation-actions";
 
 function jsonResult(payload: unknown) {
   return { content: [{ type: "text" as const, text: JSON.stringify(payload, null, 2) }] };
+}
+
+/**
+ * Modular routing tool registration seam.
+ * P5: suggestion tools. P8: confirmed mutation tools.
+ */
+export function registerRoutingTools(server: McpServer, identity: McpIdentity): void {
+  registerRoutingSuggestTools(server, identity);
+  registerRoutingMutationTools(server, identity);
 }
 
 export function createPlxMcMcpServer(identity: McpIdentity): McpServer {
@@ -33,8 +44,8 @@ export function createPlxMcMcpServer(identity: McpIdentity): McpServer {
     },
     {
       instructions:
-        "PLX Mission Control MCP — task lifecycle (checkout/progress/complete), search, skills directory install/sync/submit, and optional swarm delegation. " +
-        "Always mc_checkout_task before agent work; append MC-Checkout stamp lines to PR bodies.",
+        "PLX Mission Control MCP — task lifecycle (checkout/progress/complete), routing suggestions (mc_suggest_work), skills directory install/sync/submit, and optional swarm delegation. " +
+        "Prefer mc_suggest_work when the Task is unknown; always mc_checkout_task before agent work; append MC-Checkout stamp lines to PR bodies.",
     }
   );
 
@@ -78,7 +89,7 @@ export function createPlxMcMcpServer(identity: McpIdentity): McpServer {
       priority: z.enum(["urgent", "high", "medium", "low"]).optional(),
       repos: z.array(z.string()).optional(),
     },
-    async (body) => jsonResult(await actionCreateTask({ ...body, reporter: body.reporter || identity.operatorEmail }))
+    async (body) => jsonResult(await actionCreateTask(identity, { ...body, reporter: body.reporter || identity.operatorEmail }))
   );
 
   server.tool(
@@ -113,7 +124,7 @@ export function createPlxMcMcpServer(identity: McpIdentity): McpServer {
       verificationCommands: z.array(z.string()).optional(),
       filesChanged: z.array(z.string()).optional(),
     },
-    async (body) => jsonResult(await actionComplete(body))
+    async (body) => jsonResult(await actionComplete(identity, body))
   );
 
   server.tool(
@@ -164,6 +175,8 @@ export function createPlxMcMcpServer(identity: McpIdentity): McpServer {
     },
     async (body) => jsonResult(await actionSubmitSkill(identity, body))
   );
+
+  registerRoutingTools(server, identity);
 
   return server;
 }

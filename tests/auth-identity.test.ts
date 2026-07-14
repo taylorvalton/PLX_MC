@@ -1,0 +1,97 @@
+// Entra OID propagation through JWT/session identity helpers.
+
+import { afterEach, describe, expect, it, vi } from "vitest";
+
+import {
+  extractEntraOid,
+  hydrateMcUserByOid,
+  permissionsEnforcementEnabled,
+  toSessionIdentity,
+} from "@/lib/auth/identity";
+
+afterEach(() => {
+  vi.unstubAllEnvs();
+});
+
+describe("extractEntraOid", () => {
+  it("prefers the Entra oid claim over sub", () => {
+    expect(
+      extractEntraOid({
+        oid: "11111111-2222-3333-4444-555555555555",
+        sub: "should-not-win",
+        email: "vince@petrasoap.com",
+      })
+    ).toBe("11111111-2222-3333-4444-555555555555");
+  });
+
+  it("returns null when oid is missing", () => {
+    expect(extractEntraOid({ sub: "only-sub", email: "vince@petrasoap.com" })).toBeNull();
+    expect(extractEntraOid(null)).toBeNull();
+  });
+});
+
+describe("toSessionIdentity", () => {
+  it("carries oid + email into the session user shape", () => {
+    expect(
+      toSessionIdentity({
+        oid: "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
+        email: "Vince@PetraSoap.com",
+      })
+    ).toEqual({
+      oid: "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
+      email: "vince@petrasoap.com",
+    });
+  });
+
+  it("omits oid when absent so dormant mode stays usable", () => {
+    expect(toSessionIdentity({ email: "vince@petrasoap.com" })).toEqual({
+      oid: undefined,
+      email: "vince@petrasoap.com",
+    });
+  });
+});
+
+describe("permissionsEnforcementEnabled", () => {
+  it("defaults off so local dev/build need no DB identity hydration", () => {
+    vi.stubEnv("PLX_MC_PERMISSIONS_ENFORCEMENT_ENABLED", "");
+    expect(permissionsEnforcementEnabled()).toBe(false);
+    vi.stubEnv("PLX_MC_PERMISSIONS_ENFORCEMENT_ENABLED", "0");
+    expect(permissionsEnforcementEnabled()).toBe(false);
+    vi.stubEnv("PLX_MC_PERMISSIONS_ENFORCEMENT_ENABLED", "1");
+    expect(permissionsEnforcementEnabled()).toBe(true);
+  });
+
+  it("does not query identities when enforcement is off", async () => {
+    vi.stubEnv("PLX_MC_PERMISSIONS_ENFORCEMENT_ENABLED", "0");
+    const identityQuery = vi.fn();
+
+    await expect(hydrateMcUserByOid("oid-off", identityQuery)).resolves.toBeNull();
+    expect(identityQuery).not.toHaveBeenCalled();
+  });
+
+  it("hydrates persisted role and status by Entra oid when enforcement is on", async () => {
+    vi.stubEnv("PLX_MC_PERMISSIONS_ENFORCEMENT_ENABLED", "1");
+    const identityQuery = vi.fn(async () => [
+      {
+        id: "usr_42",
+        entra_oid: "oid-persisted",
+        email: "member@petrasoap.com",
+        display_name: "Persisted Member",
+        access_role: "admin",
+        status: "revoked",
+      },
+    ]);
+
+    await expect(hydrateMcUserByOid("oid-persisted", identityQuery)).resolves.toEqual({
+      id: "usr_42",
+      entraOid: "oid-persisted",
+      email: "member@petrasoap.com",
+      displayName: "Persisted Member",
+      accessRole: "admin",
+      status: "revoked",
+    });
+    expect(identityQuery).toHaveBeenCalledWith(expect.stringContaining("FROM mc_users"), [
+      "oid-persisted",
+    ]);
+  });
+});

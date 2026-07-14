@@ -97,6 +97,14 @@ describe("isApprover", () => {
     expect(isApprover(AGENTS.vibes)).toBe(false); // agents never approve
     expect(isApprover(undefined)).toBe(false);
   });
+
+  it("delegates to the permissions repo.approve capability (compatibility shim)", () => {
+    // Owner/Admin directory roles map to access roles that grant repo.approve;
+    // agents and contributors remain denied. Synchronous caller contract preserved.
+    expect(isApprover({ ...HUMANS.vince, role: "Admin" })).toBe(true);
+    expect(isApprover({ ...HUMANS.greg, role: "Contributor" })).toBe(false);
+    expect(isApprover({ ...AGENTS.vibes })).toBe(false);
+  });
 });
 
 describe("allow-list helpers", () => {
