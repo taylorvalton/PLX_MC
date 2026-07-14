@@ -16,12 +16,18 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 // the scheduler logs (pushed/pulled/conflicts/pushErrors). No Graph, no DB.
 vi.mock("@/lib/sync/engine", () => ({
   runSweep: vi.fn(async () => ({ pushed: 0, pulled: 0, conflicts: 0, pushErrors: 0 })),
+  requireSyncServiceWrite: vi.fn(async () => ({
+    kind: "service",
+    id: "sp_sync_inbound",
+    status: "active",
+  })),
 }));
 
-import { runSweep } from "@/lib/sync/engine";
+import { requireSyncServiceWrite, runSweep } from "@/lib/sync/engine";
 import { CADENCE_MS, startSyncScheduler } from "@/lib/sync/scheduler";
 
 const runSweepMock = vi.mocked(runSweep);
+const requireSyncServiceWriteMock = vi.mocked(requireSyncServiceWrite);
 
 // The scheduler stashes its interval handle on globalThis for its idempotent
 // guard; mirror that type here so cleanup can clear and delete it.
@@ -37,6 +43,12 @@ beforeEach(() => {
   priorFlag = process.env.PLX_MC_SYNC_ENABLED;
   delete process.env.PLX_MC_SYNC_ENABLED; // default = OFF for every test
   runSweepMock.mockClear();
+  requireSyncServiceWriteMock.mockClear();
+  requireSyncServiceWriteMock.mockResolvedValue({
+    kind: "service",
+    id: "sp_sync_inbound",
+    status: "active",
+  });
 });
 
 afterEach(() => {
@@ -77,31 +89,43 @@ describe("startSyncScheduler — enabled cadence (fake timers)", () => {
     vi.useFakeTimers();
   });
 
-  it("kicks one immediate sweep, then one per CADENCE_MS", () => {
+  it("authorizes the durable service before every immediate/cadenced sweep", async () => {
     startSyncScheduler();
-    // Immediate kick (void sweep()) — runSweep is invoked synchronously before
-    // its first await, so the call count is reliable without flushing promises.
+    await vi.advanceTimersByTimeAsync(0);
+    expect(requireSyncServiceWriteMock).toHaveBeenCalledTimes(1);
     expect(runSweepMock).toHaveBeenCalledTimes(1);
+    expect(runSweepMock).toHaveBeenLastCalledWith("sp_sync_inbound");
     expect(schedulerGlobal.__plxMcSyncTimer).toBeDefined();
 
-    vi.advanceTimersByTime(CADENCE_MS); // second sweep at +5 min
+    await vi.advanceTimersByTimeAsync(CADENCE_MS);
+    expect(requireSyncServiceWriteMock).toHaveBeenCalledTimes(2);
     expect(runSweepMock).toHaveBeenCalledTimes(2);
 
-    vi.advanceTimersByTime(CADENCE_MS); // third sweep at +10 min
+    await vi.advanceTimersByTimeAsync(CADENCE_MS);
+    expect(requireSyncServiceWriteMock).toHaveBeenCalledTimes(3);
     expect(runSweepMock).toHaveBeenCalledTimes(3);
   });
 
-  it("does NOT sweep before a full CADENCE_MS has elapsed", () => {
+  it("does not sweep when durable service authorization is denied", async () => {
+    requireSyncServiceWriteMock.mockRejectedValueOnce(new Error("service revoked"));
     startSyncScheduler();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(runSweepMock).not.toHaveBeenCalled();
+  });
+
+  it("does NOT sweep before a full CADENCE_MS has elapsed", async () => {
+    startSyncScheduler();
+    await vi.advanceTimersByTimeAsync(0);
     expect(runSweepMock).toHaveBeenCalledTimes(1); // the immediate kick only
     vi.advanceTimersByTime(CADENCE_MS - 1); // one tick short of the interval
     expect(runSweepMock).toHaveBeenCalledTimes(1); // still no scheduled sweep
-    vi.advanceTimersByTime(1); // now the interval fires
+    await vi.advanceTimersByTimeAsync(1); // now the interval fires + authorization resolves
     expect(runSweepMock).toHaveBeenCalledTimes(2);
   });
 
-  it("is idempotent — a second start does not double-schedule", () => {
+  it("is idempotent — a second start does not double-schedule", async () => {
     startSyncScheduler();
+    await vi.advanceTimersByTimeAsync(0);
     const timer = schedulerGlobal.__plxMcSyncTimer;
     expect(runSweepMock).toHaveBeenCalledTimes(1);
 
@@ -110,7 +134,7 @@ describe("startSyncScheduler — enabled cadence (fake timers)", () => {
     expect(runSweepMock).toHaveBeenCalledTimes(1); // no second immediate kick
 
     // One interval still fires exactly once per CADENCE_MS (not twice).
-    vi.advanceTimersByTime(CADENCE_MS);
+    await vi.advanceTimersByTimeAsync(CADENCE_MS);
     expect(runSweepMock).toHaveBeenCalledTimes(2);
   });
 
@@ -119,6 +143,7 @@ describe("startSyncScheduler — enabled cadence (fake timers)", () => {
     // it and the interval must still fire the next sweep.
     runSweepMock.mockRejectedValueOnce(new Error("transient SharePoint outage"));
     startSyncScheduler();
+    await vi.advanceTimersByTimeAsync(0);
     expect(runSweepMock).toHaveBeenCalledTimes(1);
 
     // advanceTimersByTimeAsync flushes the rejected sweep's microtasks so the
@@ -132,7 +157,7 @@ describe("startSyncScheduler — enabled cadence (fake timers)", () => {
 });
 
 describe("startSyncScheduler — clean restart after teardown (no leak)", () => {
-  it("re-registers exactly one interval after the prior test's cleanup", () => {
+  it("re-registers exactly one interval after the prior test's cleanup", async () => {
     // Proves afterEach truly cleared the global: a fresh enable starts cleanly,
     // registers one timer, and ticks once per CADENCE_MS — not N stacked timers.
     process.env.PLX_MC_SYNC_ENABLED = "1";
@@ -140,8 +165,9 @@ describe("startSyncScheduler — clean restart after teardown (no leak)", () => 
     expect(schedulerGlobal.__plxMcSyncTimer).toBeUndefined(); // cleanup held
 
     startSyncScheduler();
+    await vi.advanceTimersByTimeAsync(0);
     expect(runSweepMock).toHaveBeenCalledTimes(1);
-    vi.advanceTimersByTime(CADENCE_MS);
+    await vi.advanceTimersByTimeAsync(CADENCE_MS);
     expect(runSweepMock).toHaveBeenCalledTimes(2); // exactly one interval running
   });
 });

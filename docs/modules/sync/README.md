@@ -2,124 +2,84 @@
 
 ## What
 
-The system-of-record side of Mission Control: SharePoint provisioning today,
-the two-way sync engine next. Owns the canonical tenant schema
-(`config/sharepoint-schema.json`), the idempotent provisioner
-(`scripts/provision-sharepoint.py`), and — as it lands — the Graph sync
-service (outbound push, inbound delta, webhooks, conflict queue, audit log).
-It is NOT the UI (web) and NOT the prototype store (which it will replace
-behind the same action surface).
+The system-of-record side of Mission Control: SharePoint provisioning, the
+two-way Graph sync engine (outbound push, inbound delta, conflict queue, audit
+log), and the canonical bounded-staleness freshness API used by routing.
+Owns `config/sharepoint-schema.json`, `scripts/provision-sharepoint.py`, and
+`src/lib/sync/**`. It is NOT the UI (web).
 
 ## Why
 
-SharePoint is the canonical system of record (SOUL.md non-negotiable); the
-tenant shape must be reproducible from the repo, never hand-built. The
-provisioning script gives the same evidence discipline as the governance
-gates: dry-run by default, `--apply` to mutate, `--verify` to diff the live
-tenant against the committed schema with exit codes.
+SharePoint is the canonical system of record (SOUL.md non-negotiable) for human
+planning data. Agents must not overwrite newer attributable human edits.
+Routing mutations fail closed when required registers are stale.
 
 ## How
 
-- Schema source: `docs/product/SHAREPOINT_INTEGRATION.md` §2–4 (spec wins) →
-  `config/sharepoint-schema.json` (keep aligned with `SP_LISTS` in
-  `src/lib/mc-data/data.ts`).
-- Auth: Graph client credentials from `MICROSOFT_GRAPH_*` env (AWS Secrets
-  Manager via the loader). Site creation uses the Graph beta create-site API
-  (`Sites.Create.All`); lists/columns/folders are Graph v1.0.
-- Environments: `--env staging` (`/sites/plx-mission-control-dev`, sandbox) and
-  `--env production` (default SoR, `/sites/plx-mission-control`, provisioned
-  2026-07-13 — verify with `python scripts/provision-sharepoint.py --env
-  production --verify`). Runtime site selection:
-  `PLX_MC_SHAREPOINT_SITE_PATH` (default `/sites/plx-mission-control`; set the
-  staging path only when intentionally pointing a host at the sandbox).
-- Cutover from staging → production: (1) provision + verify the production
-  site, (2) set `PLX_MC_SHAREPOINT_SITE_PATH` (or ship the production default),
-  (3) `node scripts/cutover-sharepoint-site.mjs --apply` to clear staging
-  `sp_item_id` + `delta_links` so the next sweep re-mirrors by TaskID/Risk key,
-  (4) trigger `POST /api/sync/sweep` or wait for the cron. Evidence:
-  `artifacts/sync/2026-07-13-prod-site-cutover/`.
-- Known constraints (verified 2026-06-11): Graph cannot create
-  hyperlinkOrPicture columns app-only → `PRD Link` is a text column; Risk
-  `Likelihood` choices are `High/Med/Low` BY DESIGN (spec §5.2) — the engine's
-  mapping layer normalizes MC's `Medium` → `Med`.
-- Persistence (landed 2026-06-11): dedicated `plx_mc` database on the staging
-  RDS instance (`plx-postgres-staging`, us-east-1), owned by the app-only
-  `plx_mc_app` role — never the trading database or its credentials. Runtime
-  URL: `PLX_MC_DATABASE_URL` (AWS Secrets Manager via the loader). Schema via
-  numbered migrations in `db/migrations/` (`npm run migrate`,
-  `scripts/migrate.mjs`); numbering serialization enforced by
-  `scripts/check-migrations.py` in every preflight mode. Tables: `delta_links`,
-  `sync_conflicts`, `sync_push_errors`, `sync_audit_log`, `entities`,
-  (Item 2) `repos` / `repo_requests`, (Item 4) `bucket_comments`, and
-  (EN-005) `buckets`.
-- Engine v1 (landed 2026-06-11, `src/lib/sync/`): outbound push + inbound
-  Graph delta poll for ToDos and Risk Register against the configured site
-  (production SoR as of 2026-07-13; staging sandbox retained).
-  Inbound runs BEFORE outbound in every sweep so dirty-field edits raise
-  conflicts (§5.1) instead of last-write-wins. Mapping layer (`mapping.ts`)
-  enforces §3 directions and the §5.2 `Medium` → `Med` Likelihood
-  normalization.   Runs inside the Next.js process: `src/instrumentation.ts`
-  starts the 5-min scheduler when `PLX_MC_SYNC_ENABLED=1` (default OFF, intended
-  for a long-lived host — e.g. the dev box). On Vercel, where serverless timers
-  are unreliable, the in-app scheduler stays OFF and the 5-min cadence runs via
-  Vercel Cron (`vercel.json` → `GET /api/cron/sweep`, authed by `CRON_SECRET`);
-  `POST /api/sync/sweep` runs one on demand. API surface per spec §6 under
-  `src/app/api/` (shared wrapper + zod). Evidence:
-  `artifacts/sync/2026-06-11-sync-engine/`.
-- Person columns (landed 2026-06-18, Item 1): ToDos `Assigned To` (↔),
-  `Accountable Owner` (→) and `Reporter` (→) mirror via `<Column>LookupId`. The
-  pure mapping layer emits a pre-resolved id (`outboundFields` `opts.persons`);
-  `graph.ts` resolves an `@petrasoap.com` email → site User Information List id
-  with a cached read (both directions). App-only client-credentials CANNOT
-  `_api/web/ensureUser`, so a user not in the UIL (or an agent with no email)
-  resolves to null → the column is skipped + audited (fail visible, never faked).
-  `assignee` pulls inbound; owner/reporter are push-only.
-- Repo Registry (landed 2026-06-18, Item 2): the allow-list + self-service
-  request queue persist in the `repos` / `repo_requests` tables (migration
-  `005`); `snapshot()` seeds the canonical repos idempotently and returns them so
-  approvals survive a reload. A push-only "Repo Registry" list mirrors the
-  registry (MC authoritative; resolved optionally so a missing list never blocks
-  the sweep). Routes `POST /api/repos` (approver-gated) + `/api/repos/requests`.
-- Sub-tasks (landed 2026-06-18, Item 3): a push-only `Subtasks` ToDos column —
-  `serializeSubtasks` renders one human-readable line per sub-task; MC owns the
-  structured array, so it is never read back.
-- Bucket comments (landed 2026-06-18, Item 4): bucket discussion threads now
-  persist in a dedicated `bucket_comments` table (migration `006`) via
-  `PATCH /api/buckets/{id}/comments` (atomic replace-thread on `db.withTransaction`)
-  and hydrate from the snapshot, so they survive a reload. The store mirrors each
-  add/edit/delete optimistically (reconcile-on-success / rollback+notice-on-failure,
-  the same spine as `patchTaskFields`). App-only — bucket comments are NEVER
-  pushed to SharePoint (the EN-001 decision).
-- Flexible buckets (landed 2026-06-18, EN-005): initiatives are no longer a
-  static fixture — they persist in a dedicated `buckets` table (migration `007`,
-  full Bucket shape in `data` jsonb, seeded idempotently from the BUCKETS fixture
-  via `ensureBucketsSeeded`). `createBucket` / `patchBucket` (state) back
-  `POST /api/buckets` + `PATCH /api/buckets/{id}` (shared wrapper + zod);
-  attached repos are clamped to the persisted registry. The store exposes
-  `allBuckets()` / `bucketById()` as the single source of truth (every consumer
-  migrated off the fixture) plus optimistic create/edit
-  (reconcile-on-success / rollback+notice-on-failure). Buckets ↔ Roadmap:
-  outbound push is live (`pushBucketRoadmap`); inbound Gantt fields
-  (name/health/started/target/progress) pull via `pullRoadmap`. ToDos Initiative
-  lookup is two-way (`InitiativeLookupId` ↔ `task.bucket`) once the Roadmap item
-  has an `sp_item_id`.
-- Still deferred to a later increment: Graph change webhooks, notification
-  DELIVERY (Teams/email — assignment/mention still in-app + audit only), Labels
-  column on ToDos, and Project Documents (driveItem) sync — file entities are
-  display fixtures until then.
+### Bounded-staleness guarantee
+
+- Required routing registers: **Projects**, **Roadmap**, **ToDos**.
+- Freshness is a **complete successful inbound delta** timestamp per register
+  (`sync_register_freshness`), **not** `max(delta_links.updated_at)`.
+- Maximum age: **360,000 ms** (six minutes). Older or missing → fail-closed
+  `sync_stale` with explicit `missing_register:*` / `stale_register:*` reasons.
+- Cadence: five-minute cron / in-app scheduler remains the recovery path.
+  Graph change-notification delivery is **out of scope for P4** (P11).
+
+### Authority matrix (routing-relevant)
+
+| Register | Two-way fields | MC-push-only (preserved) |
+|---|---|---|
+| Projects | name, health, started, target, desc | Owner, PRD Link |
+| Roadmap | name, health, started, target, progress, project | Owner, PRD Link |
+| ToDos | title, stage, assignee, priority, due, bucket, description | Accountable Owner, Reporter, reqs, estimate, repos, targetEnv, evidence, subtasks |
+
+- Human-created SharePoint rows with valid unique IDs (`PRJ-*`, `BKT-*`,
+  `TASK-*`) are **adoptable inbound** after validation. Invalid rows are
+  audited and skipped — never fabricated ownership, never silent delete.
+- Imported numeric `TASK-*` IDs reconcile `mc_task_id_seq` without moving
+  backward.
+- Inbound always runs before outbound in every sweep.
+- Newer SharePoint edits attributed to a **human** beat older **service**
+  pending edits on routing fields (audited). Human-vs-human and unknown /
+  ambiguous conflicts stay in the manual review queue.
+
+### Kill switch / fallback
+
+- `PLX_MC_SYNC_ENABLED=1` enables the in-app 5-minute scheduler (default OFF).
+- Vercel Cron `GET /api/cron/sweep` (Bearer `CRON_SECRET`) is the deployed
+  cadence; unset secret → 503.
+- `PLX_MC_GRAPH_WEBHOOK_ENABLED` (P11) can disable notifications while
+  retaining delta recovery — not wired in P4.
+- Fallback: manual `POST /api/sync/sweep` (session `sync.mutate`) or wait for
+  the next cron tick.
+
+### Authorization
+
+- Session conflict resolve / error retry / manual sweep: Entra `oid` from the
+  authenticated session (caller-supplied actor ignored) + `sync.mutate`.
+- Cron / inbound writes: durable service principal `sp_sync_inbound` +
+  `sync.service.write`. Outer cron Bearer admission is unchanged.
+
+### Audit boundary
+
+Every adoption, invalid-row skip, conflict, human-over-service precedence
+event, and sweep outcome appends to `sync_audit_log`. Conflict/error queues
+retain history after resolution.
+
+### Key files
+
+- `src/lib/sync/freshness.ts` — canonical freshness API
+- `src/lib/sync/engine.ts` — sweep, adoption, attribution, auth helpers
+- `src/lib/sync/mapping.ts` — directions + reconcile + adoption validation
+- `db/migrations/019_sync_authority.sql` — freshness + field attribution
+- `config/sharepoint-schema.json` / `docs/product/SHAREPOINT_INTEGRATION.md`
 
 ## Dependencies
 
-Python 3.12 + `requests` (`requirements.txt`). Microsoft Graph. Depended on
-by: web (its store becomes a client of this module's API).
-
-### Key Files
-
-- `config/sharepoint-schema.json` — canonical tenant schema
-- `scripts/provision-sharepoint.py` — idempotent provisioner + verifier
-- `scripts/cutover-sharepoint-site.mjs` — clear staging SP item IDs + delta
-  cursors when flipping `PLX_MC_SHAREPOINT_SITE_PATH` to production
-- `docs/product/SHAREPOINT_INTEGRATION.md` — the governing spec
+Python 3.12 + `requests`. Microsoft Graph. Postgres (`PLX_MC_DATABASE_URL`).
+Permissions kernel (`sync.mutate`, `sync.service.write`). Depended on by:
+routing (freshness gate), web store.
 
 ## Owner
 

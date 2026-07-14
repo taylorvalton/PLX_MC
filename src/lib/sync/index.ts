@@ -1,17 +1,40 @@
-// Module entry point for the sync engine (server-side only).
-// Contract: docs/modules/sync/README.md · spec: docs/product/SHAREPOINT_INTEGRATION.md
-
-export { ensureSeeded, resolveConflict, retryError, runSweep, type SweepResult } from "./engine";
 export {
+  buildAdoptedBucket,
+  buildAdoptedProject,
+  buildAdoptedTask,
+  checkRoutingFreshness,
+  ensureSeeded,
+  requireSyncMutateActor,
+  requireSyncServiceWrite,
+  resolveConflict,
+  retryError,
+  runSweep,
+  type SweepResult,
+} from "./engine";
+export {
+  ROUTING_REQUIRED_REGISTERS,
+  SYNC_FRESHNESS_MAX_AGE_MS,
+  assertFreshOrThrow,
+  evaluateSyncFreshness,
+  type SyncFreshnessResult,
+} from "./freshness";
+export {
+  classifyLastModifiedBy,
   displayValue,
   dueToIso,
+  inboundBucketPatches,
   inboundPatches,
+  inboundProjectPatches,
   isoToDue,
   outboundFields,
   parseFieldValue,
   reconcileInbound,
+  validateInboundAdoptionRow,
   type EntityType,
+  type FieldAttribution,
+  type FieldSource,
 } from "./mapping";
+export { normalizeLastModified } from "./graph";
 export { validateRepoInOrg, type RepoValidation } from "./github";
 export { startSyncScheduler, syncEnabled } from "./scheduler";
 export {
