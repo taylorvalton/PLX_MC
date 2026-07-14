@@ -1,5 +1,4 @@
-// The shared route wrapper's envelope contract (governance: one standard
-// response envelope, zod on mutating routes).
+// Shared route wrapper — Response pass-through seam (P11) + envelope contract.
 
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
@@ -36,6 +35,30 @@ describe("route wrapper envelope", () => {
     const body = await resp.json();
     expect(body.error.code).toBe("internal");
     expect(body.error.message).not.toContain("secret internals");
+  });
+});
+
+describe("route wrapper Response pass-through (P11)", () => {
+  it("returns a Response instance as-is without the JSON envelope", async () => {
+    const token = "Validation:Token-123";
+    const resp = await route(async () => {
+      return new Response(token, {
+        status: 200,
+        headers: { "content-type": "text/plain; charset=utf-8" },
+      });
+    })(req({}), ctx);
+    expect(resp).toBeInstanceOf(Response);
+    expect(resp.status).toBe(200);
+    expect(resp.headers.get("content-type")).toMatch(/text\/plain/);
+    const body = await resp.text();
+    expect(body).toBe(token);
+    // Must NOT be JSON-enveloped
+    expect(() => JSON.parse(body)).toThrow();
+  });
+
+  it("still envelopes plain objects when handler does not return Response", async () => {
+    const resp = await route(async () => ({ accepted: 1 }))(req({}), ctx);
+    expect(await resp.json()).toEqual({ data: { accepted: 1 } });
   });
 });
 

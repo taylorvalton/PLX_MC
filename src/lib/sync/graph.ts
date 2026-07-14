@@ -282,3 +282,68 @@ export async function listDelta(
     url = page["@odata.nextLink"];
   }
 }
+
+// ─── Change-notification subscriptions (P11) ─────────────────────────────────
+// Graph subscription max lifetime for list resources is typically ~3 days.
+// Create/renew/delete call Graph; phase acceptance must inject/mocks — never
+// create a live subscription during acceptance gates.
+
+export const GRAPH_SUBSCRIPTION_MAX_MINUTES = 4230; // < 3 days
+
+export interface GraphSubscription {
+  id: string;
+  resource: string;
+  changeType: string;
+  notificationUrl: string;
+  expirationDateTime: string;
+  clientState?: string;
+}
+
+export interface CreateGraphSubscriptionInput {
+  resource: string;
+  notificationUrl: string;
+  clientState: string;
+  expirationDateTime: string;
+  changeType?: string;
+}
+
+export function buildListSubscriptionResource(siteId: string, listId: string): string {
+  return `sites/${siteId}/lists/${listId}`;
+}
+
+export async function createGraphSubscription(
+  input: CreateGraphSubscriptionInput
+): Promise<GraphSubscription> {
+  return graphFetch<GraphSubscription>("/subscriptions", {
+    method: "POST",
+    body: JSON.stringify({
+      changeType: input.changeType ?? "updated",
+      notificationUrl: input.notificationUrl,
+      resource: input.resource,
+      expirationDateTime: input.expirationDateTime,
+      clientState: input.clientState,
+    }),
+  });
+}
+
+export async function renewGraphSubscription(
+  subscriptionId: string,
+  expirationDateTime: string
+): Promise<GraphSubscription> {
+  return graphFetch<GraphSubscription>(`/subscriptions/${encodeURIComponent(subscriptionId)}`, {
+    method: "PATCH",
+    body: JSON.stringify({ expirationDateTime }),
+  });
+}
+
+export async function deleteGraphSubscription(subscriptionId: string): Promise<void> {
+  await graphFetch(`/subscriptions/${encodeURIComponent(subscriptionId)}`, {
+    method: "DELETE",
+  });
+}
+
+/** Default expiry ~2.5 days from `now` (under Graph list-subscription max). */
+export function defaultSubscriptionExpiry(now = new Date()): string {
+  const ms = Math.min(GRAPH_SUBSCRIPTION_MAX_MINUTES, 3600) * 60_000;
+  return new Date(now.getTime() + ms).toISOString();
+}
