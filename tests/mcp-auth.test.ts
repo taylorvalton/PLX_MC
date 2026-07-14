@@ -1,7 +1,7 @@
 // MCP auth — shared API key authenticates a durable service principal;
 // operator email is allowlisted audit context only (no human capability grant).
 
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.stubEnv("PLX_MC_MCP_ENABLED", "1");
 vi.stubEnv("PLX_MC_MCP_API_KEY", "test-mcp-key");
@@ -18,6 +18,10 @@ import {
 function req(headers: Record<string, string>): Request {
   return new Request("http://localhost/api/cursor/self-check", { headers });
 }
+
+afterEach(() => {
+  vi.unstubAllEnvs();
+});
 
 describe("MCP service principal auth", () => {
   beforeEach(() => {
@@ -80,5 +84,87 @@ describe("MCP service principal auth", () => {
         })
       )
     ).rejects.toBeInstanceOf(ApiError);
+  });
+
+  it("does not query durable identities when permissions enforcement is off", async () => {
+    vi.stubEnv("PLX_MC_PERMISSIONS_ENFORCEMENT_ENABLED", "0");
+    const identityQuery = vi.fn();
+
+    await verifyMcpRequest(
+      req({
+        "x-api-key": "test-mcp-key",
+        "x-mc-operator-email": "vince@petrasoap.com",
+        "x-mc-repo": "petralabx/PLX_MC",
+      }),
+      { query: identityQuery }
+    );
+
+    expect(identityQuery).not.toHaveBeenCalled();
+  });
+
+  it("loads an active MCP service principal when enforcement is on", async () => {
+    vi.stubEnv("PLX_MC_PERMISSIONS_ENFORCEMENT_ENABLED", "1");
+    const identityQuery = vi.fn(async () => [
+      { id: "sp_mcp_cursor", name: "PLX MC MCP", status: "active" },
+    ]);
+
+    const identity = await verifyMcpRequest(
+      req({
+        "x-api-key": "test-mcp-key",
+        "x-mc-operator-email": "vince@petrasoap.com",
+        "x-mc-repo": "petralabx/PLX_MC",
+      }),
+      { query: identityQuery }
+    );
+
+    expect(identity.actor).toEqual({
+      kind: "service",
+      id: "sp_mcp_cursor",
+      status: "active",
+    });
+    expect(identityQuery).toHaveBeenCalledWith(
+      expect.stringContaining("FROM service_principals"),
+      ["sp_mcp_cursor"]
+    );
+  });
+
+  it("rejects a missing MCP service principal when enforcement is on", async () => {
+    vi.stubEnv("PLX_MC_PERMISSIONS_ENFORCEMENT_ENABLED", "1");
+    const identityQuery = vi.fn(async () => []);
+
+    await expect(
+      verifyMcpRequest(
+        req({
+          "x-api-key": "test-mcp-key",
+          "x-mc-operator-email": "vince@petrasoap.com",
+          "x-mc-repo": "petralabx/PLX_MC",
+        }),
+        { query: identityQuery }
+      )
+    ).rejects.toMatchObject({
+      code: "mcp_service_principal_missing",
+      status: 503,
+    });
+  });
+
+  it("rejects a revoked MCP service principal when enforcement is on", async () => {
+    vi.stubEnv("PLX_MC_PERMISSIONS_ENFORCEMENT_ENABLED", "1");
+    const identityQuery = vi.fn(async () => [
+      { id: "sp_mcp_cursor", name: "PLX MC MCP", status: "revoked" },
+    ]);
+
+    await expect(
+      verifyMcpRequest(
+        req({
+          "x-api-key": "test-mcp-key",
+          "x-mc-operator-email": "vince@petrasoap.com",
+          "x-mc-repo": "petralabx/PLX_MC",
+        }),
+        { query: identityQuery }
+      )
+    ).rejects.toMatchObject({
+      code: "mcp_service_principal_revoked",
+      status: 403,
+    });
   });
 });

@@ -44,7 +44,10 @@ callable for tests and gradual rollout.
 
 **MCP:** the shared API key authenticates durable service principal
 `sp_mcp_cursor`. `X-MC-Operator-Email` is allowlisted audit/context only and
-never grants human capabilities.
+never grants human capabilities. With enforcement enabled, MCP authentication
+loads that principal from `service_principals` and rejects missing or revoked
+records. Service capabilities always come from the reviewed versioned registry;
+callers cannot inject a capability list.
 
 **Audit data:** every enforcement call should record `allowed`, `reasonCode`,
 and `policyVersion` on the mutation audit event (wired by later routing/task
@@ -60,13 +63,14 @@ concrete rule cannot be expressed that way.
 - `src/lib/permissions/grants.ts` — role + service-principal bundles
 - `src/lib/permissions/predicates.ts` — contextual denials
 - `src/lib/permissions/identities.ts` — record builders / active checks
+- `src/lib/permissions/repository.ts` — lazy, parameterized identity lookups
 - `db/migrations/016_permissions_identities.sql` — durable identity tables
 - `src/lib/auth/identity.ts` — Entra `oid` session helpers + enforcement flag
 
 ## Dependencies
 
-- Depends on: none at runtime for `authorize` (pure). Identity hydration later
-  uses `db` only when enforcement is enabled.
+- Depends on: none at runtime for `authorize` (pure). Identity hydration uses
+  the shared `db` query seam only when enforcement is enabled.
 - Depended on by: `mc-data/repos` (`isApprover` shim), MCP auth (service
   principal actor), future routing / task / sync mutation paths.
 

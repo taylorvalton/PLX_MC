@@ -3,8 +3,13 @@
 // is gated by PLX_MC_PERMISSIONS_ENFORCEMENT_ENABLED so local dev/build
 // never requires identity tables.
 
-import type { AccessRole, McUserRecord, PermissionActor } from "@/lib/permissions";
-import { directoryRoleToAccessRole } from "@/lib/permissions";
+import type {
+  AccessRole,
+  IdentityQuery,
+  McUserRecord,
+  PermissionActor,
+} from "@/lib/permissions";
+import { directoryRoleToAccessRole, findMcUserByEntraOid } from "@/lib/permissions";
 
 export interface EntraProfileClaims {
   oid?: string;
@@ -98,14 +103,11 @@ export function permissionActorFromDirectoryRole(input: {
  * Next.js builds and dormant auth mode stay DB-free.
  */
 export async function hydrateMcUserByOid(
-  entraOid: string
+  entraOid: string,
+  runQuery?: IdentityQuery
 ): Promise<McUserRecord | null> {
   if (!permissionsEnforcementEnabled()) {
     return null;
   }
-  // Enforcement-on hydration lands with the P8/P9 callers that need durable
-  // role lookup. P1 intentionally keeps this fail-closed no-op so importing
-  // auth never requires DATABASE_URL during local build.
-  void entraOid;
-  return null;
+  return findMcUserByEntraOid(entraOid, runQuery);
 }

@@ -18,13 +18,8 @@ function human(role: AccessRole, id = "oid-human"): PermissionActor {
   return { kind: "human", id, role, status: "active" };
 }
 
-function service(id: string, capabilities?: readonly Capability[]): PermissionActor {
-  return {
-    kind: "service",
-    id,
-    status: "active",
-    ...(capabilities ? { capabilities: [...capabilities] } : {}),
-  };
+function service(id: string): PermissionActor {
+  return { kind: "service", id, status: "active" };
 }
 
 describe("capability typing", () => {
@@ -169,7 +164,7 @@ describe("default deny", () => {
 
   it("denies by default when no grant matches", () => {
     const decision = authorize({
-      actor: service("sp_empty", []),
+      actor: service("sp_unknown"),
       capability: "task.read",
     });
     expect(decision.allowed).toBe(false);
@@ -178,6 +173,20 @@ describe("default deny", () => {
 });
 
 describe("service-principal separation", () => {
+  it("cannot inject caller-supplied service capabilities", () => {
+    const injected: PermissionActor = {
+      kind: "service",
+      id: "sp_unknown",
+      status: "active",
+      // @ts-expect-error Service capabilities come only from the registry.
+      capabilities: ["permissions.manage"],
+    };
+    expect(authorize({ actor: injected, capability: "permissions.manage" })).toMatchObject({
+      allowed: false,
+      reasonCode: "capability_not_granted",
+    });
+  });
+
   it("grants only explicit MCP service capabilities", () => {
     const mcpCaps = capabilitiesForServicePrincipal("sp_mcp_cursor");
     expect(mcpCaps).toEqual(

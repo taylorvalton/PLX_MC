@@ -47,6 +47,12 @@ export {
   isMcUserActive,
   isServicePrincipalActive,
 } from "./identities";
+export {
+  findGithubIdentityByUserId,
+  findMcUserByEntraOid,
+  findServicePrincipalById,
+} from "./repository";
+export type { IdentityQuery } from "./repository";
 
 /** Map directory/job-title strings onto access roles for compatibility callers. */
 export function directoryRoleToAccessRole(role: string | undefined | null): AccessRole | null {

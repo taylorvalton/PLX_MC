@@ -43,10 +43,6 @@ export type PermissionActor =
       kind: "service";
       id: string;
       status: ActorStatus;
-      /** Optional override for tests; production uses the service registry. */
-      capabilities?: Capability[];
-      /** Ignored — service principals never inherit human role bundles. */
-      role?: AccessRole;
     };
 
 export type PermissionResource =

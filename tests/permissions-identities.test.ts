@@ -10,6 +10,8 @@ import {
   buildGithubIdentityRecord,
   buildMcUserRecord,
   buildServicePrincipalRecord,
+  findGithubIdentityByUserId,
+  findServicePrincipalById,
   isGithubIdentityActive,
   isMcUserActive,
   isServicePrincipalActive,
@@ -107,5 +109,53 @@ describe("identity records", () => {
         status: "revoked",
       })
     ).toBe(false);
+  });
+});
+
+describe("durable identity query seams", () => {
+  it("loads service-principal status from persistence", async () => {
+    const identityQuery = async () => [
+      { id: "sp_mcp_cursor", name: "PLX MC MCP", status: "revoked" },
+    ];
+    await expect(findServicePrincipalById("sp_mcp_cursor", identityQuery)).resolves.toEqual({
+      id: "sp_mcp_cursor",
+      name: "PLX MC MCP",
+      status: "revoked",
+    });
+  });
+
+  it("loads active and revoked GitHub identity links by numeric user id", async () => {
+    const activeQuery = async () => [
+      {
+        github_user_id: "123456",
+        mc_user_id: "usr_1",
+        github_login: "vince",
+        verified_at: "2026-07-14T12:00:00.000Z",
+        revoked_at: null,
+      },
+    ];
+    const revokedQuery = async () => [
+      {
+        github_user_id: 654321,
+        mc_user_id: "usr_2",
+        github_login: "former-user",
+        verified_at: new Date("2026-07-01T12:00:00.000Z"),
+        revoked_at: new Date("2026-07-10T12:00:00.000Z"),
+      },
+    ];
+
+    const active = await findGithubIdentityByUserId(123456, activeQuery);
+    const revoked = await findGithubIdentityByUserId(654321, revokedQuery);
+
+    expect(active).toEqual({
+      githubUserId: 123456,
+      mcUserId: "usr_1",
+      githubLogin: "vince",
+      verifiedAt: "2026-07-14T12:00:00.000Z",
+      revokedAt: null,
+    });
+    expect(isGithubIdentityActive(active!)).toBe(true);
+    expect(revoked?.revokedAt).toBe("2026-07-10T12:00:00.000Z");
+    expect(isGithubIdentityActive(revoked!)).toBe(false);
   });
 });

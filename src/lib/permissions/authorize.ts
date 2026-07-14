@@ -32,9 +32,6 @@ function grantedCapabilities(actor: PermissionActor): ReadonlySet<Capability> {
   if (actor.kind === "human") {
     return new Set(capabilitiesForRole(actor.role));
   }
-  if (actor.capabilities) {
-    return new Set(actor.capabilities);
-  }
   return new Set(capabilitiesForServicePrincipal(actor.id));
 }
 
