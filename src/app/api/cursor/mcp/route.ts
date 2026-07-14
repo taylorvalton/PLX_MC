@@ -9,7 +9,7 @@ export const runtime = "nodejs";
 
 async function handleMcpRequest(req: Request): Promise<Response> {
   try {
-    const identity = verifyMcpRequest(req);
+    const identity = await verifyMcpRequest(req);
     const server = createPlxMcMcpServer(identity);
     const transport = new WebStandardStreamableHTTPServerTransport({
       sessionIdGenerator: undefined,

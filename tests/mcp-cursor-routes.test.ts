@@ -14,21 +14,40 @@ vi.stubEnv("PLX_MC_MCP_API_KEY", env.PLX_MC_MCP_API_KEY);
 vi.stubEnv("PLX_MC_ALLOWED_USERS", env.PLX_MC_ALLOWED_USERS);
 vi.stubEnv("PLX_MC_PUBLIC_URL", env.PLX_MC_PUBLIC_URL);
 
-import { ApiError } from "@/lib/api/route";
-import { parseIdentity, verifyMcpRequest, mcpEnabled } from "@/lib/mcp/auth";
-import { buildMeta, publicMcBaseUrl, taskLink } from "@/lib/mcp/envelope";
+vi.mock("@/lib/mcp/audit", () => ({
+  recordMcpToolCall: vi.fn(async () => "1"),
+}));
 
-function req(headers: Record<string, string>): Request {
-  return new Request("http://localhost/api/cursor/self-check", { headers });
+import { ApiError } from "@/lib/api/route";
+import {
+  MCP_SERVICE_PRINCIPAL_ID,
+  parseOperatorContext,
+  verifyMcpRequest,
+  mcpEnabled,
+} from "@/lib/mcp/auth";
+import { buildMeta, publicMcBaseUrl, taskLink } from "@/lib/mcp/envelope";
+import { cursorRoute } from "@/lib/mcp/route";
+
+function req(headers: Record<string, string>, init?: RequestInit): Request {
+  return new Request("http://localhost/api/cursor/self-check", {
+    ...init,
+    headers,
+  });
 }
 
 describe("mcp auth", () => {
+  beforeEach(() => {
+    vi.stubEnv("PLX_MC_MCP_ENABLED", "1");
+    vi.stubEnv("PLX_MC_MCP_API_KEY", "test-mcp-key");
+    vi.stubEnv("PLX_MC_ALLOWED_USERS", "vince@petrasoap.com");
+  });
+
   it("reports enabled when flag is 1", () => {
     expect(mcpEnabled()).toBe(true);
   });
 
-  it("accepts valid api key + operator headers", () => {
-    const identity = verifyMcpRequest(
+  it("accepts valid api key + operator headers asynchronously", async () => {
+    const identity = await verifyMcpRequest(
       req({
         "x-api-key": "test-mcp-key",
         "x-mc-operator-email": "vince@petrasoap.com",
@@ -39,11 +58,13 @@ describe("mcp auth", () => {
     );
     expect(identity.operatorEmail).toBe("vince@petrasoap.com");
     expect(identity.repo).toBe("petralabx/PLX_MC");
+    expect(identity.servicePrincipalId).toBe(MCP_SERVICE_PRINCIPAL_ID);
+    expect(identity.actor.kind).toBe("service");
   });
 
   it("rejects missing operator email", () => {
     expect(() =>
-      parseIdentity(
+      parseOperatorContext(
         req({
           "x-mc-repo": "petralabx/PLX_MC",
         })
@@ -51,8 +72,8 @@ describe("mcp auth", () => {
     ).toThrow(ApiError);
   });
 
-  it("rejects invalid api key", () => {
-    expect(() =>
+  it("rejects invalid api key", async () => {
+    await expect(
       verifyMcpRequest(
         req({
           "x-api-key": "wrong",
@@ -60,18 +81,43 @@ describe("mcp auth", () => {
           "x-mc-repo": "petralabx/PLX_MC",
         })
       )
-    ).toThrow(ApiError);
+    ).rejects.toBeInstanceOf(ApiError);
   });
 
   it("rejects non-allowlisted operator", () => {
     expect(() =>
-      parseIdentity(
+      parseOperatorContext(
         req({
           "x-mc-operator-email": "outsider@example.com",
           "x-mc-repo": "petralabx/PLX_MC",
         })
       )
     ).toThrow(ApiError);
+  });
+});
+
+describe("async cursor route wrapper", () => {
+  it("awaits async MCP identity resolution before invoking the handler", async () => {
+    const seen: {
+      servicePrincipalId?: string;
+      actorId?: string;
+    } = {};
+    const route = cursorRoute("mc_self_check", async (_req, _ctx, identity) => {
+      seen.servicePrincipalId = identity.servicePrincipalId;
+      seen.actorId = identity.actor.id;
+      return { data: { ok: true } };
+    });
+    const res = await route(
+      req({
+        "x-api-key": "test-mcp-key",
+        "x-mc-operator-email": "vince@petrasoap.com",
+        "x-mc-repo": "petralabx/PLX_MC",
+      }),
+      { params: Promise.resolve({}) }
+    );
+    expect(res.status).toBe(200);
+    expect(seen.servicePrincipalId).toBe(MCP_SERVICE_PRINCIPAL_ID);
+    expect(seen.actorId).toBe(MCP_SERVICE_PRINCIPAL_ID);
   });
 });
 
@@ -87,9 +133,16 @@ describe("mcp envelope", () => {
       runtime: "cursor",
       workerId: "w1",
       repo: "petralabx/PLX_MC",
+      servicePrincipalId: MCP_SERVICE_PRINCIPAL_ID,
+      actor: {
+        kind: "service",
+        id: MCP_SERVICE_PRINCIPAL_ID,
+        status: "active",
+      },
     });
     expect(meta.requestId).toMatch(/^[0-9a-f-]{36}$/i);
     expect(meta.actor.operatorEmail).toBe("vince@petrasoap.com");
+    expect(meta.actor.servicePrincipalId).toBe(MCP_SERVICE_PRINCIPAL_ID);
     expect(meta.links.mcBase).toBe("https://mc.plxcustomer.io");
   });
 });

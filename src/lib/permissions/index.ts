@@ -1,0 +1,61 @@
+// Permissions module barrel — authorize + typed grants/identities.
+
+export { POLICY_VERSION, MCP_SERVICE_PRINCIPAL_ID, SYNC_INBOUND_SERVICE_PRINCIPAL_ID, ROUTING_MAINTENANCE_SERVICE_PRINCIPAL_ID, CAPABILITIES } from "./types";
+import type {
+  AccessRole,
+  ActorStatus,
+  AuthorizeDecision,
+  AuthorizeInput,
+  Capability,
+  DenyReasonCode,
+  GithubIdentityRecord,
+  McUserRecord,
+  PermissionActor,
+  PermissionContext,
+  PermissionResource,
+  ReasonCode,
+  ServicePrincipalRecord,
+} from "./types";
+
+export type {
+  AccessRole,
+  ActorStatus,
+  AuthorizeDecision,
+  AuthorizeInput,
+  Capability,
+  DenyReasonCode,
+  GithubIdentityRecord,
+  McUserRecord,
+  PermissionActor,
+  PermissionContext,
+  PermissionResource,
+  ReasonCode,
+  ServicePrincipalRecord,
+};
+
+export { authorize, isCapability } from "./authorize";
+export {
+  capabilitiesForRole,
+  capabilitiesForServicePrincipal,
+  isKnownServicePrincipal,
+} from "./grants";
+export {
+  buildGithubIdentityRecord,
+  buildMcUserRecord,
+  buildServicePrincipalRecord,
+  isGithubIdentityActive,
+  isMcUserActive,
+  isServicePrincipalActive,
+} from "./identities";
+
+/** Map directory/job-title strings onto access roles for compatibility callers. */
+export function directoryRoleToAccessRole(role: string | undefined | null): AccessRole | null {
+  if (!role) return null;
+  const normalized = role.trim().toLowerCase();
+  if (normalized === "owner") return "owner";
+  if (normalized === "admin") return "admin";
+  if (normalized === "member" || normalized === "contributor") return "member";
+  // Unknown job titles still admit as member for task create/link once
+  // enforcement is on; governance capabilities remain role-gated.
+  return "member";
+}

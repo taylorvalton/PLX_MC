@@ -27,7 +27,7 @@ export function cursorRoute(toolName: string, handler: CursorHandler) {
     let identity: McpIdentity | null = null;
     let requestId = "";
     try {
-      identity = verifyMcpRequest(req);
+      identity = await verifyMcpRequest(req);
       const baseMeta = buildMeta(identity);
       requestId = baseMeta.requestId;
       const result = await handler(req, ctx, identity, baseMeta);

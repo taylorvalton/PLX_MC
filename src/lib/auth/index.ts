@@ -12,8 +12,17 @@ import MicrosoftEntraID from "next-auth/providers/microsoft-entra-id";
 import { entraAuthConfigured, entraAuthCredentials } from "@/lib/secrets";
 
 import { basicGate, isAllowedUser, isPublicAsset } from "./gate";
+import { extractEntraOid, toSessionIdentity, type EntraProfileClaims } from "./identity";
 
 export { basicGate, isAllowedUser } from "./gate";
+export {
+  extractEntraOid,
+  hydrateMcUserByOid,
+  permissionsEnforcementEnabled,
+  permissionActorFromDirectoryRole,
+  permissionActorFromMcUser,
+  toSessionIdentity,
+} from "./identity";
 export const oidcEnabled = entraAuthConfigured;
 
 // Lazy config: secrets are read per-request, never at module load — builds
@@ -41,8 +50,33 @@ export const { handlers, auth, signIn, signOut } = NextAuth(() => {
       : [],
     callbacks: {
       signIn({ profile }) {
-        const claims = profile as { email?: string; preferred_username?: string } | null;
+        const claims = profile as EntraProfileClaims | null;
         return isAllowedUser(claims?.email ?? claims?.preferred_username);
+      },
+      // Persist Entra oid on the JWT so session callbacks can expose it.
+      // Email allowlist remains the admission gate above; oid is durable id.
+      jwt({ token, profile }) {
+        if (profile) {
+          const claims = profile as EntraProfileClaims;
+          const oid = extractEntraOid(claims);
+          if (oid) token.oid = oid;
+          const email = (claims.email ?? claims.preferred_username)?.trim().toLowerCase();
+          if (email) token.email = email;
+        }
+        return token;
+      },
+      session({ session, token }) {
+        const identity = toSessionIdentity({
+          oid: typeof token.oid === "string" ? token.oid : undefined,
+          email:
+            (typeof token.email === "string" ? token.email : undefined) ??
+            session.user?.email,
+        });
+        if (session.user) {
+          session.user.oid = identity.oid ?? null;
+          if (identity.email) session.user.email = identity.email;
+        }
+        return session;
       },
       // Drives the middleware (src/middleware.ts default-exports `auth`):
       // OIDC mode: unauthenticated → false → redirect to Microsoft sign-in.
