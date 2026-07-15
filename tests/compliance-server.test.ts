@@ -52,6 +52,20 @@ vi.mock("@/lib/sync/repo", () => ({
   },
 }));
 
+vi.mock("@/lib/sync", () => ({
+  actorIdByEmail(email: string) {
+    return email.toLowerCase() === "greg.m@petrasoap.com" ? "greg" : null;
+  },
+  async patchTask(taskId: string, patch: Partial<Task>) {
+    const task = db.tasks.get(taskId);
+    if (!task) return null;
+    const updated = { ...task, ...patch };
+    db.tasks.set(taskId, updated);
+    return updated;
+  },
+  snapshot: vi.fn(),
+}));
+
 // Imported AFTER the mocks so the service's `import * as repo` + sync getEntity
 // resolve to the mocked modules.
 import { checkout, complete, verifyPr } from "@/lib/compliance/service";
@@ -97,6 +111,45 @@ describe("checkout", () => {
     expect(checkoutId).toMatch(/^dsp_/);
     expect(db.dispatches.get(checkoutId)).toMatchObject({ taskId: "TASK-900", actorKind: "agent", accountableHuman: "vince" });
     expect(db.events.some((e) => e.kind === "checkout")).toBe(true);
+  });
+
+  it("backfills a null accountable owner from the dispatching human", async () => {
+    db.tasks.set("TASK-900", taskish({ accountableOwner: null }));
+
+    await checkout({
+      taskId: "TASK-900",
+      runtime: "cursor",
+      accountableHuman: "greg.m@petrasoap.com",
+      repo: "PLX_MC",
+    });
+
+    expect(db.tasks.get("TASK-900")?.accountableOwner).toBe("greg");
+  });
+
+  it("preserves an existing accountable owner", async () => {
+    db.tasks.set("TASK-900", taskish({ accountableOwner: "stephen" }));
+
+    await checkout({
+      taskId: "TASK-900",
+      runtime: "cursor",
+      accountableHuman: "greg.m@petrasoap.com",
+      repo: "PLX_MC",
+    });
+
+    expect(db.tasks.get("TASK-900")?.accountableOwner).toBe("stephen");
+  });
+
+  it("defaults COS dispatches to Vince instead of treating COS as human", async () => {
+    db.tasks.set("TASK-900", taskish({ accountableOwner: null }));
+
+    await checkout({
+      taskId: "TASK-900",
+      runtime: "cursor",
+      accountableHuman: "cos@petrasoap.com",
+      repo: "PLX_MC",
+    });
+
+    expect(db.tasks.get("TASK-900")?.accountableOwner).toBe("vince");
   });
 });
 

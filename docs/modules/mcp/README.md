@@ -35,7 +35,11 @@ MC_REPO=petralabx/PLX_MC   # repo binding for checkout credentials
 MC_BASE_URL=https://mc.plxcustomer.io
 ```
 
-**PR stamp:** `mc_checkout_task` → `meta.links.checkoutStamp` = `MC-Checkout: dsp_*`
+**PR stamp:** `mc_checkout_task` → `meta.links.checkoutStamp` = `MC-Checkout: dsp_*`.
+Checkout also backfills a missing task `accountableOwner` from the dispatching
+human's canonical directory id. Operator/service aliases that are not people
+(for example `cos@petrasoap.com`) resolve to the PLX default accountable human,
+Vince; an owner already on the task is never replaced.
 
 **Routing suggestion:** `mc_suggest_work` authorizes `routing.suggest` for the durable MCP
 service principal (`sp_mcp_cursor`). Operator email is admission/audit context only
@@ -47,7 +51,9 @@ later confirmed-mutation tools (P8).
 **Compliance handshake (hard mode):** an agent PR that carries a `MC-Checkout` stamp
 is held to the tier bundle. `mc_complete_task` writes the task's `evidence`
 (`summary` + a done checklist + `rollback`) so the gate is satisfiable through the
-MCP flow — pass `rollback` (and `verificationCommands`) when completing. The verify
+MCP flow — pass `rollback` (and `verificationCommands`) when completing. The stdio
+tool exposes the same `rollback`, `testRun`, and `shots` evidence fields as
+`POST /api/cursor/complete`. The verify
 gate matches `repo` on the **bare** GitHub name (`github.event.repository.name`), so
 a checkout minted with either `MC_REPO=PLX_MC` or `MC_REPO=petralabx/PLX_MC`
 resolves. The capture hook requests suggestions via `/api/cursor/routing/suggest`

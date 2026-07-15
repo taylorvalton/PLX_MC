@@ -16,6 +16,19 @@
 
 ## Lessons
 
+### 2026-07-15 (ET) — Checkout recorded accountability without assigning the task owner
+
+- **What happened:** Agent checkout persisted `accountableHuman` on the dispatch,
+  but a task with `accountableOwner: null` stayed ownerless and the compliance
+  gate blocked the stamped PR.
+- **Root cause:** The checkout handshake and task mutation were implemented as
+  separate concerns, and the MCP stdio completion schema also lagged the REST
+  evidence contract.
+- **Rule going forward:** Checkout idempotently backfills only a missing owner
+  through the canonical human directory, maps operator/service aliases to the
+  PLX human default, and keeps MCP tool schemas in parity with their REST routes
+  through focused contract tests.
+
 ### 2026-07-14 (ET) — Playwright finished every test but never released Next on Windows
 
 - **What happened:** The pre-push gate reached all 195 Playwright cases twice,

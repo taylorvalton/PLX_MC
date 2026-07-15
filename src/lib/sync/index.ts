@@ -19,6 +19,7 @@ export {
   type SyncFreshnessResult,
 } from "./freshness";
 export {
+  actorIdByEmail,
   classifyLastModifiedBy,
   displayValue,
   dueToIso,
