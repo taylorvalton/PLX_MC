@@ -5,11 +5,6 @@ import { useState } from "react";
 
 const MCP_URL = "https://mc.plxcustomer.io/api/cursor/mcp";
 
-const MCP_HEADERS = `x-api-key: <from team Cursor MCP / AWS Secrets Manager>
-x-mc-operator-email: <your @petrasoap.com or @petralabx.com email>
-x-mc-repo: petralabx/PLX_MC
-x-mc-runtime: cursor`;
-
 async function copyText(value: string): Promise<boolean> {
   try {
     await navigator.clipboard.writeText(value);
@@ -20,13 +15,13 @@ async function copyText(value: string): Promise<boolean> {
 }
 
 export function WelcomeClient() {
-  const [copied, setCopied] = useState<"url" | "headers" | null>(null);
+  const [copied, setCopied] = useState(false);
 
-  async function onCopy(kind: "url" | "headers", value: string) {
-    const ok = await copyText(value);
+  async function onCopyUrl() {
+    const ok = await copyText(MCP_URL);
     if (ok) {
-      setCopied(kind);
-      window.setTimeout(() => setCopied(null), 2000);
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 2000);
     }
   }
 
@@ -35,50 +30,74 @@ export function WelcomeClient() {
       <Link className="mc-welcome-cta mc-welcome-cta-primary" href="/">
         Open Mission Control
       </Link>
+      <p className="mc-welcome-hint">
+        Most colleagues only need that button. Sign in with your work Microsoft
+        account — you&apos;re done.
+      </p>
 
-      <section className="mc-welcome-card" aria-labelledby="connect-cursor-heading">
-        <h2 id="connect-cursor-heading">Connect Cursor</h2>
-        <p>
-          Register the team HTTP MCP at{" "}
-          <a href="https://cursor.com/agents" rel="noreferrer">
-            cursor.com/agents
-          </a>
-          . Keys stay in team MCP / Secrets Manager — never paste secrets here.
-        </p>
-        <label className="mc-welcome-label" htmlFor="mcp-url">
-          MCP URL
-        </label>
-        <div className="mc-welcome-copy-row">
-          <code id="mcp-url">{MCP_URL}</code>
-          <button type="button" onClick={() => void onCopy("url", MCP_URL)}>
-            {copied === "url" ? "Copied" : "Copy"}
-          </button>
-        </div>
-        <label className="mc-welcome-label" htmlFor="mcp-headers">
-          Headers (placeholders only)
-        </label>
-        <div className="mc-welcome-copy-row mc-welcome-copy-row-block">
-          <pre id="mcp-headers">{MCP_HEADERS}</pre>
-          <button type="button" onClick={() => void onCopy("headers", MCP_HEADERS)}>
-            {copied === "headers" ? "Copied" : "Copy"}
-          </button>
-        </div>
-        <a
-          className="mc-welcome-text-link"
-          href="https://github.com/petralabx/PLX_MC/blob/main/docs/runbooks/plx-mc-mcp-team-registration.md"
-          rel="noreferrer"
-        >
-          Full MCP registration runbook
-        </a>
-      </section>
+      <details className="mc-welcome-details">
+        <summary>I use Cursor with AI agents (optional)</summary>
 
-      <a
-        className="mc-welcome-cta"
-        href="https://github.com/petralabx/PLX_MC/blob/main/docs/SKILLS-SOP.md"
-        rel="noreferrer"
-      >
-        Install company skills
-      </a>
+        <section className="mc-welcome-card" aria-labelledby="connect-cursor-heading">
+          <h2 id="connect-cursor-heading">Connect Cursor</h2>
+          <ol className="mc-welcome-steps">
+            <li>
+              Ask Vince (or your admin) to add you to the team PLX-MC Cursor MCP —
+              they give you the API key. You should not hunt for secrets yourself.
+            </li>
+            <li>
+              In Cursor, open{" "}
+              <a href="https://cursor.com/agents" rel="noreferrer">
+                cursor.com/agents
+              </a>{" "}
+              (or Cursor Settings → MCP) and add a server.
+            </li>
+            <li>
+              Paste the URL below with <strong>Copy</strong>.{" "}
+              <strong>Do not open this URL in Chrome/Edge</strong> — it is not a
+              website; a browser tab will look broken on purpose.
+            </li>
+          </ol>
+          <label className="mc-welcome-label" htmlFor="mcp-url">
+            MCP URL (copy into Cursor only)
+          </label>
+          <div className="mc-welcome-copy-row">
+            <code id="mcp-url">{MCP_URL}</code>
+            <button type="button" onClick={() => void onCopyUrl()}>
+              {copied ? "Copied" : "Copy"}
+            </button>
+          </div>
+          <p className="mc-welcome-hint">
+            Headers / keys stay in team Cursor MCP config — never paste secrets
+            into email or this page.
+          </p>
+        </section>
+
+        <section className="mc-welcome-card" aria-labelledby="skills-heading">
+          <h2 id="skills-heading">Company skills (optional)</h2>
+          <p>
+            Skills are files agents use on your laptop. If you only browse Mission
+            Control, skip this.
+          </p>
+          <p>
+            <strong>Easiest:</strong> book 10 minutes with Vince — they run the
+            one-time install with you. You do not need to choose folders or learn
+            the terminal.
+          </p>
+          <p>
+            Technical self-serve (after PLX_MC is already cloned): Windows PowerShell
+            in that repo folder →{" "}
+            <code>.\scripts\bootstrap-company-skills.ps1</code>. Details:{" "}
+            <a
+              href="https://github.com/petralabx/PLX_MC/blob/main/docs/runbooks/mc-for-colleagues.md"
+              rel="noreferrer"
+            >
+              colleague guide
+            </a>
+            .
+          </p>
+        </section>
+      </details>
     </div>
   );
 }
