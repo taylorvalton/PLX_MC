@@ -28,6 +28,7 @@ export function isAllowedUser(
 export function isPublicAsset(pathname: string): boolean {
   return (
     pathname === "/signin" ||
+    pathname === "/welcome" ||
     pathname.startsWith("/brand/") ||
     pathname.startsWith("/fonts/") ||
     pathname.startsWith("/presentations/")

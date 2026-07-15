@@ -269,7 +269,7 @@ describe("routing suggest (P5)", () => {
   it("rejects shadow cohorts before minting a session or scoring candidates", async () => {
     await expect(
       actionSuggestWork(
-        mcpIdentity({ repo: "petralabx/skills" }),
+        mcpIdentity({ repo: "petralabx/local-inference" }),
         { title: "shadow-only work" }
       )
     ).rejects.toMatchObject({

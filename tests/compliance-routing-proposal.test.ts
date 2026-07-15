@@ -298,7 +298,7 @@ describe("proposeRoutingFromPr", () => {
 
   it("persists shadow candidates for audit but returns no candidates or deep link", async () => {
     const result = await proposeRoutingFromPr({
-      repository: "petralabx/skills",
+      repository: "petralabx/local-inference",
       repositoryId: "1001",
       prNumber: 9,
       action: "opened",
