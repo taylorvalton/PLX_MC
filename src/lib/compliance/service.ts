@@ -7,7 +7,7 @@
 import { randomBytes } from "node:crypto";
 import { ApiError } from "@/lib/api/route";
 import { permissionsEnforcementEnabled } from "@/lib/auth";
-import type { Task } from "@/lib/mc-data";
+import { CURRENT_USER, HUMANS, type Task } from "@/lib/mc-data";
 import { publicMcBaseUrl } from "@/lib/mcp/envelope";
 import {
   authorize,
@@ -27,7 +27,7 @@ import {
   upsertRoutingProposal,
   upsertRoutingSession,
 } from "@/lib/routing/repo";
-import { snapshot } from "@/lib/sync";
+import { actorIdByEmail, patchTask, snapshot } from "@/lib/sync";
 import { getEntity, getRegisterInboundCompletions } from "@/lib/sync/repo";
 import trackedReposRegistry from "../../../config/tracked-repos-registry.json";
 import { bucketPrdForTask } from "./bucket-prd";
@@ -49,6 +49,11 @@ const CHECKOUT_TTL_MIN = 8 * 60;
 
 function genId(prefix: string): string {
   return `${prefix}_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`;
+}
+
+function accountableOwnerForDispatch(accountableHuman: string): string {
+  const normalized = accountableHuman.trim().toLowerCase();
+  return actorIdByEmail(normalized) ?? HUMANS[normalized]?.id ?? CURRENT_USER;
 }
 
 // Deterministic check id so recordCheck's upsert actually dedups across
@@ -109,6 +114,22 @@ export async function checkout(input: CheckoutInput): Promise<{ checkoutId: stri
       "forbidden",
       "task.checkout requires a durable authorized actor.",
       403
+    );
+  }
+
+  const taskRow = await getEntity("task", input.taskId);
+  const task = taskRow?.data as Task | undefined;
+  if (task && !task.accountableOwner) {
+    await patchTask(
+      input.taskId,
+      { accountableOwner: accountableOwnerForDispatch(input.accountableHuman) },
+      input.accountableHuman,
+      {
+        attribution: {
+          source: "service",
+          actorId: input.actor?.id ?? input.runtime,
+        },
+      }
     );
   }
 

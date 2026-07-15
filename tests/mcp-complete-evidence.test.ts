@@ -3,6 +3,8 @@
 // needs a test run (qa) or screenshots (shots). This proves the MCP complete-flow
 // can supply that proof, so a high-risk PR (e.g. a migration) is gate-passable.
 // All seams are mocked in-memory (same technique as compliance-server.test.ts).
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { Task } from "@/lib/mc-data";
 
@@ -106,5 +108,22 @@ describe("actionComplete evidence (P0d)", () => {
     });
     const ev = db.patched.at(-1)?.patch.evidence as { shots?: { label: string }[] };
     expect(ev.shots).toHaveLength(2);
+  });
+});
+
+describe("stdio mc_complete_task contract", () => {
+  it("exposes and forwards the REST completion evidence fields", () => {
+    const source = readFileSync(
+      join(process.cwd(), "tools/plx-mc-mcp/index.ts"),
+      "utf8"
+    );
+    const start = source.indexOf('"mc_complete_task"');
+    const end = source.indexOf("\nserver.tool(", start + 1);
+    const block = source.slice(start, end);
+
+    expect(block).toContain("rollback: z.string().optional()");
+    expect(block).toContain("testRun: z");
+    expect(block).toContain("shots: z.array");
+    expect(block).toContain('mcFetch("/complete", { method: "POST", body })');
   });
 });
