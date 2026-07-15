@@ -3,7 +3,12 @@
 import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js";
 import { ApiError } from "@/lib/api/route";
 import { verifyMcpRequest } from "@/lib/mcp/auth";
+import {
+  isUnauthenticatedBrowserGet,
+  mcpBrowserHelpHtml,
+} from "@/lib/mcp/browser-help";
 import { createPlxMcMcpServer } from "@/lib/mcp/create-http-server";
+import { publicMcBaseUrl } from "@/lib/mcp/envelope";
 
 export const runtime = "nodejs";
 
@@ -27,6 +32,16 @@ async function handleMcpRequest(req: Request): Promise<Response> {
 }
 
 export async function GET(req: Request) {
+  if (isUnauthenticatedBrowserGet(req)) {
+    const welcome = `${publicMcBaseUrl()}/welcome`;
+    return new Response(mcpBrowserHelpHtml(welcome), {
+      status: 200,
+      headers: {
+        "content-type": "text/html; charset=utf-8",
+        "cache-control": "no-store",
+      },
+    });
+  }
   return handleMcpRequest(req);
 }
 

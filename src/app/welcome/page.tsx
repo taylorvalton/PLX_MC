@@ -8,7 +8,7 @@ import { WelcomeClient } from "./welcome-client";
 export const metadata: Metadata = {
   title: "Welcome · PLX Mission Control",
   description:
-    "Get started with Mission Control in three steps: open MC, connect Cursor, install company skills.",
+    "Get started with Mission Control: open the app in your browser. Cursor MCP and skills are optional.",
 };
 
 export default function WelcomePage() {
@@ -24,10 +24,10 @@ export default function WelcomePage() {
           priority
         />
         <Kicker className="mc-welcome-kicker">Mission Control</Kicker>
-        <h1>Get going in three clicks</h1>
+        <h1>Start here</h1>
         <p className="mc-welcome-lede">
-          Sign in, connect Cursor, and install company skills — no secret zips,
-          no mystery setup.
+          One click for most people: open Mission Control and sign in with your
+          work account. No downloads, no secret files.
         </p>
         <WelcomeClient />
       </section>

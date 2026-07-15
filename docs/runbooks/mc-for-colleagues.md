@@ -1,21 +1,52 @@
 # Mission Control for colleagues
 
-**Audience:** Petra humans getting productive on MC without agent babysitting  
-**Owner:** Vince · **Effective:** 2026-07-15  
+**Audience:** Petra humans getting productive on MC  
+**Owner:** Vince · **Effective:** 2026-07-15 (updated for non-technical path)  
 **Click path:** https://mc.plxcustomer.io/welcome
 
 This is the canonical prose. Prefer the `/welcome` page for day-one setup.
 
 ---
 
-## Three clicks
+## Most people (browser only)
 
-1. **Open Mission Control** — https://mc.plxcustomer.io (Entra sign-in).
-2. **Connect Cursor** — register team HTTP MCP at [cursor.com/agents](https://cursor.com/agents):
-   - URL: `https://mc.plxcustomer.io/api/cursor/mcp`
-   - Headers: `x-api-key` (from team Cursor MCP / AWS Secrets Manager), `x-mc-operator-email` (your Petra email), `x-mc-repo` (e.g. `petralabx/PLX_MC`), `x-mc-runtime: cursor`
-   - Details: [plx-mc-mcp-team-registration.md](./plx-mc-mcp-team-registration.md)
-3. **Install company skills** — follow [SKILLS-SOP.md](../SKILLS-SOP.md) (`scripts/bootstrap-company-skills.*`). MCP ≠ skills.
+1. Open https://mc.plxcustomer.io/welcome
+2. Click **Open Mission Control**
+3. Sign in with your work Microsoft account
+
+You’re done. You do **not** need Cursor, MCP, a terminal, or company skills to use Mission Control in the browser.
+
+---
+
+## Optional: Cursor + AI agents
+
+Only if you run agents in Cursor that check out MC tasks.
+
+### Connect Cursor (MCP)
+
+1. Ask Vince (or your admin) to add you to the **team PLX-MC Cursor MCP** — they provide the API key. Do not dig for secrets yourself.
+2. In Cursor → Settings → MCP (or [cursor.com/agents](https://cursor.com/agents)), add the server.
+3. Paste this URL with **Copy** from `/welcome`:
+
+   `https://mc.plxcustomer.io/api/cursor/mcp`
+
+4. **Do not open that URL in Chrome/Edge.** It is an API for Cursor, not a web page. A browser tab without a key will show an error on purpose (or a help page). That does not mean MC is down.
+
+Details: [plx-mc-mcp-team-registration.md](./plx-mc-mcp-team-registration.md)
+
+### Company skills
+
+Skills are files on your laptop for agents. Browser-only users: skip.
+
+**Easiest:** 10 minutes with Vince — they run the one-time install. You do not pick folders.
+
+**Self-serve (technical):** clone `petralabx/PLX_MC`, open a terminal **in that repo folder**, then:
+
+```powershell
+.\scripts\bootstrap-company-skills.ps1
+```
+
+Full SOP: [SKILLS-SOP.md](../SKILLS-SOP.md). MCP ≠ skills — do both only if you use Cursor agents.
 
 Do **not** download env/secret zip files. Secrets stay in AWS / team Cursor MCP.
 

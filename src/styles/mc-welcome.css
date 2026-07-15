@@ -58,6 +58,45 @@
   margin-top: var(--p-space-2);
 }
 
+.mc-welcome-hint {
+  margin: 0;
+  font-size: 0.88rem;
+  line-height: 1.45;
+  color: color-mix(in srgb, var(--p-ink) 72%, transparent);
+}
+
+.mc-welcome-details {
+  border: 1px solid var(--p-grid);
+  background: var(--p-paper);
+  padding: var(--p-space-3) var(--p-space-4);
+}
+
+.mc-welcome-details > summary {
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 0.95rem;
+  list-style-position: outside;
+}
+
+.mc-welcome-details[open] > summary {
+  margin-bottom: var(--p-space-3);
+}
+
+.mc-welcome-details .mc-welcome-card {
+  margin-top: var(--p-space-3);
+}
+
+.mc-welcome-steps {
+  margin: 0;
+  padding-left: 1.2rem;
+  display: flex;
+  flex-direction: column;
+  gap: var(--p-space-2);
+  font-size: 0.9rem;
+  line-height: 1.45;
+  color: color-mix(in srgb, var(--p-ink) 78%, transparent);
+}
+
 .mc-welcome-cta {
   display: inline-flex;
   align-items: center;
