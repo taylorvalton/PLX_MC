@@ -440,8 +440,14 @@ def test_active_registry_and_pilot_descriptors_have_one_authority():
         "petralabx/PLX_MC",
         "petralabx/plx-customer-portal",
         "petralabx/agentic-swarm",
+        "petralabx/skills",
+        "petralabx/for-and-against",
     }
-    assert len(shadow) == 5
+    assert shadow == {
+        "petralabx/local-inference",
+        "petralabx/1hr-after",
+        "petralabx/furgenics",
+    }
 
     for pilot in enabled_pilots:
         registered = active_repos[pilot["repo"]]

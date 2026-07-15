@@ -82,11 +82,11 @@ describe("pilot enrollment", () => {
       "petralabx/PLX_MC": "suggestion",
       "petralabx/plx-customer-portal": "suggestion",
       "petralabx/agentic-swarm": "suggestion",
-      "petralabx/skills": "shadow",
+      "petralabx/skills": "suggestion",
       "petralabx/local-inference": "shadow",
       "petralabx/1hr-after": "shadow",
       "petralabx/furgenics": "shadow",
-      "petralabx/for-and-against": "shadow",
+      "petralabx/for-and-against": "suggestion",
     });
     for (const pilot of pilots) {
       expect(pilot.fuzzyAutoLinkEnabled).toBe(false);
@@ -108,8 +108,8 @@ describe("pilot enrollment", () => {
     expect(rolloutHealth().pilots).toBe(8);
     expect(rolloutHealth().reasons).toEqual([]);
     expect(rolloutHealth().configuredModes).toEqual({
-      suggestion: 3,
-      shadow: 5,
+      suggestion: 5,
+      shadow: 3,
       confirmation: 0,
     });
     expect(rolloutHealth().scope).toBe("descriptor_config");

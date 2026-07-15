@@ -4,14 +4,14 @@
   "displayName": "Skills Catalog",
   "tier": "skills",
   "enabled": true,
-  "mode": "shadow",
+  "mode": "suggestion",
   "policyVersion": "routing.v1",
   "fuzzyAutoLinkEnabled": false,
   "activation": {
     "status": "active",
     "localManifest": ".plx/mc-routing.json",
     "workflowManifest": ".github/plx-mc-routing-manifest.json",
-    "notes": "Downstream shadow metadata workflow activation merged in petralabx/skills PR #7 with successful routing runs."
+    "notes": "Promoted to suggestion for colleague-visible MC deep links (TASK-465). Fuzzy auto-link remains off."
   },
   "defaultBucket": "BKT-INFRA",
   "owner": "Vince"

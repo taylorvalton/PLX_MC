@@ -1,0 +1,203 @@
+/* Welcome / get-started — public brand surface for new colleagues.
+   Tokens only under .brand-plx / .mc-welcome. Light paper threshold. */
+
+.mc-welcome {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--p-space-6);
+  padding: var(--p-space-6) var(--p-space-5) var(--p-space-7);
+  background:
+    radial-gradient(ellipse 80% 50% at 50% -10%, color-mix(in srgb, var(--p-accent) 12%, transparent), transparent),
+    var(--p-paper);
+  color: var(--p-ink);
+  font-family: var(--p-font-sans);
+  font-feature-settings: "ss01", "ss02";
+}
+
+.mc-welcome-hero {
+  width: 100%;
+  max-width: 520px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--p-space-3);
+}
+
+.mc-welcome-logo {
+  height: 44px;
+  width: auto;
+}
+
+.mc-welcome-kicker {
+  display: block;
+  margin-top: var(--p-space-2);
+}
+
+.mc-welcome h1 {
+  margin: 0;
+  font-family: var(--p-font-serif);
+  font-size: clamp(2rem, 4vw, 2.75rem);
+  font-weight: 400;
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+}
+
+.mc-welcome-lede {
+  margin: 0;
+  font-size: 1.05rem;
+  line-height: 1.5;
+  color: color-mix(in srgb, var(--p-ink) 78%, transparent);
+  max-width: 36ch;
+}
+
+.mc-welcome-ctas {
+  display: flex;
+  flex-direction: column;
+  gap: var(--p-space-3);
+  margin-top: var(--p-space-2);
+}
+
+.mc-welcome-cta {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 48px;
+  padding: 0 var(--p-space-4);
+  border: 1px solid var(--p-grid);
+  background: var(--p-paper);
+  color: var(--p-ink);
+  text-decoration: none;
+  font-weight: 600;
+  font-size: 0.95rem;
+}
+
+.mc-welcome-cta:hover {
+  border-color: var(--p-ink);
+}
+
+.mc-welcome-cta-primary {
+  background: var(--p-ink);
+  color: var(--p-paper);
+  border-color: var(--p-ink);
+}
+
+.mc-welcome-cta-primary:hover {
+  opacity: 0.92;
+}
+
+.mc-welcome-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--p-space-2);
+  padding: var(--p-space-4);
+  border: 1px solid var(--p-grid);
+  background: var(--p-paper);
+}
+
+.mc-welcome-card h2 {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.mc-welcome-card p {
+  margin: 0;
+  font-size: 0.9rem;
+  line-height: 1.45;
+  color: color-mix(in srgb, var(--p-ink) 78%, transparent);
+}
+
+.mc-welcome-label {
+  font-family: var(--mono, var(--font-jetbrains-mono), monospace);
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: color-mix(in srgb, var(--p-ink) 55%, transparent);
+}
+
+.mc-welcome-copy-row {
+  display: flex;
+  gap: var(--p-space-2);
+  align-items: stretch;
+}
+
+.mc-welcome-copy-row code,
+.mc-welcome-copy-row pre {
+  flex: 1;
+  margin: 0;
+  padding: var(--p-space-2) var(--p-space-3);
+  border: 1px solid var(--p-grid);
+  background: color-mix(in srgb, var(--p-paper) 92%, var(--p-ink));
+  font-family: var(--mono, var(--font-jetbrains-mono), monospace);
+  font-size: 12px;
+  line-height: 1.4;
+  overflow-x: auto;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+.mc-welcome-copy-row button {
+  flex: 0 0 auto;
+  min-width: 72px;
+  border: 1px solid var(--p-grid);
+  background: var(--p-paper);
+  color: var(--p-ink);
+  font-weight: 600;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+.mc-welcome-copy-row button:hover {
+  border-color: var(--p-ink);
+}
+
+.mc-welcome-copy-row-block {
+  align-items: flex-start;
+}
+
+.mc-welcome-text-link {
+  font-size: 0.85rem;
+  color: var(--p-accent);
+}
+
+.mc-welcome-secondary {
+  width: 100%;
+  max-width: 520px;
+  padding-top: var(--p-space-4);
+  border-top: 1px solid var(--p-grid);
+}
+
+.mc-welcome-secondary h2 {
+  margin: 0 0 var(--p-space-3);
+  font-size: 1.05rem;
+}
+
+.mc-welcome-secondary ul {
+  margin: 0 0 var(--p-space-3);
+  padding-left: 1.2rem;
+  display: flex;
+  flex-direction: column;
+  gap: var(--p-space-2);
+  font-size: 0.92rem;
+  line-height: 1.5;
+}
+
+.mc-welcome-secondary code {
+  font-family: var(--mono, var(--font-jetbrains-mono), monospace);
+  font-size: 0.85em;
+}
+
+.mc-welcome-secondary a {
+  color: var(--p-accent);
+}
+
+@media (max-width: 480px) {
+  .mc-welcome {
+    padding: var(--p-space-5) var(--p-space-3) var(--p-space-6);
+  }
+
+  .mc-welcome-copy-row {
+    flex-direction: column;
+  }
+}

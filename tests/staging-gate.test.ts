@@ -70,6 +70,7 @@ describe("OIDC sign-in allowlist", () => {
 describe("public asset + sign-in bypass", () => {
   it("allow-lists only the sign-in page and brand/font assets", () => {
     expect(isPublicAsset("/signin")).toBe(true);
+    expect(isPublicAsset("/welcome")).toBe(true);
     expect(isPublicAsset("/brand/logo-horizontal-ink.png")).toBe(true);
     expect(isPublicAsset("/fonts/mazius/MaziusDisplay-Regular.woff2")).toBe(true);
     expect(isPublicAsset("/presentations/plx-platform-vision.html")).toBe(true);
@@ -82,6 +83,7 @@ describe("public asset + sign-in bypass", () => {
   it("lets the sign-in page and brand assets through the Basic gate", async () => {
     process.env.PLX_MC_STAGING_PASSWORD = "s3cret";
     expect((await run(new NextRequest("http://test/signin"))).status).toBe(200);
+    expect((await run(new NextRequest("http://test/welcome"))).status).toBe(200);
     expect(
       (await run(new NextRequest("http://test/brand/logo-horizontal-ink.png"))).status
     ).toBe(200);

@@ -103,12 +103,14 @@ describe("inbox cohort visibility boundary", () => {
         "petralabx/PLX_MC",
         "petralabx/plx-customer-portal",
         "petralabx/agentic-swarm",
+        "petralabx/skills",
+        "petralabx/for-and-against",
       ];
       expect(inboxDb.calls[0]?.text).toContain("p.repo_id = ANY($2::text[])");
       expect(inboxDb.calls[0]?.params[1]).toEqual(visibleRepos);
       expect(inboxDb.calls[1]?.text).toContain("p.repo_id = ANY($2::text[])");
       expect(inboxDb.calls[1]?.params[1]).toEqual(visibleRepos);
-      expect(visibleRepos).not.toContain("petralabx/skills");
+      expect(visibleRepos).not.toContain("petralabx/local-inference");
     } finally {
       if (previousSuggest === undefined) {
         delete process.env.PLX_MC_ROUTING_SUGGEST_ENABLED;
@@ -133,7 +135,7 @@ describe("inbox cohort visibility boundary", () => {
       inboxDb.responses.push([]);
       await expect(getInboxProposalDetail("rpp_shadow")).resolves.toBeNull();
       expect(inboxDb.calls[0]?.text).toContain("p.repo_id = ANY($2::text[])");
-      expect(inboxDb.calls[0]?.params[1]).not.toContain("petralabx/skills");
+      expect(inboxDb.calls[0]?.params[1]).not.toContain("petralabx/local-inference");
     } finally {
       if (previousSuggest === undefined) {
         delete process.env.PLX_MC_ROUTING_SUGGEST_ENABLED;

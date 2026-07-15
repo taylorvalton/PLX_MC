@@ -681,9 +681,11 @@ export function rolloutHealth(
     suggestion: enrolled.filter((pilot) => pilot.mode === "suggestion").length,
     confirmation: enrolled.filter((pilot) => pilot.mode === "confirmation").length,
   };
+  // Colleague-ready cohort: five suggestion (hub + portal + swarm descriptor +
+  // skills + for-and-against) and three remaining shadow pending activation.
   if (
-    configuredModes.suggestion !== 3 ||
-    configuredModes.shadow !== 5 ||
+    configuredModes.suggestion !== 5 ||
+    configuredModes.shadow !== 3 ||
     configuredModes.confirmation !== 0
   ) {
     reasons.push("configured_mode_distribution_mismatch");

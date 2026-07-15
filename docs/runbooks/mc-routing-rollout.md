@@ -20,7 +20,7 @@ or killing a routing surface.
 | **confirmation** | Authorized confirm / attach / Task create (not enabled in this rollout) |
 
 Configured per pilot in `config/routing-pilots/*.json`. Three cohorts are
-configured for **suggestion** and five for **shadow**. Confirmation remains off.
+configured for **suggestion** and three for **shadow**. Confirmation remains off.
 Rolling-window breach demotes **confirmation → suggestion** if a later approved
 rollout ever enables it.
 
@@ -63,11 +63,11 @@ agent checkout/evidence compliance remains unchanged.
 | `petralabx/PLX_MC` | hub | `main` | `BKT-INFRA` | suggestion | **active** | `TASK-452` | `vince@petrasoap.com` |
 | `petralabx/plx-customer-portal` | product_app | `staging` | `BKT-PROD` | suggestion | **active** | `TASK-447` | `vince@petrasoap.com` |
 | `petralabx/agentic-swarm` | product_platform | `main` | `BKT-INFRA` | suggestion | `pending_downstream_pr` | `TASK-448` | `vince@petrasoap.com` |
-| `petralabx/skills` | skills | `main` | `BKT-INFRA` | shadow | **active** | `TASK-449` | `vince@petrasoap.com` |
+| `petralabx/skills` | skills | `main` | `BKT-INFRA` | suggestion | **active** | `TASK-449` | `vince@petrasoap.com` |
 | `petralabx/local-inference` | tooling | `main` | `BKT-INFRA` | shadow | `pending_downstream_pr` | `TASK-450` | `vince@petrasoap.com` |
 | `petralabx/1hr-after` | tooling | `main` | `BKT-INFRA` | shadow | `pending_downstream_pr` | `TASK-453` | `vince@petrasoap.com` |
 | `petralabx/furgenics` | tooling | `main` | `BKT-INFRA` | shadow | `pending_downstream_pr` | `TASK-454` | `vince@petrasoap.com` |
-| `petralabx/for-and-against` | tooling | `main` | `BKT-INFRA` | shadow | **active** | `TASK-455` | `vince@petrasoap.com` |
+| `petralabx/for-and-against` | tooling | `main` | `BKT-INFRA` | suggestion | **active** | `TASK-455` | `vince@petrasoap.com` |
 
 Central config: `config/mc-routing-rollout.json`.  
 Workflow template: `docs/templates/mc-routing-manifest.json` →
@@ -337,7 +337,7 @@ rolloutHealth(); // pilots===8, fuzzyAutoLinkEnabled===false
 - `rolloutHealth()` returns `scope: "descriptor_config"` and is
   **descriptor-valid/config health only**. `ok` means: eight unique enabled
   pilots exactly intersect the active non-sandbox registry; configured modes
-  are 3 suggestion / 5 shadow / 0 confirmation; descriptor tier/default Bucket
+  are 5 suggestion / 3 shadow / 0 confirmation; descriptor tier/default Bucket
   match the registry; and fuzzy is off. `reasons[]` names count, duplicate,
   intersection, mode-distribution, tier, Bucket, or fuzzy mismatches. It does
   not prove a downstream workflow is live.

@@ -16,13 +16,16 @@ test status → merge commit). The full product spec lives in
 
 ## Team start here (humans)
 
-1. Open **https://mc.plxcustomer.io** and sign in with your Petra Microsoft 365
-   account (`@petrasoap.com` / `@petralabx.com`, allowlisted).
-2. In the sidebar, open **SOP guide** → start with **Human — How to Use Mission
+**Start here:** https://mc.plxcustomer.io/welcome — three clicks (open MC, connect Cursor, install skills).
+
+1. Open **https://mc.plxcustomer.io/welcome** (or sign in at **https://mc.plxcustomer.io** with your Petra Microsoft 365 account).
+2. Follow the on-page CTAs, or read
+   [`docs/runbooks/mc-for-colleagues.md`](docs/runbooks/mc-for-colleagues.md).
+3. In the sidebar, open **SOP guide** → **Human — How to Use Mission
    Control** (also [`docs/HUMAN-MC-SOP.md`](docs/HUMAN-MC-SOP.md)).
-3. If you open PRs against tracked repos, also read
+4. If you open PRs against tracked repos, also read
    [`docs/COLLABORATOR-SOP.md`](docs/COLLABORATOR-SOP.md).
-4. For Cursor/Claude agents on your laptop:
+5. For Cursor/Claude agents on your laptop:
    - MCP registration:
      [`docs/runbooks/plx-mc-mcp-team-registration.md`](docs/runbooks/plx-mc-mcp-team-registration.md)
    - Company skills install: [`docs/SKILLS-SOP.md`](docs/SKILLS-SOP.md) (MCP ≠
