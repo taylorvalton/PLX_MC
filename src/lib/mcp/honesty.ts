@@ -1,6 +1,5 @@
-// Honesty-oracle fields for mc_self_check (P2 thin v1).
-// Local-only: no Graph network probe. dataSource discriminates seed vs live
-// from recorded inbound deltas on sync_register_freshness.
+// Honesty-oracle fields for mc_self_check (P4 full Graph probe).
+// dataSource: live requires recorded inbound delta AND acquirable Graph token.
 
 import { cronConfigured, graphWebhookConfigured, graphWebhookEnabled } from "@/lib/secrets";
 import {
@@ -8,6 +7,7 @@ import {
   evaluateSyncFreshness,
   type SyncFreshnessResult,
 } from "@/lib/sync/freshness";
+import { probeGraphTokenOk } from "@/lib/sync/graph";
 import { getRegisterInboundCompletions } from "@/lib/sync/repo";
 import { syncEnabled } from "@/lib/sync/scheduler";
 import { mcpEnabled } from "./auth";
@@ -24,6 +24,7 @@ export interface HonestyFields {
   freshness: SyncFreshnessResult;
   webhooksEnabled: boolean;
   mcpEnabled: boolean;
+  graphTokenOk: boolean;
   dataSource: DataSource;
 }
 
@@ -54,12 +55,15 @@ export function resolveLastSweepAgeMs(
 }
 
 /**
- * live = any required register has a completed inbound delta stamp.
- * seed = no required register has ever recorded one (fresh ensureSeeded state).
+ * live = any required register has a completed inbound delta stamp AND Graph
+ * token + site/list probe succeeded. Otherwise seed (either leg missing).
  */
-export function resolveDataSource(freshness: SyncFreshnessResult): DataSource {
+export function resolveDataSource(
+  freshness: SyncFreshnessResult,
+  graphTokenOk: boolean
+): DataSource {
   const anyCompleted = freshness.registers.some((r) => r.lastCompleteInboundAt != null);
-  return anyCompleted ? "live" : "seed";
+  return anyCompleted && graphTokenOk ? "live" : "seed";
 }
 
 export function resolveWebhooksEnabled(opts?: {
@@ -71,11 +75,12 @@ export function resolveWebhooksEnabled(opts?: {
   return enabled && configured;
 }
 
-/** Load freshness + honesty flags from local env/DB (no Graph). */
+/** Load freshness + honesty flags; Graph probe is fail-soft (never throws). */
 export async function buildHonestyFields(opts?: {
   lastSweep?: string | null;
   now?: Date;
   loadRegisterTimestamps?: () => Promise<Partial<Record<string, Date | string | null | undefined>>>;
+  probeGraphToken?: () => Promise<boolean>;
 }): Promise<HonestyFields> {
   const now = opts?.now ?? new Date();
   const syncOn = syncEnabled();
@@ -87,6 +92,13 @@ export async function buildHonestyFields(opts?: {
       opts?.loadRegisterTimestamps ?? (() => getRegisterInboundCompletions()),
   });
 
+  let graphTokenOk = false;
+  try {
+    graphTokenOk = await (opts?.probeGraphToken ?? (() => probeGraphTokenOk()))();
+  } catch {
+    graphTokenOk = false;
+  }
+
   return {
     syncMode: resolveSyncMode({ syncEnabled: syncOn, cronConfigured: cronOn }),
     cronConfigured: cronOn,
@@ -96,6 +108,7 @@ export async function buildHonestyFields(opts?: {
     freshness,
     webhooksEnabled: resolveWebhooksEnabled(),
     mcpEnabled: mcpEnabled(),
-    dataSource: resolveDataSource(freshness),
+    graphTokenOk,
+    dataSource: resolveDataSource(freshness, graphTokenOk),
   };
 }
