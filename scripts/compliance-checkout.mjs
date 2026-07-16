@@ -185,8 +185,9 @@ export async function capture({ env = process.env, fetch = globalThis.fetch, log
     const data = json?.data ?? json;
     const checkoutId = data?.checkoutId;
     if (!checkoutId) throw new Error(`no checkoutId for ${taskId}`);
-    const prBodyLine = data?.prBodyLine || `MC-Checkout: ${checkoutId}`;
     const expectedPrBodyLine = `MC-Checkout: ${checkoutId}`;
+    const prBodyLine = data?.prBodyLine || (!useCursorApi ? expectedPrBodyLine : "");
+    if (!prBodyLine) throw new Error(`checkout stamp missing for ${taskId}`);
 
     if (useCursorApi) {
       if (data?.taskId !== taskId) {
@@ -204,6 +205,13 @@ export async function capture({ env = process.env, fetch = globalThis.fetch, log
     if (prBodyLine !== expectedPrBodyLine) {
       throw new Error(
         `checkout stamp mismatch: expected "${expectedPrBodyLine}", received "${prBodyLine}"`
+      );
+    }
+    if (useCursorApi && json?.meta?.links?.checkoutStamp !== prBodyLine) {
+      throw new Error(
+        `checkout metadata stamp mismatch: expected "${prBodyLine}", received "${
+          json?.meta?.links?.checkoutStamp || "missing"
+        }"`
       );
     }
 
