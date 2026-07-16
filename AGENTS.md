@@ -20,8 +20,10 @@ DESIGN_TOKENS).
 - `npm run dev` â€” Next.js dev server (App Router, `app/`).
 - `npm run build` / `npm run start` â€” production build and serve.
 - `./scripts/preflight.sh --mode pre-commit|pre-push|ci` â€” the one gate command.
-- SharePoint sync: five-minute delta sweep + Graph subscription renewal /
-  notification queue (see `docs/modules/sync/README.md`).
+- SharePoint sync (current): five-minute inbound delta sweep + outbound push
+  via Vercel Cron / `POST /api/sync/sweep` (see `docs/modules/sync/README.md`).
+  Graph change-notification subscription renewal and notification queue are
+  deferred (P11) — gated scaffolding only, not live push freshness.
 - Routing maintenance cron: `GET /api/cron/routing-maintenance` (hourly) —
   retention expiry + rolling-breach cohort demotion; authorized only for
   `sp_routing_maintenance`. Rollout runbook:
@@ -33,7 +35,8 @@ DESIGN_TOKENS).
 |---|---|---|
 | Web app | Next.js (App Router) + TypeScript; all screens from the design handoff | `app/`, `src/` |
 | Brand surface | PLX design system, fourth brand surface per ADR-003; `--p-*` tokens, opt-in `.brand-plx` boundary | `src/styles/`, `src/components/brand/`, `docs/design-system/` |
-| Sync engine (planned) | Two-way Microsoft Graph mirror: outbound PATCH on mutation, inbound delta + webhooks, conflict queue, audit log | spec: `docs/product/SHAREPOINT_INTEGRATION.md` |
+| Sync engine (delta) — current | Two-way Microsoft Graph mirror: outbound PATCH on mutation, inbound delta poll (ToDos/Risk/Projects/Roadmap), conflict queue, audit log, freshness API | `docs/modules/sync/README.md`; product backdrop: `docs/product/SHAREPOINT_INTEGRATION.md` |
+| Graph change-notifications — deferred (P11) | Push webhooks / subscription renewal / notification queue — gated scaffolding only until P11; delta sweep remains the correctness backbone | `docs/modules/sync/README.md` (P11); cron routes under `src/app/api/cron/sync-*` |
 | Governance tooling | Contract generator + drift gate, hygiene checker, preflight wrapper (Python 3.12) | `scripts/`, `config/` |
 
 ## Module Ownership
