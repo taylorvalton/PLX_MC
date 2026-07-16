@@ -1,8 +1,8 @@
 # P4 — Self-check full Graph probe
 
-**Branch:** `proj/honesty-oracle/phase-4-self-check-full`  
-**Base:** `proj/honesty-oracle/phase-2-self-check-thin` @ `d0ffdc805cd12b66d866100930cb6338922d663e`  
-**MC:** TASK-490 · `MC-Checkout: dsp_mrnrxfuu6eu8lh` · owner Vince  
+**Branch:** `proj/honesty-oracle/phase-4-self-check-full`
+**Base:** `proj/honesty-oracle/phase-2-self-check-thin` @ `d0ffdc805cd12b66d866100930cb6338922d663e`
+**MC:** TASK-490 · `MC-Checkout: dsp_mrnrxfuu6eu8lh` · owner Vince
 **Date:** 2026-07-16
 
 ## What shipped
@@ -47,6 +47,6 @@ git diff --check                                       → exit 0
 ## Owns / forbidden
 
 Touched only: `src/lib/mcp/**`, `src/lib/sync/**`, `tests/**`,
-`.orchestrator/honesty-oracle/P4/**`.  
+`.orchestrator/honesty-oracle/P4/**`.
 Did not touch: `vercel.json`, `package.json`, `package-lock.json`,
 `.cursor/mcp.json`, `AGENTS.md`.
