@@ -181,7 +181,10 @@ describe("compliance capture hook", () => {
           taskId: "TASK-1",
           prBodyLine: "MC-Checkout: dsp_mcp",
         },
-        meta: { actor: { repo: "petralabx/PLX_MC" } },
+        meta: {
+          actor: { repo: "petralabx/PLX_MC" },
+          links: { checkoutStamp: "MC-Checkout: dsp_mcp" },
+        },
       },
     }));
     const result = await capture({
@@ -283,6 +286,63 @@ describe("compliance capture hook", () => {
         log: () => {},
       })
     ).rejects.toThrow("checkout stamp mismatch");
+  });
+
+  it("rejects a checkout whose returned PR stamp is missing", async () => {
+    const { fetch } = recorder(() => ({
+      ok: true,
+      json: {
+        data: {
+          checkoutId: "dsp_missing_stamp",
+          taskId: "TASK-1",
+        },
+        meta: {
+          actor: { repo: "petralabx/PLX_MC" },
+          links: { checkoutStamp: "MC-Checkout: dsp_missing_stamp" },
+        },
+      },
+    }));
+
+    await expect(
+      capture({
+        env: {
+          ...baseEnv,
+          MC_TASK_ID: "TASK-1",
+          MC_MCP_API_KEY: "sek",
+        },
+        fetch,
+        log: () => {},
+      })
+    ).rejects.toThrow("checkout stamp missing");
+  });
+
+  it("rejects a checkout whose metadata stamp disagrees", async () => {
+    const { fetch } = recorder(() => ({
+      ok: true,
+      json: {
+        data: {
+          checkoutId: "dsp_expected",
+          taskId: "TASK-1",
+          prBodyLine: "MC-Checkout: dsp_expected",
+        },
+        meta: {
+          actor: { repo: "petralabx/PLX_MC" },
+          links: { checkoutStamp: "MC-Checkout: dsp_other" },
+        },
+      },
+    }));
+
+    await expect(
+      capture({
+        env: {
+          ...baseEnv,
+          MC_TASK_ID: "TASK-1",
+          MC_MCP_API_KEY: "sek",
+        },
+        fetch,
+        log: () => {},
+      })
+    ).rejects.toThrow("checkout metadata stamp mismatch");
   });
 
   it("requires a full repository slug before checkout", async () => {
