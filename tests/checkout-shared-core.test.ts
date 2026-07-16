@@ -120,8 +120,9 @@ describe("checkout doors → shared checkout() core", () => {
 
     expect(mocks.checkout).toHaveBeenCalledTimes(2);
 
-    const mcpCall = mocks.checkout.mock.calls[0][0];
-    const complianceCall = mocks.checkout.mock.calls[1][0];
+    const checkoutCalls = mocks.checkout.mock.calls as unknown as Array<[Record<string, unknown>]>;
+    const mcpCall = checkoutCalls[0][0];
+    const complianceCall = checkoutCalls[1][0];
 
     // Equivalent verification guarantees: same task + repo + authorized actor.
     expect(mcpCall).toMatchObject({
