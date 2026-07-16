@@ -1,4 +1,4 @@
-// P2 honesty-oracle thin v1 — hard gate: freshly seeded / no inbound-delta → dataSource "seed".
+// P4 honesty-oracle — hard gate: live requires inbound delta AND graphTokenOk.
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const env = vi.hoisted(() => ({
@@ -23,6 +23,11 @@ const completions = vi.hoisted(() => ({
   stamps: {} as Record<string, Date | null>,
 }));
 
+const graphProbe = vi.hoisted(() => ({
+  ok: false as boolean,
+  throws: false as boolean,
+}));
+
 vi.mock("@/lib/sync", () => ({
   snapshot: vi.fn(async () => ({
     tasks: [{ id: "TASK-1" }, { id: "TASK-2" }, { id: "TASK-3" }],
@@ -45,6 +50,15 @@ vi.mock("@/lib/sync/repo", () => ({
   getRegisterInboundCompletions: vi.fn(async () => ({ ...completions.stamps })),
 }));
 
+vi.mock("@/lib/sync/graph", () => ({
+  probeGraphTokenOk: vi.fn(async () => {
+    if (graphProbe.throws) throw new Error("probe boom");
+    return graphProbe.ok;
+  }),
+  GRAPH_TOKEN_PROBE_TIMEOUT_MS: 8_000,
+  clearSiteContextCache: vi.fn(),
+}));
+
 import { actionSelfCheck } from "@/lib/mcp/actions";
 import {
   resolveDataSource,
@@ -54,6 +68,7 @@ import {
   resolveWebhooksEnabled,
   buildHonestyFields,
 } from "@/lib/mcp/honesty";
+import { probeGraphTokenOk } from "@/lib/sync/graph";
 import type { McpIdentity } from "@/lib/mcp/auth";
 import type { SyncFreshnessResult } from "@/lib/sync/freshness";
 
@@ -101,6 +116,8 @@ function emptyFreshness(): SyncFreshnessResult {
 
 beforeEach(() => {
   completions.stamps = {};
+  graphProbe.ok = false;
+  graphProbe.throws = false;
   vi.stubEnv("PLX_MC_MCP_ENABLED", "0");
   vi.stubEnv("PLX_MC_SYNC_ENABLED", "");
   vi.stubEnv("CRON_SECRET", "");
@@ -118,10 +135,11 @@ describe("honesty helpers", () => {
   });
 
   it("resolveDataSource is seed when no register has inbound completion", () => {
-    expect(resolveDataSource(emptyFreshness())).toBe("seed");
+    expect(resolveDataSource(emptyFreshness(), true)).toBe("seed");
+    expect(resolveDataSource(emptyFreshness(), false)).toBe("seed");
   });
 
-  it("resolveDataSource is live when any required register completed inbound", () => {
+  it("resolveDataSource is seed when inbound exists but graphTokenOk is false", () => {
     const fresh = emptyFreshness();
     fresh.registers[0] = {
       listKey: "projects",
@@ -130,7 +148,19 @@ describe("honesty helpers", () => {
       ok: true,
       reason: "fresh",
     };
-    expect(resolveDataSource(fresh)).toBe("live");
+    expect(resolveDataSource(fresh, false)).toBe("seed");
+  });
+
+  it("resolveDataSource is live only when inbound completed AND graphTokenOk", () => {
+    const fresh = emptyFreshness();
+    fresh.registers[0] = {
+      listKey: "projects",
+      lastCompleteInboundAt: "2026-07-16T17:55:00.000Z",
+      ageMs: 60_000,
+      ok: true,
+      reason: "fresh",
+    };
+    expect(resolveDataSource(fresh, true)).toBe("live");
   });
 
   it("resolveDatabaseBound / lastSweepAgeMs / webhooksEnabled", () => {
@@ -146,20 +176,57 @@ describe("honesty helpers", () => {
   });
 });
 
-describe("actionSelfCheck honesty oracle (P2)", () => {
+describe("probeGraphTokenOk fail-soft", () => {
+  it("returns false when resolveSite throws / times out (never throws)", async () => {
+    const { probeGraphTokenOk: realProbe } = await vi.importActual<typeof import("@/lib/sync/graph")>(
+      "@/lib/sync/graph"
+    );
+    await expect(
+      realProbe({
+        timeoutMs: 50,
+        resolveSite: async () => {
+          throw new Error("missing secret");
+        },
+      })
+    ).resolves.toBe(false);
+
+    await expect(
+      realProbe({
+        timeoutMs: 20,
+        resolveSite: async () =>
+          new Promise(() => {
+            /* hang until timeout */
+          }),
+      })
+    ).resolves.toBe(false);
+  });
+
+  it("returns true when site/list resolution succeeds", async () => {
+    const { probeGraphTokenOk: realProbe } = await vi.importActual<typeof import("@/lib/sync/graph")>(
+      "@/lib/sync/graph"
+    );
+    await expect(
+      realProbe({
+        resolveSite: async () => ({ siteId: "site", listIds: { todos: "1" } }),
+      })
+    ).resolves.toBe(true);
+  });
+});
+
+describe("actionSelfCheck honesty oracle (P4)", () => {
   it("HARD GATE: freshly seeded / no inbound-delta → dataSource seed + honesty fields", async () => {
-    // No sync_register_freshness rows — same as ensureSeeded-only DB.
     completions.stamps = {};
+    graphProbe.ok = false;
 
     const result = await actionSelfCheck(identity);
 
     expect(result.dataSource).toBe("seed");
+    expect(result.graphTokenOk).toBe(false);
     expect(result.ok).toBe(true);
     expect(result.operator).toBe("vince@petrasoap.com");
     expect(result.taskCount).toBe(3);
     expect(result.bucketCount).toBe(1);
 
-    // Honesty fields present (shape contract).
     expect(result).toMatchObject({
       syncMode: "off",
       cronConfigured: false,
@@ -167,6 +234,7 @@ describe("actionSelfCheck honesty oracle (P2)", () => {
       databaseBound: false,
       webhooksEnabled: false,
       mcpEnabled: false,
+      graphTokenOk: false,
       dataSource: "seed",
     });
     expect(typeof result.lastSweepAgeMs === "number" || result.lastSweepAgeMs === null).toBe(true);
@@ -183,19 +251,43 @@ describe("actionSelfCheck honesty oracle (P2)", () => {
       })
     );
     expect(result.freshness.registers.every((r) => r.lastCompleteInboundAt === null)).toBe(true);
-
-    // mcpEnabled must NOT be hardcoded true.
     expect(result.mcpEnabled).toBe(false);
+    expect(probeGraphTokenOk).toHaveBeenCalled();
   });
 
-  it("reports live when a required register has completed inbound delta", async () => {
+  it("stays seed when inbound delta exists but Graph token probe fails", async () => {
     completions.stamps = {
       projects: new Date("2026-07-16T17:55:00.000Z"),
     };
+    graphProbe.ok = false;
 
     const result = await actionSelfCheck(identity);
+    expect(result.graphTokenOk).toBe(false);
+    expect(result.dataSource).toBe("seed");
+  });
+
+  it("reports live when inbound delta completed AND graphTokenOk", async () => {
+    completions.stamps = {
+      projects: new Date("2026-07-16T17:55:00.000Z"),
+    };
+    graphProbe.ok = true;
+
+    const result = await actionSelfCheck(identity);
+    expect(result.graphTokenOk).toBe(true);
     expect(result.dataSource).toBe("live");
     expect(result.freshness.registers.find((r) => r.listKey === "projects")?.lastCompleteInboundAt).toBeTruthy();
+  });
+
+  it("graphTokenOk false and dataSource seed when probe throws (fail-soft)", async () => {
+    completions.stamps = {
+      projects: new Date("2026-07-16T17:55:00.000Z"),
+    };
+    graphProbe.throws = true;
+
+    const result = await actionSelfCheck(identity);
+    expect(result.graphTokenOk).toBe(false);
+    expect(result.dataSource).toBe("seed");
+    expect(result.ok).toBe(true);
   });
 
   it("reflects real env for mcpEnabled / syncMode / cronConfigured / databaseBound", async () => {
@@ -208,6 +300,7 @@ describe("actionSelfCheck honesty oracle (P2)", () => {
       lastSweep: "2026-07-16T17:00:00.000Z",
       now: new Date("2026-07-16T18:00:00.000Z"),
       loadRegisterTimestamps: async () => ({}),
+      probeGraphToken: async () => false,
     });
 
     expect(honesty.mcpEnabled).toBe(true);
@@ -216,6 +309,7 @@ describe("actionSelfCheck honesty oracle (P2)", () => {
     expect(honesty.cronConfigured).toBe(true);
     expect(honesty.databaseBound).toBe(true);
     expect(honesty.lastSweepAgeMs).toBe(3_600_000);
+    expect(honesty.graphTokenOk).toBe(false);
     expect(honesty.dataSource).toBe("seed");
   });
 
@@ -226,13 +320,35 @@ describe("actionSelfCheck honesty oracle (P2)", () => {
 
     const on = await buildHonestyFields({
       loadRegisterTimestamps: async () => ({}),
+      probeGraphToken: async () => false,
     });
     expect(on.webhooksEnabled).toBe(true);
 
     vi.stubEnv("PLX_MC_GRAPH_WEBHOOK_ENABLED", "0");
     const off = await buildHonestyFields({
       loadRegisterTimestamps: async () => ({}),
+      probeGraphToken: async () => false,
     });
     expect(off.webhooksEnabled).toBe(false);
+  });
+
+  it("buildHonestyFields folds injected probe into dataSource live discriminator", async () => {
+    const seed = await buildHonestyFields({
+      loadRegisterTimestamps: async () => ({
+        projects: new Date("2026-07-16T17:55:00.000Z"),
+      }),
+      probeGraphToken: async () => false,
+    });
+    expect(seed.graphTokenOk).toBe(false);
+    expect(seed.dataSource).toBe("seed");
+
+    const live = await buildHonestyFields({
+      loadRegisterTimestamps: async () => ({
+        projects: new Date("2026-07-16T17:55:00.000Z"),
+      }),
+      probeGraphToken: async () => true,
+    });
+    expect(live.graphTokenOk).toBe(true);
+    expect(live.dataSource).toBe("live");
   });
 });
