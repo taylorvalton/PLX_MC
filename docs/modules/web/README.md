@@ -26,6 +26,15 @@ owner, target, and description via `updateProject` → optimistic
 `PATCH /api/projects/{id}` (same contract as `updateBucket` on initiative
 detail).
 
+### Hosting
+
+Production web app deploys on Vercel project **`plx-mission-control`** at
+**`https://mc.plxcustomer.io`** (see root `README.md` and `vercel.json` for
+crons). HTTPS APIs under `/api/*` (including `/api/cursor/*`) ship with that
+deploy. The PLX-MC MCP **stdio** client and the agentic swarm (loopback
+`127.0.0.1:8900`) are **operator-local** and are not part of the Vercel
+deploy — see `AGENTS.md` → Production Hosting and `TOOLS.md`.
+
 ## Why
 
 The product is a fast, opinionated lens over the SharePoint record. The
