@@ -1011,6 +1011,21 @@ export async function runSweep(actor: string = SYNC_ACTOR): Promise<SweepResult>
     );
   }
 
+  // Mirror-is-boring streak: every successful sweep is one cron tick. Fail-soft —
+  // never fail the sweep if the gate table is missing or the eval throws.
+  try {
+    const { recordBoringTickAfterSweep } = await import("./boring-gate");
+    const boring = await recordBoringTickAfterSweep({ graphOk: true });
+    console.log(
+      `[sync] boring-tick ${boring.lastBoringOutcome} streak=${boring.boringTickStreak}/${boring.boringGateN} gateMet=${boring.boringGateMet}`
+    );
+  } catch (err) {
+    console.warn(
+      "[sync] boring-tick eval skipped:",
+      err instanceof Error ? err.message : err
+    );
+  }
+
   return {
     pushed,
     pushErrors,

@@ -66,6 +66,17 @@ Routing mutations fail closed when required registers are stale.
   `artifacts/sync/2026-07-13-prod-site-cutover/` (Vercel Production redeploy
   aliases include `mc.plxcustomer.io`).
 
+### Mirror-is-boring streak (N=7)
+
+- After every successful `runSweep`, the engine evaluates whether self-check
+  would report `dataSource: live` **and** `freshness.ok`, then increments or
+  resets a singleton counter in `sync_boring_gate` (migration `021`).
+- Exposed on `mc_self_check`: `boringTickStreak`, `boringGateN` (default 7),
+  `boringGateMet`, `lastBoringEvalAt`, `lastBoringOutcome` (`green`|`reset`).
+- Conflicts do **not** reset the streak (warning-only until volume exists).
+- New planes (Knowledge Hub UI, OpenFlowKit, P11 live webhooks, …) wait until
+  `boringGateMet` is true — see `AGENTS.md` → "Mirror Is Boring Entry Gate".
+
 ### Authorization
 
 - Session conflict resolve / error retry / manual sweep: Entra `oid` from the

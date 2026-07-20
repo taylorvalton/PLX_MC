@@ -251,6 +251,82 @@ export async function getRegisterInboundCompletions(): Promise<Record<string, Da
   return out;
 }
 
+export type BoringGateOutcome = "green" | "reset";
+
+export interface BoringGateRow {
+  tickStreak: number;
+  requiredN: number;
+  gateMet: boolean;
+  lastEvalAt: string | null;
+  lastOutcome: BoringGateOutcome | null;
+  lastResetReason: string | null;
+  updatedAt: string | null;
+}
+
+type BoringGateDbRow = {
+  tick_streak: number;
+  required_n: number;
+  gate_met: boolean;
+  last_eval_at: Date | null;
+  last_outcome: string | null;
+  last_reset_reason: string | null;
+  updated_at: Date | null;
+};
+
+function toBoringGateRow(r: BoringGateDbRow): BoringGateRow {
+  const outcome =
+    r.last_outcome === "green" || r.last_outcome === "reset" ? r.last_outcome : null;
+  return {
+    tickStreak: r.tick_streak,
+    requiredN: r.required_n,
+    gateMet: r.gate_met,
+    lastEvalAt: r.last_eval_at ? r.last_eval_at.toISOString() : null,
+    lastOutcome: outcome,
+    lastResetReason: r.last_reset_reason,
+    updatedAt: r.updated_at ? r.updated_at.toISOString() : null,
+  };
+}
+
+/** Singleton mirror-is-boring streak row (021). */
+export async function getBoringGateRow(): Promise<BoringGateRow | null> {
+  const rows = await query<BoringGateDbRow>(
+    `SELECT tick_streak, required_n, gate_met, last_eval_at, last_outcome,
+            last_reset_reason, updated_at
+       FROM sync_boring_gate WHERE id = 1`
+  );
+  return rows[0] ? toBoringGateRow(rows[0]) : null;
+}
+
+export async function upsertBoringGateRow(
+  row: Omit<BoringGateRow, "updatedAt">
+): Promise<BoringGateRow> {
+  const rows = await query<BoringGateDbRow>(
+    `INSERT INTO sync_boring_gate (
+       id, tick_streak, required_n, gate_met, last_eval_at, last_outcome,
+       last_reset_reason, updated_at
+     ) VALUES (1, $1, $2, $3, $4, $5, $6, now())
+     ON CONFLICT (id) DO UPDATE SET
+       tick_streak = EXCLUDED.tick_streak,
+       required_n = EXCLUDED.required_n,
+       gate_met = EXCLUDED.gate_met,
+       last_eval_at = EXCLUDED.last_eval_at,
+       last_outcome = EXCLUDED.last_outcome,
+       last_reset_reason = EXCLUDED.last_reset_reason,
+       updated_at = now()
+     RETURNING tick_streak, required_n, gate_met, last_eval_at, last_outcome,
+               last_reset_reason, updated_at`,
+    [
+      row.tickStreak,
+      row.requiredN,
+      row.gateMet,
+      row.lastEvalAt,
+      row.lastOutcome,
+      row.lastResetReason,
+    ]
+  );
+  return toBoringGateRow(rows[0]!);
+}
+
 /**
  * Advance mc_task_id_seq above an adopted TASK-* id without ever moving
  * backward (P4 / 018 contract).

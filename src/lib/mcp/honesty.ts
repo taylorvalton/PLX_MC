@@ -4,6 +4,12 @@
 import { latestCheckoutDoor } from "@/lib/compliance/repo";
 import { cronConfigured, graphWebhookConfigured, graphWebhookEnabled } from "@/lib/secrets";
 import {
+  boringGateFieldsFromRow,
+  loadBoringGateFieldsSafe,
+  type BoringGateFields,
+  type BoringTickOutcome,
+} from "@/lib/sync/boring-gate";
+import {
   ROUTING_REQUIRED_REGISTERS,
   evaluateSyncFreshness,
   type SyncFreshnessResult,
@@ -16,7 +22,7 @@ import { mcpEnabled } from "./auth";
 export type SyncMode = "in-app" | "cron" | "off";
 export type DataSource = "seed" | "live";
 
-export interface HonestyFields {
+export interface HonestyFields extends BoringGateFields {
   syncMode: SyncMode;
   cronConfigured: boolean;
   syncEnabled: boolean;
@@ -30,6 +36,8 @@ export interface HonestyFields {
   /** Most recent checkout door from audit (`mcp` | `compliance`), if any. */
   lastCheckoutDoor: string | null;
 }
+
+export type { BoringTickOutcome };
 
 /** Cadence mode: in-app scheduler wins when enabled; else cron if secret present. */
 export function resolveSyncMode(opts: {
@@ -93,6 +101,7 @@ export async function buildHonestyFields(opts?: {
   loadRegisterTimestamps?: () => Promise<Partial<Record<string, Date | string | null | undefined>>>;
   probeGraphToken?: () => Promise<boolean>;
   loadLastCheckoutDoor?: () => Promise<string | null>;
+  loadBoringGate?: () => Promise<BoringGateFields>;
 }): Promise<HonestyFields> {
   const now = opts?.now ?? new Date();
   const syncOn = syncEnabled();
@@ -117,6 +126,12 @@ export async function buildHonestyFields(opts?: {
     graphTokenOk = false;
   }
 
+  const boring = opts?.loadBoringGate
+    ? await opts.loadBoringGate()
+    : databaseBound
+      ? await loadBoringGateFieldsSafe()
+      : boringGateFieldsFromRow(null);
+
   return {
     syncMode: resolveSyncMode({ syncEnabled: syncOn, cronConfigured: cronOn }),
     cronConfigured: cronOn,
@@ -129,5 +144,6 @@ export async function buildHonestyFields(opts?: {
     graphTokenOk,
     dataSource: resolveDataSource(freshness, graphTokenOk),
     lastCheckoutDoor,
+    ...boring,
   };
 }
