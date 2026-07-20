@@ -48,6 +48,8 @@ vi.mock("@/lib/sync", () => ({
 vi.mock("@/lib/sync/repo", () => ({
   getEntity: vi.fn(async () => null),
   getRegisterInboundCompletions: vi.fn(async () => ({ ...completions.stamps })),
+  getBoringGateRow: vi.fn(async () => null),
+  upsertBoringGateRow: vi.fn(),
 }));
 
 vi.mock("@/lib/sync/graph", () => ({
@@ -237,6 +239,11 @@ describe("actionSelfCheck honesty oracle (P4)", () => {
       graphTokenOk: false,
       dataSource: "seed",
       lastCheckoutDoor: null,
+      boringTickStreak: 0,
+      boringGateN: 7,
+      boringGateMet: false,
+      lastBoringEvalAt: null,
+      lastBoringOutcome: null,
     });
     expect(typeof result.lastSweepAgeMs === "number" || result.lastSweepAgeMs === null).toBe(true);
     expect(result.freshness).toEqual(

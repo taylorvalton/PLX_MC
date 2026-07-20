@@ -19,6 +19,15 @@ export {
   type SyncFreshnessResult,
 } from "./freshness";
 export {
+  BORING_GATE_DEFAULT_N,
+  boringGateFieldsFromRow,
+  loadBoringGateFieldsSafe,
+  nextBoringStreak,
+  recordBoringTickAfterSweep,
+  type BoringGateFields,
+  type BoringTickOutcome,
+} from "./boring-gate";
+export {
   actorIdByEmail,
   classifyLastModifiedBy,
   displayValue,

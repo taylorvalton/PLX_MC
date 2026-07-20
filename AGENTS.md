@@ -112,6 +112,11 @@ all of:
    cron ticks** (default **N=7** ticks, not calendar days — a tick streak
    cannot be reset by an unrelated flake).
 
+Read the streak on `mc_self_check` / `GET /api/cursor/self-check`:
+`boringTickStreak`, `boringGateN`, `boringGateMet`, `lastBoringEvalAt`,
+`lastBoringOutcome`. Each successful cron/manual sweep records one tick
+(`sync_boring_gate`). Gate is earned when `boringGateMet` is true (streak ≥ N).
+
 Conflict SLO is **warning-only until conflict volume exists** — a
 low-volume queue with items legitimately awaiting a human must not deadlock
 this gate. See `SOUL.md` for the non-negotiable summary.
