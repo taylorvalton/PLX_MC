@@ -26,7 +26,8 @@ test.describe("MC-SOP-Guide (governance-sops)", () => {
 
   test("index lists the seed catalog; active SOPs are ready", async ({ page }) => {
     const rows = page.locator("[data-testid='gs-row']");
-    await expect(rows).toHaveCount(8);
+    // Fleet SOPs (8) + PLX-Brain pointer SOPs (3).
+    await expect(rows).toHaveCount(11);
 
     const collab = page.locator("[data-testid='gs-row'][data-slug='mc-sop-collaborator']");
     await expect(collab).toBeVisible();
@@ -55,6 +56,11 @@ test.describe("MC-SOP-Guide (governance-sops)", () => {
     await expect(fleetSecrets).toHaveAttribute("data-state", "ready");
     await expect(fleetSecrets).toContainText("Fleet secrets");
     await expect(fleetSecrets).toContainText("Active");
+
+    const brainAsk = page.locator("[data-testid='gs-row'][data-slug='mc-sop-plx-brain-ask']");
+    await expect(brainAsk).toBeVisible();
+    await expect(brainAsk).toHaveAttribute("data-state", "ready");
+    await expect(brainAsk).toContainText("Ask the Brain");
 
     await page.screenshot({ path: `${EVID}/index.png`, fullPage: true });
   });
