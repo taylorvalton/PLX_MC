@@ -65,6 +65,7 @@ function parseLastSweepInstant(lastSweep: string): number | null {
   const display = LAST_SWEEP_DISPLAY_RE.exec(trimmed);
   if (display) {
     const [, y, mo, d, h, mi] = display;
+    const year = Number(y);
     const month = Number(mo);
     const day = Number(d);
     const hour = Number(h);
@@ -72,7 +73,18 @@ function parseLastSweepInstant(lastSweep: string): number | null {
     if (month < 1 || month > 12 || day < 1 || day > 31 || hour > 23 || minute > 59) {
       return null;
     }
-    return Date.UTC(Number(y), month - 1, day, hour, minute);
+    const timestamp = Date.UTC(year, month - 1, day, hour, minute);
+    const date = new Date(timestamp);
+    if (
+      date.getUTCFullYear() !== year ||
+      date.getUTCMonth() !== month - 1 ||
+      date.getUTCDate() !== day ||
+      date.getUTCHours() !== hour ||
+      date.getUTCMinutes() !== minute
+    ) {
+      return null;
+    }
+    return timestamp;
   }
 
   if (!trimmed.includes("T") || !trimmed.includes("-")) return null;
