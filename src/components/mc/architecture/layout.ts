@@ -60,20 +60,6 @@ export function nodeRendered(
   return true;
 }
 
-export function effectiveNodeId(
-  nodeId: string,
-  nodes: ArchNode[],
-  groups: ArchGroup[],
-  overrides: Record<string, boolean>
-): string | null {
-  const node = nodes.find((n) => n.id === nodeId);
-  if (!node) return null;
-  const group = groups.find((g) => g.id === node.group);
-  if (group && groupCollapsed(group, overrides)) return summaryId(group.id);
-  if (group && groupCollapsed(group, overrides)) return null;
-  return node.id;
-}
-
 export function effectiveEndpoint(
   id: string,
   view: ArchView,

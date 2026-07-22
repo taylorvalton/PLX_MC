@@ -258,6 +258,24 @@ def test_exit_1_when_source_file_missing(tmp_path: Path) -> None:
     assert "referenced source file missing: AGENTS.md" in result.stderr
 
 
+def test_exit_1_when_source_path_escapes_repo(tmp_path: Path) -> None:
+    repo = tmp_path / "mc"
+    repo.mkdir()
+    _write_clean_pack(repo)
+    (tmp_path / "outside.md").write_text("# outside\n", encoding="utf-8")
+    source_map = _minimal_source()
+    source_map["views"]["context"]["nodes"][0]["claims"][0]["sources"][0]["path"] = (
+        "../outside.md"
+    )
+    (repo / "docs" / "architecture" / "source-map.json").write_text(
+        json.dumps(source_map) + "\n",
+        encoding="utf-8",
+    )
+    result = _run_gate(repo)
+    assert result.returncode == 1
+    assert "source path escapes repository root" in result.stderr
+
+
 def test_exit_1_when_source_line_range_invalid(tmp_path: Path) -> None:
     repo = tmp_path / "mc"
     repo.mkdir()

@@ -122,7 +122,14 @@ def _validate_source_reference(
                     f"{at}: end_line ({end_line}) is before start_line ({start_line})"
                 )
 
-    source_path = repo_root / path
+    repo_root_resolved = repo_root.resolve()
+    source_path = (repo_root / path).resolve()
+    try:
+        source_path.relative_to(repo_root_resolved)
+    except ValueError:
+        violations.append(f"{at}: source path escapes repository root: {path}")
+        return violations
+
     if not source_path.is_file():
         violations.append(f"{at}: referenced source file missing: {path}")
 
