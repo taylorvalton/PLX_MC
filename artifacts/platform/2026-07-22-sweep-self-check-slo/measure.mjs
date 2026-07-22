@@ -2,9 +2,9 @@
 /**
  * Sequential production latency sampler for TASK-498 (measurement-only).
  *
- * - Concurrency 1; exits on first non-2xx (auth denial is a hard stop).
+ * - Concurrency 1; exits on first failed observation (auth denial is a hard stop).
  * - Never logs auth material, request/response bodies, or env values.
- * - Writes sanitized samples: timestamp, status, durationMs only.
+ * - Writes sanitized samples: timestamp, observer status, durationMs only.
  *
  * Sweep duration:
  *   1) direct GET /api/cron/sweep when bearer auth succeeds, else
@@ -172,7 +172,7 @@ async function sampleSweepViaVercelCompletion(apiKey, operatorEmail) {
       return { status: snap.status || 500, durationMs: Date.now() - triggerStart };
     }
     if (inboundWatermark(snap.data) > before) {
-      return { status: 200, durationMs: Date.now() - triggerStart };
+      return { status: snap.status, durationMs: Date.now() - triggerStart };
     }
   }
 
@@ -259,7 +259,7 @@ async function main() {
 
   const meta = {
     baseUrl: BASE_URL,
-    method: "sequential, concurrency 1, exit on first non-2xx",
+    method: "sequential, concurrency 1, exit on first failed observation",
     sweepTransport: sweepTransport.mode,
     sweepDurationDefinition:
       sweepTransport.mode === "direct-bearer"
@@ -306,9 +306,17 @@ async function main() {
   const selfCheckSummary = summarizeLatencies(selfCheckSamples.map((s) => s.durationMs));
 
   writeJson("meta.json", meta);
-  writeJson("sweep-samples.json", { endpoint: "/api/cron/sweep", samples: sweepSamples });
+  writeJson("sweep-samples.json", {
+    signal: "sweep-completion",
+    statusMeaning:
+      sweepTransport.mode === "direct-bearer"
+        ? "HTTP response status from direct GET /api/cron/sweep"
+        : "HTTP response status from the self-check observation that first showed inbound freshness advance; not the sweep route response",
+    samples: sweepSamples,
+  });
   writeJson("self-check-samples.json", {
     endpoint: "/api/cursor/self-check",
+    statusMeaning: "HTTP response status from direct GET /api/cursor/self-check",
     samples: selfCheckSamples,
   });
   writeJson("summary.json", {

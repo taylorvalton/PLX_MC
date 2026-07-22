@@ -1,5 +1,6 @@
 {
-  "endpoint": "/api/cron/sweep",
+  "signal": "sweep-completion",
+  "statusMeaning": "HTTP response status from the self-check observation that first showed inbound freshness advance; not the sweep route response",
   "samples": [
     {
       "timestamp": "2026-07-22T13:58:35.401Z",

@@ -1,4 +1,5 @@
 {
+  "captureContext": "pre-TASK-497 deployment; syncEnabled is the retired in-app scheduler label",
   "ok": true,
   "operator": "cos@petrasoap.com",
   "dataSource": "live",

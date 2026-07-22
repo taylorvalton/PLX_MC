@@ -79,6 +79,17 @@ function main() {
       meta.sweepTransport === "vercel-trigger-self-check-completion",
     "meta sweepTransport must be documented"
   );
+  if (meta.sweepTransport === "vercel-trigger-self-check-completion") {
+    assert(
+      sweep.statusMeaning ===
+        "HTTP response status from the self-check observation that first showed inbound freshness advance; not the sweep route response",
+      "proxy sweep status must not be represented as the sweep route HTTP status"
+    );
+  }
+  assert(
+    selfCheck.statusMeaning === "HTTP response status from direct GET /api/cursor/self-check",
+    "self-check status meaning"
+  );
 
   assert(sweep.samples.length === 12, "sweep sample count");
   assert(selfCheck.samples.length === 30, "self-check sample count");

@@ -1,6 +1,6 @@
 {
   "baseUrl": "https://mc.plxcustomer.io",
-  "method": "sequential, concurrency 1, exit on first non-2xx",
+  "method": "sequential, concurrency 1, exit on first failed observation",
   "sweepTransport": "vercel-trigger-self-check-completion",
   "sweepDurationDefinition": "vercel crons run trigger through self-check inbound freshness advance",
   "windowMs": 3300000,

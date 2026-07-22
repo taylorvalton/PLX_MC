@@ -190,6 +190,8 @@ describe("honesty helpers", () => {
     expect(resolveLastSweepAgeMs("2026.07.20", now)).toBeNull();
     expect(resolveLastSweepAgeMs("2026.07.20 · 99:99", now)).toBeNull();
     expect(resolveLastSweepAgeMs("2026.02.31 · 12:00", now)).toBeNull();
+    expect(resolveLastSweepAgeMs("2026-02-31T12:00:00.000Z", now)).toBeNull();
+    expect(resolveLastSweepAgeMs("2026-03-03T12:00:00", now)).toBeNull();
   });
 });
 

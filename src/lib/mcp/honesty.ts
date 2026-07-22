@@ -57,6 +57,8 @@ export function resolveDatabaseBound(
 
 /** UTC display stamp from sync repo.stamp(): YYYY.MM.DD · HH:mm */
 const LAST_SWEEP_DISPLAY_RE = /^(\d{4})\.(\d{2})\.(\d{2}) · (\d{2}):(\d{2})$/;
+const LAST_SWEEP_ISO_RE =
+  /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(?:\.(\d{3}))?Z$/;
 
 function parseLastSweepInstant(lastSweep: string): number | null {
   const trimmed = lastSweep.trim();
@@ -87,10 +89,41 @@ function parseLastSweepInstant(lastSweep: string): number | null {
     return timestamp;
   }
 
-  if (!trimmed.includes("T") || !trimmed.includes("-")) return null;
-  const iso = new Date(trimmed).getTime();
-  if (Number.isNaN(iso)) return null;
-  return iso;
+  const iso = LAST_SWEEP_ISO_RE.exec(trimmed);
+  if (!iso) return null;
+  const [, y, mo, d, h, mi, s, ms = "000"] = iso;
+  const year = Number(y);
+  const month = Number(mo);
+  const day = Number(d);
+  const hour = Number(h);
+  const minute = Number(mi);
+  const second = Number(s);
+  const millisecond = Number(ms);
+  if (
+    month < 1 ||
+    month > 12 ||
+    day < 1 ||
+    day > 31 ||
+    hour > 23 ||
+    minute > 59 ||
+    second > 59
+  ) {
+    return null;
+  }
+  const timestamp = Date.UTC(year, month - 1, day, hour, minute, second, millisecond);
+  const date = new Date(timestamp);
+  if (
+    date.getUTCFullYear() !== year ||
+    date.getUTCMonth() !== month - 1 ||
+    date.getUTCDate() !== day ||
+    date.getUTCHours() !== hour ||
+    date.getUTCMinutes() !== minute ||
+    date.getUTCSeconds() !== second ||
+    date.getUTCMilliseconds() !== millisecond
+  ) {
+    return null;
+  }
+  return timestamp;
 }
 
 export function resolveLastSweepAgeMs(

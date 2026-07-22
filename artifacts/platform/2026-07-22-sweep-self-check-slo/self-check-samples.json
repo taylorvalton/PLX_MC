@@ -1,5 +1,6 @@
 {
   "endpoint": "/api/cursor/self-check",
+  "statusMeaning": "HTTP response status from direct GET /api/cursor/self-check",
   "samples": [
     {
       "timestamp": "2026-07-22T13:58:35.506Z",

@@ -1,5 +1,6 @@
 {
   "capturedAt": "2026-07-22T13:31:00Z",
+  "updatedAt": "2026-07-22T17:54:00Z",
   "mcBase": "https://mc.plxcustomer.io",
   "sharepointSite": {
     "displayName": "PLX Mission Control",
@@ -14,10 +15,13 @@
   "tasks": {
     "TASK-495": {
       "mcStage": "merged",
-      "mcSyncState": "pending",
+      "mcSyncState": "synced",
       "spItemId": "275",
       "spStatusAfterPatch": "Merged",
-      "conflictResolution": "keep_mc_merged",
+      "selectedWinner": "keep_mc_merged",
+      "canonicalConflictResolved": true,
+      "operatorVerifiedAt": "2026-07-22T17:54:00Z",
+      "verification": "authenticated reload showed lifecycle Merged with no conflict card",
       "prsMerged": [150, 151]
     },
     "TASK-328": {
