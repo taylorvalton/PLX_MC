@@ -60,10 +60,15 @@ function main() {
   const sweep = loadJson("sweep-samples.json");
   const selfCheck = loadJson("self-check-samples.json");
   const summary = loadJson("summary.json");
+  const measureSource = readFileSync(join(__dirname, "measure.mjs"), "utf8");
 
   for (const file of ["meta.json", "sweep-samples.json", "self-check-samples.json", "summary.json"]) {
     assertNoSecretPatterns(readFileSync(join(__dirname, file), "utf8"), file);
   }
+  assert(
+    !/["']--token["']/.test(measureSource),
+    "measure.mjs must inherit VERCEL_TOKEN; do not put --token on the command line"
+  );
 
   assert(meta.sweep.count === 12, "meta sweep count must be 12");
   assert(meta.selfCheck.count === 30, "meta selfCheck count must be 30");

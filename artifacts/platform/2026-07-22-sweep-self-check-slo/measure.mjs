@@ -109,15 +109,13 @@ function inboundWatermark(data) {
   return max;
 }
 
-async function triggerSweepCron(vercelToken) {
+async function triggerSweepCron() {
   const args = [
     "crons",
     "run",
     "/api/cron/sweep",
     "--scope",
     VERCEL_SCOPE,
-    "--token",
-    vercelToken,
   ];
   const cmd = `vercel ${args.map((part) => (/\s/.test(part) ? `"${part}"` : part)).join(" ")}`;
   const { stdout, stderr } = await execAsync(cmd, {
@@ -149,7 +147,7 @@ async function sampleSweepDirect(cronSecret) {
   return { status: result.status, durationMs: result.durationMs };
 }
 
-async function sampleSweepViaVercelCompletion(vercelToken, apiKey, operatorEmail) {
+async function sampleSweepViaVercelCompletion(apiKey, operatorEmail) {
   const baseline = await fetchSelfCheck(apiKey, operatorEmail);
   if (baseline.status < 200 || baseline.status >= 300) {
     return { status: baseline.status || 500, durationMs: baseline.durationMs };
@@ -158,7 +156,7 @@ async function sampleSweepViaVercelCompletion(vercelToken, apiKey, operatorEmail
 
   const triggerStart = Date.now();
   try {
-    await triggerSweepCron(vercelToken);
+    await triggerSweepCron();
   } catch {
     return {
       status: 500,
@@ -181,7 +179,7 @@ async function sampleSweepViaVercelCompletion(vercelToken, apiKey, operatorEmail
   return { status: 504, durationMs: Date.now() - triggerStart };
 }
 
-async function resolveSweepTransport(cronSecret, vercelToken, apiKey, operatorEmail) {
+async function resolveSweepTransport(cronSecret, apiKey, operatorEmail) {
   if (cronSecret && (await probeSweepBearer(cronSecret))) {
     return {
       mode: "direct-bearer",
@@ -192,7 +190,7 @@ async function resolveSweepTransport(cronSecret, vercelToken, apiKey, operatorEm
   console.log(
     "measure: direct sweep bearer unavailable; using vercel trigger + self-check completion"
   );
-  const probe = await sampleSweepViaVercelCompletion(vercelToken, apiKey, operatorEmail);
+  const probe = await sampleSweepViaVercelCompletion(apiKey, operatorEmail);
   if (probe.status < 200 || probe.status >= 300) {
     console.error(`measure: hard stop — sweep probe failed status=${probe.status}`);
     process.exit(1);
@@ -200,7 +198,7 @@ async function resolveSweepTransport(cronSecret, vercelToken, apiKey, operatorEm
 
   return {
     mode: "vercel-trigger-self-check-completion",
-    sample: () => sampleSweepViaVercelCompletion(vercelToken, apiKey, operatorEmail),
+    sample: () => sampleSweepViaVercelCompletion(apiKey, operatorEmail),
   };
 }
 
@@ -251,15 +249,10 @@ function writeJson(name, payload) {
 async function main() {
   const apiKey = requireEnv("MC_MCP_API_KEY");
   const operatorEmail = requireEnv("MC_OPERATOR_EMAIL");
-  const vercelToken = requireEnv("VERCEL_TOKEN");
+  requireEnv("VERCEL_TOKEN");
   const cronSecret = (process.env.CRON_SECRET ?? "").trim();
 
-  const sweepTransport = await resolveSweepTransport(
-    cronSecret,
-    vercelToken,
-    apiKey,
-    operatorEmail
-  );
+  const sweepTransport = await resolveSweepTransport(cronSecret, apiKey, operatorEmail);
 
   const schedule = buildSchedule();
   const windowEndMs = Math.max((SWEEP_COUNT - 1) * SWEEP_INTERVAL_MS, WINDOW_MS);

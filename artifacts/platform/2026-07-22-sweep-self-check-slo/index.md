@@ -1,7 +1,7 @@
 # Sweep + self-check SLO baseline (TASK-498)
 
-**Date:** 2026-07-22  
-**MC-Checkout:** `dsp_mrw4askd1tb0lz` (TASK-498)  
+**Date:** 2026-07-22
+**MC-Checkout:** `dsp_mrw4askd1tb0lz` (TASK-498)
 **Scope:** measurement-only production baseline before P11 — no runtime instrumentation
 
 ## Files

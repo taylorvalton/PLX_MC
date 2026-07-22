@@ -1,8 +1,8 @@
 # Sweep + self-check SLO baseline (TASK-498)
 
-**Date:** 2026-07-22  
-**MC-Checkout:** `dsp_mrw4askd1tb0lz` (TASK-498)  
-**Production host:** `https://mc.plxcustomer.io`  
+**Date:** 2026-07-22
+**MC-Checkout:** `dsp_mrw4askd1tb0lz` (TASK-498)
+**Production host:** `https://mc.plxcustomer.io`
 **Scope:** measurement-only baseline before P11 — no runtime instrumentation, cadence change, or provider integration
 
 ## Verdict
@@ -25,7 +25,7 @@ Production latency baseline captured in a single sequential window. All samples 
 
 ### Sweep measurement transport
 
-Workstation direct `Authorization: Bearer $CRON_SECRET` returned **401** against live production (Vercel env pull + local runtime file both stale vs deployed runtime). Scheduled platform cron remains healthy (`mc_self_check` fresh, `boringGateMet=true`).
+Workstation direct `Authorization: Bearer $CRON_SECRET` returned **401** against live production. The cause was not established; possible explanations include a local secret mismatch or edge authorization behavior. Scheduled platform cron remains healthy (`mc_self_check` fresh, `boringGateMet=true`).
 
 Sweep samples therefore use **authorized** `vercel crons run /api/cron/sweep` plus **self-check inbound freshness advance** as completion proxy (`meta.sweepTransport=vercel-trigger-self-check-completion`). This measures end-to-end sweep completion observable at the oracle, not CLI trigger acknowledgement alone.
 

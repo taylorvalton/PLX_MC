@@ -1,7 +1,7 @@
 # P3 orchestrator notes — sweep/self-check SLO baseline
 
-**Phase:** P3 (`proj/elegant-architecture-closeout/phase-3-slo-baseline`)  
-**Task:** TASK-498 (`dsp_mrw48lgrlubyiy`)  
+**Phase:** P3 (`proj/elegant-architecture-closeout/phase-3-slo-baseline`)
+**Task:** TASK-498 (`dsp_mrw48lgrlubyiy`)
 **Checkout stamp:** `MC-Checkout: dsp_mrw4askd1tb0lz`
 
 ## What shipped
@@ -26,3 +26,10 @@
 ## Parent integration
 
 - Do **not** mark TASK-498 complete here; parent merges via `/apply-worktree` after integration review.
+
+## Parent acceptance corrections
+
+- Removed Markdown trailing whitespace reported by `git diff --check`.
+- Removed the Vercel `--token` CLI argument; the child process inherits the required `VERCEL_TOKEN` environment variable.
+- Added `_verify.mjs` enforcement against reintroducing a quoted `--token` argument in `measure.mjs`.
+- Bounded the reported 401 explanation to observed evidence; root cause remains unestablished.

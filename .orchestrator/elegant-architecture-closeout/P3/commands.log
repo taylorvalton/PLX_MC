@@ -41,3 +41,18 @@ python scripts/check-repo-hygiene.py
 - Sweep (n=12): p50=4467ms p95=5163ms
 - Self-check (n=30): p50=206ms p95=629ms
 - Transport: vercel-trigger-self-check-completion (direct bearer 401 from workstation)
+
+## Parent acceptance corrections
+
+```powershell
+git diff --check
+# exit 0; no output
+
+node artifacts/platform/2026-07-22-sweep-self-check-slo/_verify.mjs
+# verify: PASS counts window sanitization percentile recompute
+
+python scripts/check-repo-hygiene.py
+# repo hygiene clean
+```
+
+- No production samples or external mutations were run during correction.
