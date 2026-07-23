@@ -327,6 +327,40 @@ export async function listDelta(
   }
 }
 
+// ─── Project Documents drive delta (TASK-628) ────────────────────────────────
+
+// Resolve the drive backing the Project Documents library. Null when the
+// documents list is not provisioned — callers skip with an honest audit.
+export async function documentsDriveId(ctx: SiteContext): Promise<string | null> {
+  const listId = ctx.listIds["documents"];
+  if (!listId) return null;
+  const drive = await graphFetch<{ id?: string }>(
+    `/sites/${ctx.siteId}/lists/${listId}/drive?$select=id`
+  );
+  return drive?.id ?? null;
+}
+
+// Walk a drive root delta to completion (SHAREPOINT_INTEGRATION.md §6 —
+// document library inbound uses /drives/{drive-id}/root/delta).
+export async function driveDelta(
+  driveId: string,
+  storedDeltaLink: string | null
+): Promise<{ items: Record<string, unknown>[]; deltaLink: string }> {
+  let url = storedDeltaLink ?? `/drives/${driveId}/root/delta`;
+  const items: Record<string, unknown>[] = [];
+  for (;;) {
+    const page = await graphFetch<{
+      value: Record<string, unknown>[];
+      "@odata.nextLink"?: string;
+      "@odata.deltaLink"?: string;
+    }>(url);
+    items.push(...page.value);
+    if (page["@odata.deltaLink"]) return { items, deltaLink: page["@odata.deltaLink"] };
+    if (!page["@odata.nextLink"]) throw new Error("drive delta walk ended without a deltaLink");
+    url = page["@odata.nextLink"];
+  }
+}
+
 // ─── Change-notification subscriptions (P11) ─────────────────────────────────
 // Graph subscription max lifetime for list resources is typically ~3 days.
 // Create/renew/delete call Graph; phase acceptance must inject/mocks — never

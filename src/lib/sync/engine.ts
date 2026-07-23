@@ -7,13 +7,16 @@
 // Scope of this increment: ToDos + Risk Register lists, including the ToDos
 // person columns (Assigned To ↔, Accountable Owner →, Reporter →) resolved to
 // site-user lookup ids, the Initiative lookup on ToDos (two-way via Roadmap
-// item ids), and Roadmap Gantt inbound (name/health/started/target). Documents
-// (driveItem content) remain deferred (see docs/modules/sync/README.md).
+// item ids), and Roadmap Gantt inbound (name/health/started/target). Documents:
+// inbound-only Project Documents drive mirror behind PLX_MC_DOCUMENTS_SYNC_ENABLED
+// (TASK-628; see docs/modules/sync/README.md).
 
 import { ACTORS, BUCKETS, FILES, HUMANS, PROJECTS, REPOS, RISKS, SP_CONFLICTS, SP_ERRORS, TASKS } from "@/lib/mc-data/data";
 import type { Bucket, SyncState, Task } from "@/lib/mc-data/types";
 import {
   createListItem,
+  documentsDriveId,
+  driveDelta,
   findItemByField,
   GraphError,
   listDelta,
@@ -55,6 +58,8 @@ import {
   type SyncConflictSubject,
   type TaskPersonMc,
 } from "./mapping";
+import { documentsSyncEnabled } from "@/lib/secrets";
+import { fileEntryFromDriveItem, type DriveItem } from "./documents";
 import { evaluateSyncFreshness, type SyncFreshnessResult } from "./freshness";
 import {
   clearPushRetry,
@@ -816,6 +821,66 @@ async function pullList(ctx: SiteContext, listKey: string, type: EntityType): Pr
   return result;
 }
 
+// ─── Project Documents inbound (TASK-628) ────────────────────────────────────
+
+const DOCUMENTS_DELTA_KEY = "documents";
+
+// Inbound-only mirror of the Project Documents drive. SharePoint is
+// authoritative for files; MC never pushes them. Deletions are audited and
+// skipped (engine never deletes — TOOLS.md guardrail).
+async function pullDocuments(ctx: SiteContext): Promise<InboundResult> {
+  const result: InboundResult = { pulled: 0, conflicts: 0, skipped: 0, adopted: 0 };
+  const driveId = await documentsDriveId(ctx);
+  if (!driveId) {
+    await repo.appendAudit(
+      SYNC_ACTOR,
+      "Project Documents library not provisioned — documents mirror skipped.",
+      "pending"
+    );
+    return result;
+  }
+  const stored = await repo.getDeltaLink(DOCUMENTS_DELTA_KEY);
+  const { items, deltaLink } = await driveDelta(driveId, stored);
+  for (const raw of items) {
+    const item = raw as unknown as DriveItem & { root?: object };
+    if (!item?.id || item.root) continue; // malformed page rows / the drive root
+    if (item.deleted) {
+      await repo.appendAudit(
+        SYNC_ACTOR,
+        `Document removed in SharePoint — ${item.name ?? item.id}; mirror row retained (engine never deletes).`,
+        "pending"
+      );
+      result.skipped += 1;
+      continue;
+    }
+    const entry = fileEntryFromDriveItem(item);
+    if (!entry) {
+      result.skipped += 1;
+      continue;
+    }
+    const existing = await repo.getEntity("file", entry.id);
+    if (existing) {
+      await repo.updateEntity("file", entry.id, {
+        patch: entry as unknown as EntityData,
+        syncState: "synced",
+      });
+    } else {
+      await repo.insertEntity("file", entry.id, entry as unknown as EntityData, "synced", []);
+    }
+    result.pulled += 1;
+  }
+  if (result.pulled > 0) {
+    await repo.appendAudit(
+      SYNC_ACTOR,
+      `Inbound documents pulled — ${result.pulled} Project Documents item${result.pulled === 1 ? "" : "s"} mirrored.`,
+      "synced"
+    );
+  }
+  await repo.saveDeltaLink(DOCUMENTS_DELTA_KEY, deltaLink);
+  await repo.markRegisterInboundComplete(DOCUMENTS_DELTA_KEY);
+  return result;
+}
+
 async function pullRoadmap(ctx: SiteContext): Promise<InboundResult> {
   const result: InboundResult = { pulled: 0, conflicts: 0, skipped: 0, adopted: 0 };
   if (!ctx.listIds[ROADMAP_KEY]) return result;
@@ -1079,6 +1144,24 @@ export interface SweepResult {
   lastSweep: string;
 }
 
+/**
+ * Targeted inbound pull for ONE notified register (TASK-627) — the scoped
+ * delta the notification queue drains, so a SharePoint edit reaches the UI in
+ * seconds instead of waiting for the 5-minute sweep. Returns null for an
+ * unknown list key; the caller falls back to a full sweep (recovery path).
+ */
+export async function runScopedListDelta(listKey: string): Promise<InboundResult | null> {
+  await ensureSeeded();
+  await ensureReposSeeded();
+  const ctx = await siteContext();
+  if (listKey === PROJECTS_KEY) return pullProjects(ctx);
+  if (listKey === ROADMAP_KEY) return pullRoadmap(ctx);
+  if (listKey === "todos") return pullList(ctx, "todos", "task");
+  if (listKey === "risks") return pullList(ctx, "risks", "risk");
+  if (listKey === DOCUMENTS_DELTA_KEY && documentsSyncEnabled()) return pullDocuments(ctx);
+  return null;
+}
+
 export async function runSweep(actor: string = SYNC_ACTOR): Promise<SweepResult> {
   await ensureSeeded();
   await ensureReposSeeded();
@@ -1112,6 +1195,24 @@ export async function runSweep(actor: string = SYNC_ACTOR): Promise<SweepResult>
     conflicts += r.conflicts;
     skippedInbound += r.skipped;
     adoptedInbound += r.adopted;
+  }
+  if (documentsSyncEnabled()) {
+    // Optional register: a documents failure must never break the core sweep.
+    try {
+      const r = await pullDocuments(ctx);
+      pulled += r.pulled;
+      skippedInbound += r.skipped;
+    } catch (err) {
+      if (err instanceof GraphError) {
+        await repo.appendAudit(
+          SYNC_ACTOR,
+          `Documents mirror failed — SharePoint ${err.status}; core sweep unaffected.`,
+          "error"
+        );
+      } else {
+        throw err;
+      }
+    }
   }
 
   // Outbound: Projects + Roadmap before tasks so InitiativeLookupId can resolve

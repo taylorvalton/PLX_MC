@@ -44,6 +44,26 @@ Routing mutations fail closed when required registers are stale.
   pending edits on routing fields (audited). Human-vs-human and unknown /
   ambiguous conflicts stay in the manual review queue.
 
+### Live freshness (Phase 3 — TASK-626/627/628)
+
+- **Subscriptions (TASK-626)**: `/api/cron/sync-subscriptions` now ensures +
+  renews change-notification subscriptions for todos/risks/projects/roadmap
+  (`ensureAllListSubscriptions`). Live Graph create/renew is double-gated:
+  `PLX_MC_GRAPH_SUBSCRIPTIONS_LIVE=1` AND `boringGateMet` (checked at runtime);
+  otherwise rows stay `sub_local_*` placeholders. Going live replaces
+  placeholders with real Graph subscriptions idempotently.
+- **Targeted delta (TASK-627)**: the notification queue's default runner is
+  `runScopedListDelta(listKey)` — one register's inbound pull, not a full
+  sweep — and the webhook drains the queue post-ack via `after()`
+  (`PLX_MC_GRAPH_NOTIFICATION_INLINE_DRAIN`, default on when the webhook is
+  enabled; =0 falls back to the hourly cron drain). Edit-to-UI target <60s;
+  the 5-minute sweep remains the correctness recovery path.
+- **Project Documents increment (TASK-628)**: inbound-only mirror of the
+  Project Documents drive (`/drives/{id}/root/delta`) into `file` entities,
+  behind `PLX_MC_DOCUMENTS_SYNC_ENABLED` (default off). Deletions are audited
+  and skipped — the mirror never deletes; a documents failure never breaks
+  the core sweep.
+
 ### Reliability (Phase 2 — TASK-622/623/624)
 
 - **Outbound push retry queue** (`outbound_push_retries`, migration 024): a
