@@ -57,6 +57,7 @@ const MCP_AGENT_CAPABILITIES: readonly Capability[] = [
   "routing.propose",
   "routing.resolve",
   "approval.request",
+  "telemetry.report",
 ];
 
 const SERVICE_GRANTS: Record<string, readonly Capability[]> = {

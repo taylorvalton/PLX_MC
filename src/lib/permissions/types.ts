@@ -30,6 +30,7 @@ export const CAPABILITIES = [
   "sync.service.write",
   "approval.request",
   "approval.decide",
+  "telemetry.report",
 ] as const;
 
 export type Capability = (typeof CAPABILITIES)[number];
