@@ -56,6 +56,14 @@ import {
   type TaskPersonMc,
 } from "./mapping";
 import { evaluateSyncFreshness, type SyncFreshnessResult } from "./freshness";
+import {
+  clearPushRetry,
+  getDeferredPushSet,
+  isTransientGraphFailure,
+  pushRetryKey,
+  recordTransientPushFailure,
+  type PushEntityKind,
+} from "./push-queue";
 import * as repo from "./repo";
 import { SYNC_INBOUND_SERVICE_PRINCIPAL_ID, type PermissionActor } from "@/lib/permissions";
 import {
@@ -213,7 +221,7 @@ export async function ensureProjectsSeeded(): Promise<void> {
 
 // ─── Outbound (push) ─────────────────────────────────────────────────────────
 
-const PUSHABLE: EntityType[] = ["task", "risk"];
+const PUSHABLE = ["task", "risk"] as const satisfies readonly EntityType[];
 
 // Audit any human assigned to a person column that could not be mirrored
 // (not in the dev-site User Information List) — once per push, never silently.
@@ -230,8 +238,28 @@ async function auditUnresolvedPersons(row: repo.EntityRow, resolved: ResolvedPer
   }
 }
 
-async function pushEntity(ctx: SiteContext, row: repo.EntityRow): Promise<"synced" | "error"> {
+// Park an entity in the error register — terminal outcome for 4xx rejections
+// and for transient failures that exhausted their retry budget (TASK-622).
+async function parkEntityPushError(row: repo.EntityRow, err: GraphError, reason: string): Promise<void> {
+  const field = row.dirty_fields[0] ?? "—";
+  await repo.insertPushError({
+    id: `er-${row.id.toLowerCase()}-${Date.now()}`,
+    entityType: row.entity_type,
+    entityId: row.id,
+    field: displayFieldFor(row.entity_type, field) ?? field,
+    value: displayValue(row.data[field]),
+    reason: `${reason}: ${err.body.slice(0, 160)}`,
+  });
+  await repo.updateEntity(row.entity_type, row.id, {
+    syncState: "error",
+    syncExtras: { reason },
+  });
+  await repo.appendAudit(SYNC_ACTOR, `Push failed for ${row.id} — queued in the error register.`, "error");
+}
+
+async function pushEntity(ctx: SiteContext, row: repo.EntityRow): Promise<"synced" | "error" | "deferred"> {
   const listKey = row.entity_type === "task" ? "todos" : "risks";
+  const retryKind: PushEntityKind = row.entity_type === "task" ? "task" : "risk";
   // Resolve person columns up front (tasks only); failures degrade to skip+audit
   // and never throw, so they cannot block the rest of the push.
   const resolved =
@@ -262,6 +290,7 @@ async function pushEntity(ctx: SiteContext, row: repo.EntityRow): Promise<"synce
       const only = row.dirty_fields.length > 0 ? row.dirty_fields : undefined;
       await patchListItemFields(ctx, listKey, row.sp_item_id, outboundFields(row.entity_type, row.data, withLookups({ only })));
       await repo.updateEntity(row.entity_type, row.id, { syncState: "synced", dirtyFields: [] });
+      await clearPushRetry(retryKind, row.id);
       await auditUnresolvedPersons(row, resolved);
       return "synced";
     }
@@ -283,47 +312,95 @@ async function pushEntity(ctx: SiteContext, row: repo.EntityRow): Promise<"synce
       dirtyFields: [],
       syncExtras: { sp: `${listKey === "todos" ? "ToDos" : "Risk Register"} · item ${itemId}` },
     });
+    await clearPushRetry(retryKind, row.id);
     await auditUnresolvedPersons(row, resolved);
     return "synced";
   } catch (err) {
-    if (err instanceof GraphError && err.status < 500) {
-      const field = row.dirty_fields[0] ?? "—";
-      await repo.insertPushError({
-        id: `er-${row.id.toLowerCase()}-${Date.now()}`,
-        entityType: row.entity_type,
-        entityId: row.id,
-        field: displayFieldFor(row.entity_type, field) ?? field,
-        value: displayValue(row.data[field]),
-        reason: `SharePoint rejected the write: ${err.body.slice(0, 160)}`,
-      });
-      await repo.updateEntity(row.entity_type, row.id, {
-        syncState: "error",
-        syncExtras: { reason: "SharePoint rejected the outbound write" },
-      });
-      await repo.appendAudit(SYNC_ACTOR, `Push failed for ${row.id} — queued in the error register.`, "error");
+    if (err instanceof GraphError && err.status < 500 && err.status !== 429) {
+      await parkEntityPushError(row, err, "SharePoint rejected the outbound write");
+      await clearPushRetry(retryKind, row.id);
       return "error";
+    }
+    if (isTransientGraphFailure(err)) {
+      // 429/5xx: defer this entity with backoff — never abort the sweep for
+      // the other entities (TASK-622). Terminal after the retry budget.
+      const record = await recordTransientPushFailure(retryKind, row.id, err);
+      if (record.terminal) {
+        await parkEntityPushError(row, err, `SharePoint unavailable after ${record.attempts} attempts`);
+        return "error";
+      }
+      if (record.attempts === 1) {
+        await repo.appendAudit(
+          SYNC_ACTOR,
+          `Push deferred for ${row.id} — SharePoint ${err.status}; retrying with backoff.`,
+          "pending"
+        );
+      }
+      return "deferred";
     }
     throw err;
   }
+}
+
+interface RegisterPushResult {
+  pushed: number;
+  deferred: number;
+}
+
+// Shared transient-failure handling for the register mirrors (TASK-622):
+// defer with backoff, park as an error once the retry budget is exhausted.
+async function deferRegisterPush(
+  kind: PushEntityKind,
+  id: string,
+  err: GraphError,
+  markError: () => Promise<void>,
+  label: string
+): Promise<"deferred" | "terminal"> {
+  const record = await recordTransientPushFailure(kind, id, err);
+  if (record.terminal) {
+    await markError();
+    await repo.appendAudit(
+      SYNC_ACTOR,
+      `${label} push failed for ${id} after ${record.attempts} attempts — ${err.body.slice(0, 120)}`,
+      "error"
+    );
+    return "terminal";
+  }
+  if (record.attempts === 1) {
+    await repo.appendAudit(
+      SYNC_ACTOR,
+      `${label} push deferred for ${id} — SharePoint ${err.status}; retrying with backoff.`,
+      "pending"
+    );
+  }
+  return "deferred";
 }
 
 // Push-only mirror of the repo registry to the "Repo Registry" list (Item 2).
 // Mission Control is authoritative for the allow-list, so the list is never read
 // back. Skips with an honest audit when the list isn't provisioned — a missing
 // optional list never blocks the core task/risk sweep.
-async function pushRepoRegistry(ctx: SiteContext): Promise<number> {
+async function pushRepoRegistry(
+  ctx: SiteContext,
+  deferredSet: ReadonlySet<string>
+): Promise<RegisterPushResult> {
   const pending = (await repo.getRepos()).filter((r) => r.syncState === "pending");
-  if (pending.length === 0) return 0;
+  if (pending.length === 0) return { pushed: 0, deferred: 0 };
   if (!ctx.listIds[REPO_REGISTRY_KEY]) {
     await repo.appendAudit(
       SYNC_ACTOR,
       "Repo Registry list not provisioned — registry mirror skipped (run scripts/provision-sharepoint.py).",
       "pending"
     );
-    return 0;
+    return { pushed: 0, deferred: 0 };
   }
   let pushed = 0;
+  let deferred = 0;
   for (const r of pending) {
+    if (deferredSet.has(pushRetryKey("repo", r.id))) {
+      deferred += 1;
+      continue;
+    }
     try {
       if (r.spItemId) {
         await patchListItemFields(ctx, REPO_REGISTRY_KEY, r.spItemId, repoOutboundFields(r));
@@ -336,35 +413,54 @@ async function pushRepoRegistry(ctx: SiteContext): Promise<number> {
         if (existing) await patchListItemFields(ctx, REPO_REGISTRY_KEY, itemId, repoOutboundFields(r));
         await repo.setRepoSync(r.id, "synced", itemId);
       }
+      await clearPushRetry("repo", r.id);
       pushed += 1;
     } catch (err) {
-      if (err instanceof GraphError && err.status < 500) {
+      if (err instanceof GraphError && err.status < 500 && err.status !== 429) {
         await repo.setRepoSync(r.id, "error");
         await repo.appendAudit(SYNC_ACTOR, `Repo Registry push failed for ${r.id} — ${err.body.slice(0, 120)}`, "error");
+        await clearPushRetry("repo", r.id);
+      } else if (isTransientGraphFailure(err)) {
+        const outcome = await deferRegisterPush(
+          "repo",
+          r.id,
+          err,
+          () => repo.setRepoSync(r.id, "error"),
+          "Repo Registry"
+        );
+        if (outcome === "deferred") deferred += 1;
       } else {
         throw err;
       }
     }
   }
-  return pushed;
+  return { pushed, deferred };
 }
 
 // Push-only mirror of projects to the "Projects" list (P2). Mission Control is
 // authoritative; the list is never read back. Projects must land before buckets
 // so Roadmap can resolve the Project lookup column.
-async function pushProjectsMirror(ctx: SiteContext): Promise<number> {
+async function pushProjectsMirror(
+  ctx: SiteContext,
+  deferredSet: ReadonlySet<string>
+): Promise<RegisterPushResult> {
   const pending = (await repo.getProjectRows()).filter((r) => r.syncState === "pending");
-  if (pending.length === 0) return 0;
+  if (pending.length === 0) return { pushed: 0, deferred: 0 };
   if (!ctx.listIds[PROJECTS_KEY]) {
     await repo.appendAudit(
       SYNC_ACTOR,
       "Projects list not provisioned — projects mirror skipped (run scripts/provision-sharepoint.py).",
       "pending"
     );
-    return 0;
+    return { pushed: 0, deferred: 0 };
   }
   let pushed = 0;
+  let deferred = 0;
   for (const { project, spItemId } of pending) {
+    if (deferredSet.has(pushRetryKey("project", project.id))) {
+      deferred += 1;
+      continue;
+    }
     try {
       if (spItemId) {
         await patchListItemFields(ctx, PROJECTS_KEY, spItemId, projectOutboundFields(project));
@@ -377,31 +473,45 @@ async function pushProjectsMirror(ctx: SiteContext): Promise<number> {
         if (existing) await patchListItemFields(ctx, PROJECTS_KEY, itemId, projectOutboundFields(project));
         await repo.setProjectSync(project.id, "synced", { spItemId: itemId, spRef: "Projects" });
       }
+      await clearPushRetry("project", project.id);
       pushed += 1;
     } catch (err) {
-      if (err instanceof GraphError && err.status < 500) {
+      if (err instanceof GraphError && err.status < 500 && err.status !== 429) {
         await repo.setProjectSync(project.id, "error");
         await repo.appendAudit(SYNC_ACTOR, `Projects push failed for ${project.id} — ${err.body.slice(0, 120)}`, "error");
+        await clearPushRetry("project", project.id);
+      } else if (isTransientGraphFailure(err)) {
+        const outcome = await deferRegisterPush(
+          "project",
+          project.id,
+          err,
+          () => repo.setProjectSync(project.id, "error"),
+          "Projects"
+        );
+        if (outcome === "deferred") deferred += 1;
       } else {
         throw err;
       }
     }
   }
-  return pushed;
+  return { pushed, deferred };
 }
 
 // Push-only mirror of buckets/initiatives to the "Roadmap" list (EN-005). MC is
 // authoritative; inbound Gantt edits land in a later increment.
-async function pushBucketRoadmap(ctx: SiteContext): Promise<number> {
+async function pushBucketRoadmap(
+  ctx: SiteContext,
+  deferredSet: ReadonlySet<string>
+): Promise<RegisterPushResult> {
   const pending = (await repo.getBucketRows()).filter((r) => r.syncState === "pending");
-  if (pending.length === 0) return 0;
+  if (pending.length === 0) return { pushed: 0, deferred: 0 };
   if (!ctx.listIds[ROADMAP_KEY]) {
     await repo.appendAudit(
       SYNC_ACTOR,
       "Roadmap list not provisioned — initiatives mirror skipped (run scripts/provision-sharepoint.py).",
       "pending"
     );
-    return 0;
+    return { pushed: 0, deferred: 0 };
   }
   const projectSpIds = new Map(
     (await repo.getProjectRows())
@@ -409,7 +519,12 @@ async function pushBucketRoadmap(ctx: SiteContext): Promise<number> {
       .map((r) => [r.project.id, Number(r.spItemId)])
   );
   let pushed = 0;
+  let deferred = 0;
   for (const { bucket, spItemId } of pending) {
+    if (deferredSet.has(pushRetryKey("bucket", bucket.id))) {
+      deferred += 1;
+      continue;
+    }
     try {
       const ownerEmail = ACTORS[bucket.owner]?.kind === "human" ? HUMANS[bucket.owner]?.email : undefined;
       const ownerLookupId = ownerEmail ? await resolveSiteUserLookupId(ctx, ownerEmail) : null;
@@ -426,17 +541,28 @@ async function pushBucketRoadmap(ctx: SiteContext): Promise<number> {
         if (existing) await patchListItemFields(ctx, ROADMAP_KEY, itemId, fields);
         await repo.setBucketSync(bucket.id, "synced", { spItemId: itemId, spRef: "Roadmap" });
       }
+      await clearPushRetry("bucket", bucket.id);
       pushed += 1;
     } catch (err) {
-      if (err instanceof GraphError && err.status < 500) {
+      if (err instanceof GraphError && err.status < 500 && err.status !== 429) {
         await repo.setBucketSync(bucket.id, "error");
         await repo.appendAudit(SYNC_ACTOR, `Roadmap push failed for ${bucket.id} — ${err.body.slice(0, 120)}`, "error");
+        await clearPushRetry("bucket", bucket.id);
+      } else if (isTransientGraphFailure(err)) {
+        const outcome = await deferRegisterPush(
+          "bucket",
+          bucket.id,
+          err,
+          () => repo.setBucketSync(bucket.id, "error"),
+          "Roadmap"
+        );
+        if (outcome === "deferred") deferred += 1;
       } else {
         throw err;
       }
     }
   }
-  return pushed;
+  return { pushed, deferred };
 }
 
 // ─── Inbound (delta pull) ────────────────────────────────────────────────────
@@ -943,6 +1069,8 @@ async function pullProjects(ctx: SiteContext): Promise<InboundResult> {
 export interface SweepResult {
   pushed: number;
   pushErrors: number;
+  /** Entities deferred to a later tick by the transient-failure backoff queue. */
+  pushDeferred: number;
   pulled: number;
   conflicts: number;
   skippedInbound: number;
@@ -991,14 +1119,25 @@ export async function runSweep(actor: string = SYNC_ACTOR): Promise<SweepResult>
   // held back until a human resolves them.
   let pushed = 0;
   let pushErrors = 0;
-  pushed += await pushRepoRegistry(ctx);
-  pushed += await pushProjectsMirror(ctx);
-  pushed += await pushBucketRoadmap(ctx);
+  let pushDeferred = 0;
+  // Entities still inside their transient-failure backoff window are skipped
+  // this tick instead of hammering a throttled/unavailable Graph (TASK-622).
+  const deferredSet = await getDeferredPushSet();
+  for (const register of [pushRepoRegistry, pushProjectsMirror, pushBucketRoadmap]) {
+    const r = await register(ctx, deferredSet);
+    pushed += r.pushed;
+    pushDeferred += r.deferred;
+  }
   for (const type of PUSHABLE) {
     const rows = await repo.getEntities(type);
     for (const row of rows.filter((r) => r.sync_state === "pending")) {
+      if (deferredSet.has(pushRetryKey(type, row.id))) {
+        pushDeferred += 1;
+        continue;
+      }
       const outcome = await pushEntity(ctx, row);
       if (outcome === "synced") pushed += 1;
+      else if (outcome === "deferred") pushDeferred += 1;
       else pushErrors += 1;
     }
   }
@@ -1011,7 +1150,7 @@ export async function runSweep(actor: string = SYNC_ACTOR): Promise<SweepResult>
         adoptedInbound ? `, ${adoptedInbound} adopted` : ""
       }${conflicts ? `, ${conflicts} conflict${conflicts === 1 ? "" : "s"} raised` : ""}${
         pushErrors ? `, ${pushErrors} push error${pushErrors === 1 ? "" : "s"}` : ""
-      }.`,
+      }${pushDeferred ? `, ${pushDeferred} deferred for retry` : ""}.`,
       pushErrors > 0 ? "error" : conflicts > 0 ? "conflict" : "synced"
     );
   }
@@ -1020,7 +1159,9 @@ export async function runSweep(actor: string = SYNC_ACTOR): Promise<SweepResult>
   // never fail the sweep if the gate table is missing or the eval throws.
   try {
     const { recordBoringTickAfterSweep } = await import("./boring-gate");
-    const boring = await recordBoringTickAfterSweep({ graphOk: true });
+    // A tick with transient Graph failures is not "boring" — the streak resets
+    // (before TASK-622 such a tick aborted and never recorded at all).
+    const boring = await recordBoringTickAfterSweep({ graphOk: pushDeferred === 0 });
     console.log(
       `[sync] boring-tick ${boring.lastBoringOutcome} streak=${boring.boringTickStreak}/${boring.boringGateN} gateMet=${boring.boringGateMet}`
     );
@@ -1034,6 +1175,7 @@ export async function runSweep(actor: string = SYNC_ACTOR): Promise<SweepResult>
   return {
     pushed,
     pushErrors,
+    pushDeferred,
     pulled,
     conflicts,
     skippedInbound,

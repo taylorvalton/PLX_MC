@@ -44,6 +44,28 @@ Routing mutations fail closed when required registers are stale.
   pending edits on routing fields (audited). Human-vs-human and unknown /
   ambiguous conflicts stay in the manual review queue.
 
+### Reliability (Phase 2 — TASK-622/623/624)
+
+- **Outbound push retry queue** (`outbound_push_retries`, migration 024): a
+  transient Graph failure (429/5xx) on one entity defers that entity with
+  exponential backoff (5 min base, ×2 per attempt, 6 h cap, `Retry-After`
+  honored) instead of aborting the sweep. Terminal after 8 attempts → parked
+  in the error register like a 4xx. Ledger failures are fail-open (legacy
+  retry-every-tick behavior). A tick with deferrals is not "boring"
+  (`graphOk=false` resets the streak).
+- **DB TLS verification is ON** (`src/lib/db/tls.ts` + `scripts/lib/db-ssl.mjs`):
+  verify against the vendored AWS RDS CA bundle
+  (`config/certs/aws-rds-global-bundle.pem`); override via
+  `PLX_MC_DB_CA_CERT` / `PLX_MC_DB_CA_CERT_PATH`; break-glass
+  `PLX_MC_DB_TLS_INSECURE=1` (loud).
+- **Missed-tick watchdog** (`src/lib/sync/health.ts`): the reconcile cron
+  (independent schedule) alerts when no register completed inbound within
+  15 min — one deduped `sync.missed_tick` event per hour-long episode plus an
+  optional `PLX_MC_ALERT_WEBHOOK_URL` POST. Fail-open by contract.
+- **Cadence redundancy**: `.github/workflows/sweep-redundancy.yml` triggers
+  the sweep every 15 min from GitHub Actions (secret `PLX_MC_CRON_SECRET`) so
+  Vercel Cron is no longer a single point of failure.
+
 ### Kill switch / fallback
 
 - `PLX_MC_SYNC_ENABLED=1` enables the in-app 5-minute scheduler (default OFF).

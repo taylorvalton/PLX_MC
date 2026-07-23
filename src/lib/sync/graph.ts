@@ -17,10 +17,21 @@ export class GraphError extends Error {
   constructor(
     public status: number,
     public body: string,
-    url: string
+    url: string,
+    /** Parsed Retry-After header (ms) on 429/503 throttling responses. */
+    public retryAfterMs?: number
   ) {
     super(`graph ${status} on ${url}: ${body.slice(0, 300)}`);
   }
+}
+
+function retryAfterMsFrom(resp: Response): number | undefined {
+  const header = resp.headers.get("retry-after");
+  if (!header) return undefined;
+  const seconds = Number(header);
+  if (Number.isFinite(seconds) && seconds >= 0) return seconds * 1000;
+  const at = Date.parse(header);
+  return Number.isNaN(at) ? undefined : Math.max(0, at - Date.now());
 }
 
 let cachedToken: { token: string; expiresAt: number } | null = null;
@@ -61,7 +72,9 @@ export async function graphFetch<T>(url: string, init?: RequestInit): Promise<T>
       ...init?.headers,
     },
   });
-  if (!resp.ok) throw new GraphError(resp.status, await resp.text(), absolute);
+  if (!resp.ok) {
+    throw new GraphError(resp.status, await resp.text(), absolute, retryAfterMsFrom(resp));
+  }
   if (resp.status === 204) return undefined as T;
   return (await resp.json()) as T;
 }

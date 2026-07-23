@@ -46,6 +46,17 @@ export interface EventRow {
 
 // Keyset pagination on the monotonic `seq` — the clean export cursor. Optional
 // `kind` filter for a typed consumer (e.g. only gate.* or pr.* events).
+/** Timestamp of the newest event of a kind — used for alert deduping. */
+export async function latestEventAt(kind: string): Promise<string | null> {
+  const rows = await query<{ ts: Date | string }>(
+    `SELECT ts FROM mc_events WHERE kind = $1 ORDER BY seq DESC LIMIT 1`,
+    [kind]
+  );
+  const ts = rows[0]?.ts;
+  if (!ts) return null;
+  return ts instanceof Date ? ts.toISOString() : ts;
+}
+
 export async function eventTaskIdByDedupKey(dedupKey: string): Promise<string | null> {
   const rows = await query<{ task_id: string | null }>(
     `SELECT task_id FROM mc_events WHERE dedup_key = $1 LIMIT 1`,
