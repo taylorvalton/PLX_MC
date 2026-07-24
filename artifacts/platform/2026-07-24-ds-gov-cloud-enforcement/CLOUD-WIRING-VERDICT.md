@@ -7,38 +7,37 @@
 
 ## Verdict
 
-**REPO DELIVERABLES: PASS** · **CONSOLE CUTOVER: BLOCKED (no write API)**
-
-Attempted to execute the three operator moves from this Cloud Agent. Team Rules
-and Team MCP registration are **dashboard-only**; Admin API cannot mutate them;
-Cloud Agents API rejects the team Admin key (needs user/service-account key).
+**REPO DELIVERABLES: PASS** · **TEAM RULES: PASS** · **TEAM MCP VISIBLE TO THIS RUN: FAIL** · **FRESH-AGENT VERIFY: PENDING**
 
 | Check | Result | Evidence |
 |---|---|---|
 | SPEC approved | PASS | SPEC frontmatter `status: approved` |
 | Fleet always-apply paste source | PASS | `config/cloud-agent-fleet-always-apply.md` |
-| Cloud wiring runbook | PASS | `docs/runbooks/cloud-agent-fleet-wiring.md` |
-| REST `mc_self_check` with hydrated key | PASS | 2026-07-24 — `ok: true`, `mcpEnabled: true` |
-| REST checkout mint | PASS | TASK-681/682 `dsp_*` |
-| This session MCP catalog includes PLX-MC | FAIL | Only `cursor-cloud` |
-| Team always-apply includes fleet slice | FAIL | No `team_rule` audit events |
-| Team MCP Hub/Portal registered historically | LIKELY YES | Audit: create 2026-07-20 20:34Z, no later delete |
-| Team MCP visible to this Cloud run | FAIL | Not in MCP tool catalog |
-| Portal `--p-*` not in fleet slice | PASS | By design in paste source |
-| Swarm dispatch default-OFF | PASS | Documented |
+| Team Rules created (dashboard) | PASS | Audit `team_rule` 2026-07-24T12:19–12:21Z — rules 18212–18215, active+required |
+| REST `mc_self_check` / checkout | PASS | This run via hydrated key |
+| This session MCP catalog includes PLX-MC | FAIL | Only `cursor-cloud` (re-checked after rules paste) |
+| Team MCP Hub/Portal registered historically | LIKELY YES | Audit create 2026-07-20 20:34Z, no later delete |
+| Fresh Cloud Agent verify | PENDING | Needs Hub/Portal enabled for Cloud + new `bc-…` |
 
-Details: `CONSOLE-CUTOVER-BLOCKED.md`
+### Team Rules audit (Vince)
 
-## Operator cutover checklist
+| rule_id | name | action | time (UTC) |
+|---|---|---|---|
+| 18212 | Rule 1 — Mission Control checkout & evidence | create→update | 12:19 / 12:20 |
+| 18213 | Rule 2 — Thin fleet governance pillars | create | 12:21:10 |
+| 18214 | Rule 3 — Openable file paths (Cloud-safe) | create | 12:21:22 |
+| 18215 | Rule 4 — PLX-MC MCP expected in Cloud | create | 12:21:30 |
 
-- [ ] Paste rules from `config/cloud-agent-fleet-always-apply.md` into Team Rules
-- [ ] Confirm/re-enable Team MCP HTTP `PLX-MC-Hub` + `PLX-MC-Portal` for Cloud + this environment
-- [ ] Fresh Cloud Agent verify (`mc_self_check` / `mc_checkout_task` via MCP tools)
+## Remaining checklist
+
+- [x] Paste fleet Team Rules
+- [ ] Confirm/re-enable Team MCP HTTP `PLX-MC-Hub` + `PLX-MC-Portal` for Cloud + this environment ([Integrations](https://cursor.com/dashboard/integrations))
+- [ ] Fresh Cloud Agent: MCP catalog shows Hub/Portal; `mc_self_check` / `mc_checkout_task` via MCP tools
 - [ ] Spot-check `local-inference` has no portal token blast radius
-- [ ] Update this verdict to **CONSOLE CUTOVER: PASS** with new `bc-…` URL
+- [ ] Flip this verdict to full **CONSOLE CUTOVER: PASS** with new `bc-…` URL
 
 ## Kill switches
 
 - Disable Team MCP server entries
 - Vercel / server `PLX_MC_MCP_ENABLED=0`
-- Remove Team Rules paste
+- Remove/deactivate Team Rules 18212–18215
