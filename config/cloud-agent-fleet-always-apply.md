@@ -78,19 +78,27 @@ Optional: add a GitHub blob URL after the file is pushed.
 # Cross-Repo PLX-MC MCP Expectation
 Version: cursor-cloud-team-rules.v1
 
-Cloud Agents working petralabx governed repos should use Team MCP Streamable HTTP
-servers `PLX-MC-Hub` and/or `PLX-MC-Portal` (see
-`docs/runbooks/plx-mc-mcp-team-registration.md` and
+Cloud Agents working petralabx governed repos should prefer Team MCP Streamable
+HTTP servers `PLX-MC-Hub` / `PLX-MC-Portal` when present in the tool catalog
+(see `docs/runbooks/plx-mc-mcp-team-registration.md` and
 `docs/runbooks/cloud-agent-fleet-wiring.md`).
 
 - Prefer `mc_checkout_task` / `mc_report_progress` / `mc_complete_task` over inventing stamps.
 - Confirm `meta.actor.repo` matches the repo being edited before checkout.
-- Swarm dispatch stays default-OFF (`SWARM_DISPATCH_ENABLED=0`) unless explicitly enabled for the session.
+- Swarm dispatch stays default-OFF (`SWARM_DISPATCH_ENABLED=0`) unless explicitly enabled.
 - Kill switch: disable the Team MCP server or set server-side `PLX_MC_MCP_ENABLED=0`.
 
-If PLX-MC MCP tools are missing from the session catalog, record the gap, use
-`scripts/compliance-checkout.mjs` / REST `/api/cursor/*` with hydrated key when
-available, and do not invent `MC-Checkout` lines.
+If PLX-MC MCP tools are missing from the session catalog (known Cursor Cloud
+attach bug even when Integrations lists Hub/Portal):
+
+1. Record the gap.
+2. Use REST `https://mc.plxcustomer.io/api/cursor/*` with
+   `PLX_MC_MCP_API_KEY` hydrated from AWS Secrets Manager `prod/ec2-secrets`,
+   or `scripts/compliance-checkout.mjs`.
+3. Never invent `MC-Checkout` lines.
+
+Optional: launch agents with inline `mcpServers` via a Cursor **service account**
+API key — `docs/runbooks/cursor-cloud-service-account-api-key.md`.
 ```
 
 ---
