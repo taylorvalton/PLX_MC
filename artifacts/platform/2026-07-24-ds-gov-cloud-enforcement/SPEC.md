@@ -1,14 +1,14 @@
 ---
 project: ds-gov-cloud-enforcement
 created: 2026-07-24T11:52:30Z
-status: draft
-approved_by:
-approved_at:
+status: approved
+approved_by: Vince
+approved_at: 2026-07-24T12:01:00Z
 model_plan:
-  planner:
-  builder:
-  mechanical:
-  critic:
+  planner: frontier-orchestrator
+  builder: frontier-orchestrator
+  mechanical: local-coder
+  critic: frontier-orchestrator
 budget:
   max_parallel_phases: 2
   max_attempts_per_phase: 3
@@ -38,7 +38,7 @@ Make PLX design-system and governance contracts actually bind Cursor Cloud Agent
 - [ ] PLX_MC records adoption via `plx-brand.json` pin + sync/parity preflight (existing BrandBoundary / no-raw-hex gates remain)
 - [ ] Opt-out repos (e.g. `local-inference`) keep recorded non-adoption; no portal-token blast radius
 - [ ] P3 adopt/decline automation stays blocked until Vince locks semver + auto-adopt policy
-- [ ] This SPEC is human-approved before execute phases start
+- [x] This SPEC is human-approved before execute phases start (Vince, 2026-07-24)
 
 ## Scope
 

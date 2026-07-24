@@ -2,8 +2,9 @@
 
 | File | Description |
 |---|---|
-| `REPORT.md` | Kickoff report: problem, decision, MC tasks, next steps |
-| `SPEC.md` | Program SPEC draft (working copy also at gitignored `.orchestrator/ds-gov-cloud-enforcement/SPEC.md`) |
+| `REPORT.md` | Kickoff report |
+| `SPEC.md` | Program SPEC (**approved** Vince 2026-07-24) |
+| `CLOUD-WIRING-VERDICT.md` | P1 / TASK-682 verdict |
 
 ## MC references
 
