@@ -27,3 +27,4 @@ python3 scripts/check-mc-brand-application.py
 ## Next
 
 TASK-685 (adopt/decline automation) remains **held** until Vince writes `P4-UNBLOCKED.md`.
+
