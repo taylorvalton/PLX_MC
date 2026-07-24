@@ -1,0 +1,35 @@
+---
+description: Share markdown and file paths as session-openable links
+alwaysApply: true
+---
+
+# Openable File Paths In Chat
+
+Whenever you share a file (especially `.md`) or a filesystem path with the user,
+make it openable from this Cursor session. Do not leave bare unlinked path text
+as the only reference.
+
+## Required format
+
+1. Use a **markdown link** whose target is a path Cursor can resolve in this
+   workspace.
+2. Prefer an **absolute workspace path** as the link target
+   (e.g. `/agent/repos/PLX_MC/docs/FOO.md`).
+3. Link text may be the basename or a short label
+   (e.g. `[SPEC.md](/agent/repos/PLX_MC/.orchestrator/.../SPEC.md)`).
+4. If you mention several files, **each** gets its own openable link.
+5. Code citations for regions still use the `startLine:endLine:filepath`
+   citation format; this rule covers narrative path sharing, not citation
+   blocks.
+
+## Examples
+
+Good:
+
+- Draft SPEC: [SPEC.md](/agent/repos/PLX_MC/artifacts/platform/2026-07-24-ds-gov-cloud-enforcement/SPEC.md)
+- Kickoff report: [REPORT.md](/agent/repos/PLX_MC/artifacts/platform/2026-07-24-ds-gov-cloud-enforcement/REPORT.md)
+
+Bad:
+
+- SPEC is at `artifacts/platform/.../SPEC.md` (no openable link)
+- See the SPEC in the orchestrator folder (no path)
