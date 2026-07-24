@@ -28,3 +28,4 @@ python3 scripts/check-mc-brand-application.py
 
 TASK-685 (adopt/decline automation) remains **held** until Vince writes `P4-UNBLOCKED.md`.
 
+ci retrigger 2026-07-24T13:18:23Z
