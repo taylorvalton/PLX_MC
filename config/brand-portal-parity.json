@@ -2,7 +2,7 @@
   "schemaVersion": "plx-brand-parity/v1",
   "portalRepo": "plx-customer-portal",
   "portalCommit": "243506d7a",
-  "syncedAt": "2026-07-24T13:00:58Z",
+  "syncedAt": "2026-07-24T13:10:16Z",
   "owner": "Vince",
   "rationale": "ADR-003 upstream authority; MC must not fork shared brand artifacts.",
   "files": [
@@ -21,6 +21,10 @@
     {
       "path": "src/components/brand/BrandBoundary.tsx",
       "sha256": "bc08d1976b96ff0bca86d6cc58429ebbf265fb96968eb4d617fc63eae4d3c67a"
+    },
+    {
+      "path": "src/components/brand/BrandStatusBadge.tsx",
+      "sha256": "fd2679e7e9cd70dc01f13e86940ff707f6df2a87ca077a63ff58d965c80dabb6"
     },
     {
       "path": "src/components/brand/Kicker.tsx",
