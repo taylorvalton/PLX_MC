@@ -7,38 +7,38 @@
 
 ## Verdict
 
-**REPO DELIVERABLES: PASS** · **CONSOLE CUTOVER: PENDING OPERATOR**
+**REPO DELIVERABLES: PASS** · **CONSOLE CUTOVER: BLOCKED (no write API)**
 
-In-repo wiring artifacts are landed. Live Cloud always-apply + Team MCP attachment
-still require Vince to paste/enable settings in the Cursor dashboard (agents cannot
-mutate Team Rules / Team MCP from this runtime).
+Attempted to execute the three operator moves from this Cloud Agent. Team Rules
+and Team MCP registration are **dashboard-only**; Admin API cannot mutate them;
+Cloud Agents API rejects the team Admin key (needs user/service-account key).
 
 | Check | Result | Evidence |
 |---|---|---|
 | SPEC approved | PASS | SPEC frontmatter `status: approved` |
 | Fleet always-apply paste source | PASS | `config/cloud-agent-fleet-always-apply.md` |
 | Cloud wiring runbook | PASS | `docs/runbooks/cloud-agent-fleet-wiring.md` |
-| REST `mc_self_check` with hydrated key | PASS | 2026-07-24T11:51Z — `ok: true`, `mcpEnabled: true` |
-| REST checkout mint | PASS | TASK-681 → `dsp_mryvrl8gj222kz` |
-| This session MCP catalog includes PLX-MC | FAIL (expected pre-cutover) | Only `cursor-cloud` MCP server present |
-| Team always-apply includes fleet slice | FAIL (expected pre-cutover) | Session always-apply = thin ops rules only |
-| Portal `--p-*` not in fleet slice | PASS (by design) | Explicit “out of fleet” table in paste source |
-| Swarm dispatch default-OFF | PASS | Documented; committed mcp.json stays `SWARM_DISPATCH_ENABLED=0` |
+| REST `mc_self_check` with hydrated key | PASS | 2026-07-24 — `ok: true`, `mcpEnabled: true` |
+| REST checkout mint | PASS | TASK-681/682 `dsp_*` |
+| This session MCP catalog includes PLX-MC | FAIL | Only `cursor-cloud` |
+| Team always-apply includes fleet slice | FAIL | No `team_rule` audit events |
+| Team MCP Hub/Portal registered historically | LIKELY YES | Audit: create 2026-07-20 20:34Z, no later delete |
+| Team MCP visible to this Cloud run | FAIL | Not in MCP tool catalog |
+| Portal `--p-*` not in fleet slice | PASS | By design in paste source |
+| Swarm dispatch default-OFF | PASS | Documented |
 
-## Operator cutover checklist (blocks full SUCCESS criteria)
+Details: `CONSOLE-CUTOVER-BLOCKED.md`
 
-- [ ] Paste rules from `config/cloud-agent-fleet-always-apply.md` into Cursor Team Rules (always-apply)
-- [ ] Register Team MCP HTTP `PLX-MC-Hub` (+ `PLX-MC-Portal`) per `docs/runbooks/cloud-agent-fleet-wiring.md`
-- [ ] Start a **fresh** Cloud Agent and confirm always-apply + `mc_self_check` / `mc_checkout_task` via MCP tools
-- [ ] Spot-check `local-inference` session: no portal token blast radius
-- [ ] Update this verdict to **CONSOLE CUTOVER: PASS** with the new `bc-…` URL
+## Operator cutover checklist
+
+- [ ] Paste rules from `config/cloud-agent-fleet-always-apply.md` into Team Rules
+- [ ] Confirm/re-enable Team MCP HTTP `PLX-MC-Hub` + `PLX-MC-Portal` for Cloud + this environment
+- [ ] Fresh Cloud Agent verify (`mc_self_check` / `mc_checkout_task` via MCP tools)
+- [ ] Spot-check `local-inference` has no portal token blast radius
+- [ ] Update this verdict to **CONSOLE CUTOVER: PASS** with new `bc-…` URL
 
 ## Kill switches
 
 - Disable Team MCP server entries
 - Vercel / server `PLX_MC_MCP_ENABLED=0`
 - Remove Team Rules paste
-
-## Next program phase
-
-After console cutover (or in parallel if Vince prefers): portal project-orchestrator for **TASK-683** (ADR-005 authority package).
