@@ -13,3 +13,4 @@ Consumer ledger for the portal authority package (`petralabx/plx-customer-portal
   `--p-z-*`, `--p-field-label-w`, `--p-text-body-compact`); `--p-*-text` status
   colors now alias `var(--p-ok|--p-warn|--p-info)`; Mazius cuts aligned to package
 - decision: **ADOPTED** — TASK-684 / ADR-005 consumer pin
+- note: portal `BrandStatusBadge` not mirrored yet — depends on shadcn `Badge` / `@/lib/utils` paths MC lacks; pin covers tokens/fonts

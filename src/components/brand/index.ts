@@ -7,12 +7,6 @@ export type {
 export { BrandBoundary } from "./BrandBoundary";
 export type { BrandBoundaryProps } from "./BrandBoundary";
 
-export { BrandStatusBadge } from "./BrandStatusBadge";
-export type {
-  BrandStatusBadgeProps,
-  BrandStatusTone,
-} from "./BrandStatusBadge";
-
 export { Kicker } from "./Kicker";
 export type { KickerProps } from "./Kicker";
 

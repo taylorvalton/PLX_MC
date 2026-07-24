@@ -64,7 +64,7 @@ fi
 copy_file "$PORTAL_APP/src/styles/brand-tokens.css" "$MC/src/styles/brand-tokens.css"
 
 # ── Brand React primitives ──
-for f in BrandBoundary.tsx BrandStatusBadge.tsx Kicker.tsx MonoData.tsx PMark.tsx AuthStatusBanner.tsx index.ts README.md; do
+for f in BrandBoundary.tsx Kicker.tsx MonoData.tsx PMark.tsx AuthStatusBanner.tsx index.ts README.md; do
   if [[ -f "$PORTAL_APP/src/components/brand/$f" ]]; then
     copy_file "$PORTAL_APP/src/components/brand/$f" "$MC/src/components/brand/$f"
   fi
@@ -131,7 +131,6 @@ paths: list[str] = [
     "docs/design-system/tokens.ts",
     "src/styles/brand-tokens.css",
     "src/components/brand/BrandBoundary.tsx",
-    "src/components/brand/BrandStatusBadge.tsx",
     "src/components/brand/Kicker.tsx",
     "src/components/brand/MonoData.tsx",
     "src/components/brand/PMark.tsx",

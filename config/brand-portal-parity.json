@@ -2,9 +2,11 @@
   "schemaVersion": "plx-brand-parity/v1",
   "portalRepo": "plx-customer-portal",
   "portalCommit": "243506d7a",
-  "syncedAt": "2026-07-24T13:10:16Z",
+  "syncedAt": "2026-07-24T13:13:15Z",
   "owner": "Vince",
   "rationale": "ADR-003 upstream authority; MC must not fork shared brand artifacts.",
+  "authorityVersion": "1.0.0",
+  "authorityIntegrity": "sha256-39e28ca756aef25bf4ae55af3da1fd75657353ef603a07911243057e6dd2bb5d",
   "files": [
     {
       "path": "docs/design-system/tokens.css",
@@ -21,10 +23,6 @@
     {
       "path": "src/components/brand/BrandBoundary.tsx",
       "sha256": "bc08d1976b96ff0bca86d6cc58429ebbf265fb96968eb4d617fc63eae4d3c67a"
-    },
-    {
-      "path": "src/components/brand/BrandStatusBadge.tsx",
-      "sha256": "fd2679e7e9cd70dc01f13e86940ff707f6df2a87ca077a63ff58d965c80dabb6"
     },
     {
       "path": "src/components/brand/Kicker.tsx",
@@ -44,7 +42,7 @@
     },
     {
       "path": "src/components/brand/index.ts",
-      "sha256": "b8f2464a3bf0179783d729846968f68f7bb9c31ad2a2261934848712c52d8dee"
+      "sha256": "7925b2447bd3a0c686ff9be5d7d69fbc84ac8add69066af986862ca9dc877ced"
     },
     {
       "path": "public/fonts/mazius/LICENSE.txt",
@@ -146,7 +144,5 @@
       "path": "docs/design-system/assets/fonts/mazius/MaziusDisplay-Regular.woff2",
       "sha256": "2220486909addce8dadf31067c02e6f6e9b2d03f9991d71a3d5c0b3cd44e9a2b"
     }
-  ],
-  "authorityVersion": "1.0.0",
-  "authorityIntegrity": "sha256-39e28ca756aef25bf4ae55af3da1fd75657353ef603a07911243057e6dd2bb5d"
+  ]
 }
